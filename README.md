@@ -2,6 +2,8 @@
 
 Web game where each player picks one action per day for their character (quest, rest, training, shopping...), with a server-side random roll for the outcome. Front hosted on GitHub Pages, backend on Firebase (Auth, Firestore, Cloud Functions).
 
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the technical deep dive (data model, security rules, Cloud Function logic, deployment details).
+
 ## Stack
 - **Front**: React + Vite
 - **Backend**: Firebase Auth, Firestore, Cloud Functions
