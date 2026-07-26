@@ -16,6 +16,11 @@ functions/node_modules
 functions/lib
 functions/serviceAccountKey.json
 
+# Claude Code local tooling (never committed)
+.claude/agents/
+.claude/skills/
+.claude/commands/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

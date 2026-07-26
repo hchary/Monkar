@@ -1,67 +1,67 @@
-# Jeu de rôle textuel — quotidien
+# Monkar — daily text RPG
 
-Jeu web où chaque joueur choisit une action par jour pour son personnage (quête, repos, entraînement, shopping...), avec un résultat tiré aléatoirement côté serveur. Front hébergé sur GitHub Pages, backend sur Firebase (Auth, Firestore, Cloud Functions).
+Web game where each player picks one action per day for their character (quest, rest, training, shopping...), with a server-side random roll for the outcome. Front hosted on GitHub Pages, backend on Firebase (Auth, Firestore, Cloud Functions).
 
 ## Stack
-- **Front** : React + Vite
-- **Backend** : Firebase Auth, Firestore, Cloud Functions
-- **Hébergement front** : GitHub Pages (déploiement automatique via GitHub Actions)
+- **Front**: React + Vite
+- **Backend**: Firebase Auth, Firestore, Cloud Functions
+- **Front hosting**: GitHub Pages (automatic deployment via GitHub Actions)
 
-## Structure du projet
+## Project structure
 ```
 src/
-  lib/firebase.js        config client Firebase
-  context/AuthContext.jsx état d'authentification global
-  components/             composants partagés (ProtectedRoute...)
+  lib/firebase.js        Firebase client config
+  context/AuthContext.jsx global auth state
+  components/             shared components (ProtectedRoute...)
   pages/                  Login, Signup, CharacterProfile, CreatorDashboard
 functions/
-  src/index.js            Cloud Function performAction (tirage + verrou quotidien)
-  scripts/setCreatorRole.js script admin pour se donner le rôle "créateur"
-firestore.rules            règles de sécurité Firestore
+  src/index.js            performAction Cloud Function (roll + daily lock)
+  scripts/setCreatorRole.js admin script to grant yourself the "creator" role
+firestore.rules            Firestore security rules
 ```
 
-## Mise en place (étapes manuelles)
+## Setup (manual steps)
 
-### 1. Créer le projet Firebase
-1. Aller sur https://console.firebase.google.com, créer un nouveau projet.
-2. Activer **Authentication** → méthode Email/Password (et Google si voulu).
-3. Activer **Firestore Database** (mode production).
-4. Dans "Paramètres du projet" → section "Vos applications" → ajouter une app Web, récupérer la config (`apiKey`, `authDomain`, etc.).
+### 1. Create the Firebase project
+1. Go to https://console.firebase.google.com, create a new project.
+2. Enable **Authentication** → Email/Password method (and Google if you want it).
+3. Enable **Firestore Database** (production mode).
+4. In "Project settings" → "Your apps" section → add a Web app, get the config (`apiKey`, `authDomain`, etc.).
 
-### 2. Configurer les variables d'environnement locales
-Copier `.env.example` en `.env` et remplir avec les valeurs de la config Firebase :
+### 2. Configure local environment variables
+Copy `.env.example` to `.env` and fill it with the Firebase config values:
 ```bash
 cp .env.example .env
 ```
 
-### 3. Installer les dépendances et lancer en local
+### 3. Install dependencies and run locally
 ```bash
 npm install
 npm run dev
 ```
 
-### 4. Déployer les règles Firestore et les Cloud Functions
-Nécessite le CLI Firebase (`npm install -g firebase-tools`, puis `firebase login`).
+### 4. Deploy Firestore rules and Cloud Functions
+Requires the Firebase CLI (`npm install -g firebase-tools`, then `firebase login`).
 ```bash
-firebase use --add          # sélectionner le projet Firebase créé
+firebase use --add          # select the Firebase project you created
 firebase deploy --only firestore:rules
 cd functions && npm install && cd ..
 firebase deploy --only functions
 ```
 
-### 5. Se donner le rôle créateur
-1. Créer ton compte joueur normalement via l'écran d'inscription du site.
-2. Récupérer ton `uid` (Firebase Console → Authentication → Users).
-3. Télécharger une clé de compte de service : Paramètres du projet → Comptes de service → "Générer une nouvelle clé privée", sauvegarder sous `functions/serviceAccountKey.json` (déjà ignoré par git, ne jamais committer ce fichier).
-4. Lancer :
+### 5. Grant yourself the creator role
+1. Create your player account normally through the site's signup screen.
+2. Get your `uid` (Firebase Console → Authentication → Users).
+3. Download a service account key: Project settings → Service accounts → "Generate new private key", save it as `functions/serviceAccountKey.json` (already gitignored, never commit this file).
+4. Run:
 ```bash
 cd functions
-node scripts/setCreatorRole.js <ton-uid>
+node scripts/setCreatorRole.js <your-uid>
 ```
-5. Se déconnecter/reconnecter sur le site pour que le nouveau rôle soit pris en compte.
+5. Log out/back in on the site for the new role to take effect.
 
-### 6. Créer les données de départ du monde
-Dans Firestore, créer manuellement (ou via un futur écran admin) au moins un document dans `worldData/actionTypes/items/{id}` avec cette forme :
+### 6. Seed the world's starting data
+In Firestore, manually create (or via a future admin screen) at least one document in `worldData/actionTypes/items/{id}` shaped like:
 ```json
 {
   "label": "Partir en quête",
@@ -72,24 +72,24 @@ Dans Firestore, créer manuellement (ou via un futur écran admin) au moins un d
   ]
 }
 ```
-(`weight` = poids relatif sur 100 au total pour le tirage aléatoire)
+(`weight` = relative weight out of 100 total for the random roll. `label`, tier `name`s, and `narrativeText` are in-game content, written in French.)
 
-### 7. Déploiement GitHub Pages
-1. Créer le repo sur GitHub et pousser ce projet sur la branche `main`.
-2. Dans les Settings du repo GitHub → Pages → Source : choisir **GitHub Actions**.
-3. Dans Settings → Secrets and variables → Actions, ajouter les secrets suivants (mêmes valeurs que le `.env` local) :
+### 7. GitHub Pages deployment
+1. Create the repo on GitHub and push this project to the `main` branch.
+2. In the GitHub repo Settings → Pages → Source: choose **GitHub Actions**.
+3. In Settings → Secrets and variables → Actions, add the following secrets (same values as the local `.env`):
    - `VITE_FIREBASE_API_KEY`
    - `VITE_FIREBASE_AUTH_DOMAIN`
    - `VITE_FIREBASE_PROJECT_ID`
    - `VITE_FIREBASE_STORAGE_BUCKET`
    - `VITE_FIREBASE_MESSAGING_SENDER_ID`
    - `VITE_FIREBASE_APP_ID`
-4. Chaque push sur `main` déclenche le build et le déploiement automatique (voir `.github/workflows/deploy.yml`).
+4. Every push to `main` triggers the automatic build and deployment (see `.github/workflows/deploy.yml`).
 
-## État actuel (Phase 0 terminée)
-- ✅ Auth email/password + création de personnage
-- ✅ Profil personnage + liste des actions du jour
-- ✅ Cloud Function `performAction` avec verrou quotidien et tirage pondéré
-- ✅ Règles Firestore (joueur = ses propres données, créateur = tout)
-- ⏳ Espace créateur : page présente mais CRUD (factions, régions, dieux, créatures) pas encore implémenté
-- ⏳ Textes narratifs, thème visuel, équilibrage des tirages
+## Current status (Phase 0 complete)
+- Done: email/password auth + character creation
+- Done: character profile page + daily action list
+- Done: `performAction` Cloud Function with daily lock and weighted roll
+- Done: Firestore rules (player = own data only, creator = everything)
+- Pending: creator dashboard page exists but the CRUD (factions, regions, gods, creatures) isn't built yet
+- Pending: narrative texts, visual theme, roll balancing
