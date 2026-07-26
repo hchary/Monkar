@@ -29,7 +29,7 @@ service cloud.firestore {
       allow write: if false; // only written by Cloud Functions (performAction)
     }
 
-    match /worldData/{collectionId}/{docId} {
+    match /worldData/{document=**} {
       allow read: if isSignedIn();
       allow write: if isCreator();
     }
