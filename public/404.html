@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // SPA fallback for GitHub Pages: encode the path into a query string
+      // and let index.html restore it before React Router mounts.
+      var segmentsToKeep = 1;
+      var l = window.location;
+      var path = l.pathname.split("/").slice(0, 1 + segmentsToKeep).join("/");
+      var rest = l.pathname.slice(path.length);
+      l.replace(
+        path +
+          "/?redirect=" +
+          encodeURIComponent(rest + l.search + l.hash)
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

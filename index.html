@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jeu de rôle textuel</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Restore the path saved by public/404.html before React Router mounts.
+      (function () {
+        var redirect = new URLSearchParams(window.location.search).get("redirect");
+        if (redirect) {
+          history.replaceState(null, "", window.location.pathname.replace(/\/$/, "") + redirect);
+        }
+      })();
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
