@@ -22,13 +22,15 @@ body {
 }
 
 #root {
-  max-width: 640px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 24px 16px;
 }
 
 .auth-page form,
-.action-list {
+.action-list,
+.region-list,
+.name-suggestions {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -72,4 +74,123 @@ input {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 4px;
+}
+
+button.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.character-banner {
+  text-align: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.character-banner .title {
+  font-style: italic;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.banner-stats {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.character-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .character-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.character-tabs .tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.character-tabs .tab-content {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px;
+  min-height: 160px;
+}
+
+.character-tabs ul {
+  padding-left: 20px;
+}
+
+.action-panel {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px;
+  text-align: center;
+}
+
+.action-panel .last-action {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.action-panel .action-type-label {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.status.pending {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.status-toggle {
+  font-weight: 600;
+  width: 100%;
+}
+
+.action-detail {
+  text-align: left;
+  margin-top: 12px;
+}
+
+.action-detail ul {
+  padding-left: 20px;
+}
+
+.action-detail .fatal {
+  color: #d33;
+  font-weight: 600;
+}
+
+.action-detail .legendary {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.empty-state {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.character-creation .region-list,
+.character-creation .name-suggestions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  max-width: none;
+  margin-bottom: 16px;
 }
