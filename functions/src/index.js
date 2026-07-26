@@ -22,6 +22,17 @@ function rollWeighted(items) {
 
 const BASE_STATS = { force: 5, agilite: 5, intelligence: 5, charisme: 5 };
 
+const RARITY_ORDER = ["commun", "peu_commun", "rare", "tres_rare", "legendaire", "mythique", "divin", "unique"];
+
+function rarityFloor(rarity, quality) {
+  let floor = "commun";
+  if (quality >= 5) floor = "legendaire";
+  else if (quality >= 4) floor = "tres_rare";
+  else if (quality >= 3) floor = "rare";
+  const idx = Math.max(RARITY_ORDER.indexOf(rarity), RARITY_ORDER.indexOf(floor));
+  return RARITY_ORDER[idx];
+}
+
 exports.createCharacter = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Login required.");
@@ -122,6 +133,26 @@ exports.performAction = onCall(async (request) => {
     const success = tier.success !== false;
     const bonusesApplied = tier.bonuses || {};
 
+    let talentGained = null;
+    if (success && tier.talentGain?.talentId) {
+      const talentRef = db.collection("worldData").doc("talents").collection("items").doc(tier.talentGain.talentId);
+      const talentSnap = await tx.get(talentRef);
+      if (talentSnap.exists) {
+        const talent = talentSnap.data();
+        const quality = tier.talentGain.quality || 1;
+        talentGained = {
+          id: talentSnap.id,
+          name: talent.name,
+          quality,
+          trainable: !!talent.trainable,
+          rarity: rarityFloor(talent.rarity, quality),
+          effect: talent.effect || "",
+          lastChangeDate: today,
+          lastChangeCircumstance: tier.talentGain.circumstance || "",
+        };
+      }
+    }
+
     const updates = {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
@@ -134,7 +165,7 @@ exports.performAction = onCall(async (request) => {
         bonusesApplied,
         goldGain: tier.goldGain || 0,
         itemGain: tier.itemGain || null,
-        talentGain: tier.talentGain || null,
+        talentGain: talentGained,
         reputationGain: tier.reputationGain || 0,
         legendary: !!tier.legendary,
         consequence: tier.consequence || null,
@@ -148,7 +179,7 @@ exports.performAction = onCall(async (request) => {
     if (success) {
       if (tier.goldGain) updates.gold = FieldValue.increment(tier.goldGain);
       if (tier.itemGain) updates.inventory = FieldValue.arrayUnion(tier.itemGain);
-      if (tier.talentGain) updates.talents = FieldValue.arrayUnion(tier.talentGain);
+      if (talentGained) updates.talents = FieldValue.arrayUnion(talentGained);
       if (tier.reputationGain) updates.reputation = FieldValue.increment(tier.reputationGain);
       if (tier.legendary) {
         updates.legendLevel = FieldValue.increment(1);

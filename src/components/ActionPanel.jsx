@@ -97,7 +97,7 @@ export default function ActionPanel({ character }) {
                           {lastAction.itemGain && ` ${lastAction.itemGain.name}`}
                         </li>
                       )}
-                      {lastAction.talentGain && <li>Nouveau talent : {lastAction.talentGain}</li>}
+                      {lastAction.talentGain && <li>Nouveau talent : {lastAction.talentGain.name} {lastAction.talentGain.quality}</li>}
                       {lastAction.reputationGain > 0 && <li>Réputation : +{lastAction.reputationGain}</li>}
                       {lastAction.legendary && <li className="legendary">Exploit légendaire !</li>}
                     </ul>

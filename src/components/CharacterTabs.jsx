@@ -18,6 +18,18 @@ function EmptyState({ text }) {
   return <p className="empty-state">{text}</p>;
 }
 
+function formatShortDate(dateStr) {
+  if (!dateStr) return "";
+  const [, month, day] = dateStr.split("-");
+  return `${day}/${month}`;
+}
+
+function talentTooltip(talent) {
+  return `[${talent.name}${talent.trainable ? "*" : ""} ${talent.quality}][${talent.effect}][Obtenu le ${formatShortDate(
+    talent.lastChangeDate
+  )} ${talent.lastChangeCircumstance}]`;
+}
+
 export default function CharacterTabs({ character }) {
   const [activeTab, setActiveTab] = useState(TABS[0]);
   const [history, setHistory] = useState([]);
@@ -65,11 +77,14 @@ export default function CharacterTabs({ character }) {
 
         {activeTab === "Talents" &&
           (character.talents?.length > 0 ? (
-            <ul>
+            <div className="talent-list">
               {character.talents.map((t, i) => (
-                <li key={i}>{t}</li>
+                <div key={i} className={`talent-card rarity-${t.rarity}`} title={talentTooltip(t)}>
+                  {t.name}
+                  {t.trainable && "*"} {t.quality}
+                </div>
               ))}
-            </ul>
+            </div>
           ) : (
             <EmptyState text="Aucun talent acquis pour l'instant." />
           ))}

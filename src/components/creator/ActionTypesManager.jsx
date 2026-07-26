@@ -14,7 +14,9 @@ function emptyTier() {
     goldGain: 0,
     itemGainName: "",
     itemGainQty: 1,
-    talentGain: "",
+    talentGainId: "",
+    talentGainQuality: 1,
+    talentGainCircumstance: "",
     reputationGain: 0,
     legendary: false,
     consequenceType: "wound",
@@ -33,7 +35,9 @@ function tierToForm(tier) {
     goldGain: tier.goldGain || 0,
     itemGainName: tier.itemGain?.name || "",
     itemGainQty: tier.itemGain?.qty || 1,
-    talentGain: tier.talentGain || "",
+    talentGainId: tier.talentGain?.talentId || "",
+    talentGainQuality: tier.talentGain?.quality || 1,
+    talentGainCircumstance: tier.talentGain?.circumstance || "",
     reputationGain: tier.reputationGain || 0,
     legendary: !!tier.legendary,
     consequenceType: tier.consequence?.type || "wound",
@@ -60,7 +64,13 @@ function formToTier(form) {
   if (form.success) {
     tier.goldGain = Number(form.goldGain) || 0;
     if (form.itemGainName) tier.itemGain = { name: form.itemGainName, qty: Number(form.itemGainQty) || 1 };
-    if (form.talentGain) tier.talentGain = form.talentGain;
+    if (form.talentGainId) {
+      tier.talentGain = {
+        talentId: form.talentGainId,
+        quality: Number(form.talentGainQuality) || 1,
+        circumstance: form.talentGainCircumstance,
+      };
+    }
     tier.reputationGain = Number(form.reputationGain) || 0;
     tier.legendary = !!form.legendary;
   } else {
@@ -74,7 +84,7 @@ function formToTier(form) {
   return tier;
 }
 
-function TierEditor({ tier, index, onChange, onRemove }) {
+function TierEditor({ tier, index, talents, onChange, onRemove }) {
   function set(field, value) {
     onChange(index, { ...tier, [field]: value });
   }
@@ -133,8 +143,37 @@ function TierEditor({ tier, index, onChange, onRemove }) {
           </label>
           <label>
             Talent gagné
-            <input value={tier.talentGain} onChange={(e) => set("talentGain", e.target.value)} />
+            <select value={tier.talentGainId} onChange={(e) => set("talentGainId", e.target.value)}>
+              <option value="">(aucun)</option>
+              {talents.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
           </label>
+          {tier.talentGainId && (
+            <>
+              <label>
+                Qualité initiale
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={tier.talentGainQuality}
+                  onChange={(e) => set("talentGainQuality", e.target.value)}
+                />
+              </label>
+              <label>
+                Circonstance de l'obtention
+                <input
+                  placeholder="ex : en bravant le souffle ardent du terrible Syrphax"
+                  value={tier.talentGainCircumstance}
+                  onChange={(e) => set("talentGainCircumstance", e.target.value)}
+                />
+              </label>
+            </>
+          )}
           <label>
             Réputation gagnée
             <input type="number" value={tier.reputationGain} onChange={(e) => set("reputationGain", e.target.value)} />
@@ -185,6 +224,7 @@ function TierEditor({ tier, index, onChange, onRemove }) {
 
 export default function ActionTypesManager() {
   const [actionTypes, setActionTypes] = useState([]);
+  const [talents, setTalents] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [label, setLabel] = useState("");
   const [tiers, setTiers] = useState([emptyTier()]);
@@ -192,6 +232,12 @@ export default function ActionTypesManager() {
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "actionTypes", "items"), (snap) => {
       setActionTypes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", "talents", "items"), (snap) => {
+      setTalents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
@@ -248,7 +294,7 @@ export default function ActionTypesManager() {
         <input placeholder="Libellé (ex: Partir en quête)" value={label} onChange={(e) => setLabel(e.target.value)} required />
 
         {tiers.map((tier, index) => (
-          <TierEditor key={index} tier={tier} index={index} onChange={updateTier} onRemove={removeTier} />
+          <TierEditor key={index} tier={tier} index={index} talents={talents} onChange={updateTier} onRemove={removeTier} />
         ))}
 
         <button type="button" onClick={() => setTiers([...tiers, emptyTier()])}>

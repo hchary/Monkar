@@ -48,7 +48,9 @@ characters/{characterId}
   stats: { force, agilite, intelligence, charisme }
   gold: number
   inventory: [{ name, qty }]
-  talents: [string]
+  talents: [{ id, name, quality, trainable, rarity, effect, lastChangeDate, lastChangeCircumstance }]
+                                    -- id references worldData/talents/items; fields are a denormalized
+                                    -- copy taken at grant time, same convention as `trait`/`background` above
   blessings: [string]              -- not yet granted by any code path (stub)
   curses: [string]                 -- not yet granted by any code path (stub)
   wounds: [{ name, description, date }]
@@ -71,7 +73,8 @@ worldData/actionTypes/items/{id}
     name, weight, success, narrativeText,
     bonuses: { [stat]: number },          -- applied on any tier (success or failure)
     goldGain, itemGain: { name, qty },    -- success only
-    talentGain: string,                   -- success only
+    talentGain: { talentId, quality, circumstance },  -- success only; talentId references worldData/talents/items,
+                                                       -- circumstance is French narrative text (see Talents below)
     reputationGain: number,               -- success only
     legendary: boolean,                   -- success only, bumps legendLevel
     consequence: { type: "wound"|"death", name?, description }  -- failure only
@@ -87,6 +90,12 @@ worldData/regions/items/{regionId}/backgrounds/{id}
 
 worldData/traits/items/{id}
   name, description, weight, bonuses: { [stat]: number }
+
+worldData/talents/items/{id}
+  name: string                     -- French, e.g. "Résistance au feu"
+  trainable: boolean               -- shown with a trailing asterisk in the UI
+  rarity: "commun" | "peu_commun" | "rare" | "tres_rare" | "legendaire" | "mythique" | "divin" | "unique"
+  effect: string                   -- French, shown in the character sheet tooltip
 
 worldData/factions/{id}            -- not yet consumed by the app, reserved for
 worldData/gods/{id}                   the creator dashboard (Phase 3)
@@ -123,7 +132,7 @@ Callable. Given an `actionTypeId`:
 2. Loads the `actionType` document and its `tiers`.
 3. In a Firestore transaction: re-reads the character, rejects if `lastActionDate` is already today (UTC), otherwise rolls a tier by cumulative weight and:
    - applies `bonuses` to `stats` (success or failure alike),
-   - on success: increments `gold`/`reputation`, `arrayUnion`s `itemGain`/`talentGain` into `inventory`/`talents`, and increments `legendLevel` if `tier.legendary` is set (Firestore's `increment` on a `null` field just sets it, which is what makes "hidden until first legendary exploit" work),
+   - on success: increments `gold`/`reputation`, `arrayUnion`s `itemGain` into `inventory`; if `tier.talentGain` is set, reads the referenced `worldData/talents/items/{talentId}` doc, applies the rarity floor-bump for the granted `quality` (see [docs/TODO.md](TODO.md) — quality 3/4/5 floor rarity at rare/très rare/légendaire respectively, never downgrading), and `arrayUnion`s the resulting denormalized talent object into `talents`; increments `legendLevel` if `tier.legendary` is set (Firestore's `increment` on a `null` field just sets it, which is what makes "hidden until first legendary exploit" work),
    - on failure with `consequence.type === "death"`: sets `alive: false` (permadeath — the front-end then shows character creation again),
    - on failure with `consequence.type === "wound"`: `arrayUnion`s a wound into `wounds`,
    - always sets `lastActionDate`, `lastActionAt` (server timestamp), and the full `lastAction` snapshot, and writes a mirrored `actionsLog` entry.
@@ -147,11 +156,12 @@ There is no in-app UI for this (deliberately — it's a one-time, high-privilege
 
 ## Creator dashboard (`CreatorDashboard.jsx`)
 
-No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute requireCreator` and by the same `worldData`/`characters`/`actionsLog` Firestore rules described above (writes to `worldData` require the creator custom claim; there's no Cloud Function in this path since, unlike player-facing rolls, there's no anti-cheat concern — the creator is the trusted party rules already gate). Four sections, switched locally (no sub-routing):
+No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute requireCreator` and by the same `worldData`/`characters`/`actionsLog` Firestore rules described above (writes to `worldData` require the creator custom claim; there's no Cloud Function in this path since, unlike player-facing rolls, there's no anti-cheat concern — the creator is the trusted party rules already gate). Five sections, switched locally (no sub-routing):
 
 - **`RegionsManager.jsx`**: CRUD for `worldData/regions/items`, and per-region CRUD for the nested `backgrounds` subcollection (expand a region to manage its own background pool inline).
 - **`TraitsManager.jsx`**: CRUD for the global `worldData/traits/items`, with a stat-bonus sub-form for the four fixed stats.
-- **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above.
+- **`TalentsManager.jsx`**: CRUD for the global `worldData/talents/items` catalog (name, trainable flag, rarity, effect text) — see [docs/TODO.md](TODO.md) for the full talent system design.
+- **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above. The talent grant fields are a select over `worldData/talents/items` (populated live) plus a starting quality and a French circumstance string, mapping to the `tier.talentGain` shape above.
 - **`CharactersOverview.jsx`**: lists every character (any `alive` state) and, on click, shows the full character sheet plus its complete `actionsLog` history. Reads all of `characters`/`actionsLog` unfiltered, which the rules permit for the creator role — see the `actionsLog` list-query note above for why a *player's own* history tab needs an `ownerUid` filter but the creator's doesn't (the rule's `isCreator()` branch doesn't depend on `resource.data`, so it authorizes any query shape once true).
 
 ## Front-end structure
@@ -169,19 +179,21 @@ src/
     CharacterBanner.jsx      name/title/reputation/legendLevel(if set)/age/profession
     CharacterTabs.jsx        the 9-tab left panel (inventory/talents/blessings/curses/wounds/
                              quest journal/history/world knowledge/messaging); several tabs
-                             are empty-state stubs pending real content or features
+                             are empty-state stubs pending real content or features; talents
+                             render as rarity-bordered rectangles with a hover tooltip
     ActionPanel.jsx          today's action buttons (if free to act) and/or yesterday's
                              action status with the 24h reveal gate described above
     creator/
       RegionsManager.jsx     regions + nested per-region backgrounds CRUD
       TraitsManager.jsx      global traits CRUD
+      TalentsManager.jsx     global talent catalog CRUD (name/trainable/rarity/effect)
       ActionTypesManager.jsx actionTypes CRUD with a structured tiers sub-form
       CharactersOverview.jsx list of every character -> full sheet + history on click
   pages/
     Login.jsx, Signup.jsx    auth only; Signup no longer touches Firestore directly
     CharacterProfile.jsx     orchestrator: queries the living character, renders
                              CharacterCreation if none exists, else the banner+tabs+panel
-    CreatorDashboard.jsx     section nav switching between the four creator/ components above
+    CreatorDashboard.jsx     section nav switching between the five creator/ components above
 ```
 
 `NavBar.jsx` renders a "Mon personnage" link always, an "Espace créateur" link only when `user.role === "creator"`, and sign-out — it's the only way to reach `/creator` or log out, and only shows once a user is signed in.
