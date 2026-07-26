@@ -139,11 +139,20 @@ Note this is intentionally decoupled from the once-per-day *lock*, which remains
 
 ## Granting the creator role
 
-There is no in-app UI for this (deliberately — it's a one-time, high-privilege operation). `functions/scripts/setCreatorRole.js` uses `firebase-admin` with a downloaded service account key to call `auth.setCustomUserClaims(uid, { role: "creator" })`. The user must sign out/in afterward so the client fetches a fresh ID token carrying the new claim.
+There is no in-app UI for this (deliberately — it's a one-time, high-privilege operation, and letting any authenticated write grant it would defeat the point of a custom claim). `functions/scripts/setCreatorRole.js` and `functions/scripts/seedWorldData.js` both use `firebase-admin` authenticated via Application Default Credentials (`gcloud auth application-default login`) rather than a downloaded service account key file — nothing extra to download, and nothing sensitive to remember to keep out of git. `setCreatorRole.js` takes either a uid or an email (it resolves the email via `auth.getUserByEmail`) and calls `auth.setCustomUserClaims(uid, { role: "creator" })`. The user must sign out/in afterward so the client fetches a fresh ID token carrying the new claim.
 
 ## Seeding world data
 
-`functions/scripts/seedWorldData.js` populates example regions (with nested backgrounds), traits, and one actionType (`Partir en quête`, with a death tier, a wound tier, a plain success tier, and a legendary tier) — see the script for the exact shapes. It authenticates via Application Default Credentials (`gcloud auth application-default login`) rather than a service account key file, so there's nothing extra to download for this one. Until the creator dashboard's CRUD exists (Phase 3), this script — or manual edits in the Firestore console — is the only way to add world content.
+`functions/scripts/seedWorldData.js` populates example regions (with nested backgrounds), traits, and one actionType (`Partir en quête`, with a death tier, a wound tier, a plain success tier, and a legendary tier) — see the script for the exact shapes, or just use it as a one-time bootstrap and then manage everything through the creator dashboard's CRUD (see below) from that point on.
+
+## Creator dashboard (`CreatorDashboard.jsx`)
+
+No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute requireCreator` and by the same `worldData`/`characters`/`actionsLog` Firestore rules described above (writes to `worldData` require the creator custom claim; there's no Cloud Function in this path since, unlike player-facing rolls, there's no anti-cheat concern — the creator is the trusted party rules already gate). Four sections, switched locally (no sub-routing):
+
+- **`RegionsManager.jsx`**: CRUD for `worldData/regions/items`, and per-region CRUD for the nested `backgrounds` subcollection (expand a region to manage its own background pool inline).
+- **`TraitsManager.jsx`**: CRUD for the global `worldData/traits/items`, with a stat-bonus sub-form for the four fixed stats.
+- **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above.
+- **`CharactersOverview.jsx`**: lists every character (any `alive` state) and, on click, shows the full character sheet plus its complete `actionsLog` history. Reads all of `characters`/`actionsLog` unfiltered, which the rules permit for the creator role — see the `actionsLog` list-query note above for why a *player's own* history tab needs an `ownerUid` filter but the creator's doesn't (the rule's `isCreator()` branch doesn't depend on `resource.data`, so it authorizes any query shape once true).
 
 ## Front-end structure
 
@@ -163,12 +172,19 @@ src/
                              are empty-state stubs pending real content or features
     ActionPanel.jsx          today's action buttons (if free to act) and/or yesterday's
                              action status with the 24h reveal gate described above
+    creator/
+      RegionsManager.jsx     regions + nested per-region backgrounds CRUD
+      TraitsManager.jsx      global traits CRUD
+      ActionTypesManager.jsx actionTypes CRUD with a structured tiers sub-form
+      CharactersOverview.jsx list of every character -> full sheet + history on click
   pages/
     Login.jsx, Signup.jsx    auth only; Signup no longer touches Firestore directly
     CharacterProfile.jsx     orchestrator: queries the living character, renders
                              CharacterCreation if none exists, else the banner+tabs+panel
-    CreatorDashboard.jsx     placeholder — CRUD for world content is Phase 3, not built yet
+    CreatorDashboard.jsx     section nav switching between the four creator/ components above
 ```
+
+`NavBar.jsx` renders a "Mon personnage" link always, an "Espace créateur" link only when `user.role === "creator"`, and sign-out — it's the only way to reach `/creator` or log out, and only shows once a user is signed in.
 
 Routing uses React Router with `basename={import.meta.env.BASE_URL}` so it works under the `/Monkar/` subpath GitHub Pages serves from. `public/404.html` plus the inline script in `index.html` implement the standard GitHub Pages SPA fallback (redirect through a `?redirect=` query param) since GitHub Pages has no server-side rewrite rules for client-side routes like `/login`.
 
@@ -187,6 +203,6 @@ Current deployed project: `monkar-rpg` (Firebase, Blaze plan — required for Cl
 
 ## Known gaps (as of this writing)
 
-- Creator dashboard (`CreatorDashboard.jsx`) is a placeholder; no CRUD yet for regions, backgrounds, traits, action types, factions, gods, or creatures. All `worldData` content currently has to be created via `seedWorldData.js` or by hand in the Firestore console.
+- The creator dashboard has CRUD for regions/backgrounds/traits/actionTypes only (the data the game actually consumes today). Factions, gods, and creatures have no CRUD yet and still have to be created by hand in the Firestore console — deliberately deferred since nothing in the app reads them yet either.
 - `title`, `legendLevel` progression beyond the raw counter, `blessings`, `curses`, quest journal, world-knowledge lore, and messaging are all stubs — visually present (or, for messaging, not even that) but not wired to real game logic yet, by design (deferred until the underlying systems are designed).
 - No narrative text variety beyond whatever is authored per tier; no visual theme/styling pass yet.

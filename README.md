@@ -53,14 +53,13 @@ firebase deploy --only functions
 
 ### 5. Grant yourself the creator role
 1. Create your player account normally through the site's signup screen.
-2. Get your `uid` (Firebase Console → Authentication → Users).
-3. Download a service account key: Project settings → Service accounts → "Generate new private key", save it as `functions/serviceAccountKey.json` (already gitignored, never commit this file).
-4. Run:
+2. Authenticate the Google Cloud CLI so the script can use your own credentials (no service account key file needed): `gcloud auth login` then `gcloud auth application-default login`.
+3. Run:
 ```bash
 cd functions
-node scripts/setCreatorRole.js <your-uid>
+node scripts/setCreatorRole.js <your-email-or-uid>
 ```
-5. Log out/back in on the site for the new role to take effect.
+4. Log out/back in on the site for the new role to take effect — you'll then see an "Espace créateur" link in the nav bar.
 
 ### 6. Seed the world's starting data
 The game needs at least one region (with a background pool), one trait, and one action type to be playable. Run the seed script (uses your `gcloud` login, no service account key needed):

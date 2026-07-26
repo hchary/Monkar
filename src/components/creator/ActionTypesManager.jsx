@@ -1,0 +1,269 @@
+import { useEffect, useState } from "react";
+import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+
+const STATS = ["force", "agilite", "intelligence", "charisme"];
+
+function emptyTier() {
+  return {
+    name: "",
+    weight: 10,
+    success: true,
+    narrativeText: "",
+    bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0 },
+    goldGain: 0,
+    itemGainName: "",
+    itemGainQty: 1,
+    talentGain: "",
+    reputationGain: 0,
+    legendary: false,
+    consequenceType: "wound",
+    consequenceName: "",
+    consequenceDescription: "",
+  };
+}
+
+function tierToForm(tier) {
+  return {
+    name: tier.name || "",
+    weight: tier.weight ?? 10,
+    success: tier.success !== false,
+    narrativeText: tier.narrativeText || "",
+    bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0, ...(tier.bonuses || {}) },
+    goldGain: tier.goldGain || 0,
+    itemGainName: tier.itemGain?.name || "",
+    itemGainQty: tier.itemGain?.qty || 1,
+    talentGain: tier.talentGain || "",
+    reputationGain: tier.reputationGain || 0,
+    legendary: !!tier.legendary,
+    consequenceType: tier.consequence?.type || "wound",
+    consequenceName: tier.consequence?.name || "",
+    consequenceDescription: tier.consequence?.description || "",
+  };
+}
+
+function formToTier(form) {
+  const bonuses = Object.fromEntries(
+    Object.entries(form.bonuses)
+      .filter(([, v]) => Number(v) !== 0)
+      .map(([k, v]) => [k, Number(v)])
+  );
+
+  const tier = {
+    name: form.name,
+    weight: Number(form.weight),
+    success: form.success,
+    narrativeText: form.narrativeText,
+    bonuses,
+  };
+
+  if (form.success) {
+    tier.goldGain = Number(form.goldGain) || 0;
+    if (form.itemGainName) tier.itemGain = { name: form.itemGainName, qty: Number(form.itemGainQty) || 1 };
+    if (form.talentGain) tier.talentGain = form.talentGain;
+    tier.reputationGain = Number(form.reputationGain) || 0;
+    tier.legendary = !!form.legendary;
+  } else {
+    tier.consequence = {
+      type: form.consequenceType,
+      description: form.consequenceDescription,
+      ...(form.consequenceType === "wound" ? { name: form.consequenceName } : {}),
+    };
+  }
+
+  return tier;
+}
+
+function TierEditor({ tier, index, onChange, onRemove }) {
+  function set(field, value) {
+    onChange(index, { ...tier, [field]: value });
+  }
+
+  return (
+    <div className="tier-editor">
+      <div className="tier-editor-row">
+        <input placeholder="Nom du tier" value={tier.name} onChange={(e) => set("name", e.target.value)} required />
+        <label>
+          Poids
+          <input type="number" value={tier.weight} onChange={(e) => set("weight", e.target.value)} required />
+        </label>
+        <label>
+          <input type="checkbox" checked={tier.success} onChange={(e) => set("success", e.target.checked)} />
+          Succès
+        </label>
+        <button type="button" onClick={() => onRemove(index)}>
+          Supprimer ce tier
+        </button>
+      </div>
+
+      <textarea
+        placeholder="Texte narratif"
+        value={tier.narrativeText}
+        onChange={(e) => set("narrativeText", e.target.value)}
+      />
+
+      <fieldset>
+        <legend>Bonus de stats (tous tiers)</legend>
+        {STATS.map((stat) => (
+          <label key={stat}>
+            {stat}
+            <input
+              type="number"
+              value={tier.bonuses[stat]}
+              onChange={(e) => set("bonuses", { ...tier.bonuses, [stat]: e.target.value })}
+            />
+          </label>
+        ))}
+      </fieldset>
+
+      {tier.success ? (
+        <fieldset>
+          <legend>Gains (succès)</legend>
+          <label>
+            Or
+            <input type="number" value={tier.goldGain} onChange={(e) => set("goldGain", e.target.value)} />
+          </label>
+          <label>
+            Objet gagné
+            <input placeholder="Nom de l'objet" value={tier.itemGainName} onChange={(e) => set("itemGainName", e.target.value)} />
+          </label>
+          <label>
+            Quantité
+            <input type="number" value={tier.itemGainQty} onChange={(e) => set("itemGainQty", e.target.value)} />
+          </label>
+          <label>
+            Talent gagné
+            <input value={tier.talentGain} onChange={(e) => set("talentGain", e.target.value)} />
+          </label>
+          <label>
+            Réputation gagnée
+            <input type="number" value={tier.reputationGain} onChange={(e) => set("reputationGain", e.target.value)} />
+          </label>
+          <label>
+            <input type="checkbox" checked={tier.legendary} onChange={(e) => set("legendary", e.target.checked)} />
+            Exploit légendaire
+          </label>
+        </fieldset>
+      ) : (
+        <fieldset>
+          <legend>Conséquence (échec)</legend>
+          <label>
+            <input
+              type="radio"
+              name={`consequence-${index}`}
+              checked={tier.consequenceType === "wound"}
+              onChange={() => set("consequenceType", "wound")}
+            />
+            Blessure
+          </label>
+          <label>
+            <input
+              type="radio"
+              name={`consequence-${index}`}
+              checked={tier.consequenceType === "death"}
+              onChange={() => set("consequenceType", "death")}
+            />
+            Mort
+          </label>
+          {tier.consequenceType === "wound" && (
+            <input
+              placeholder="Nom de la blessure"
+              value={tier.consequenceName}
+              onChange={(e) => set("consequenceName", e.target.value)}
+            />
+          )}
+          <textarea
+            placeholder="Description de la conséquence"
+            value={tier.consequenceDescription}
+            onChange={(e) => set("consequenceDescription", e.target.value)}
+          />
+        </fieldset>
+      )}
+    </div>
+  );
+}
+
+export default function ActionTypesManager() {
+  const [actionTypes, setActionTypes] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [label, setLabel] = useState("");
+  const [tiers, setTiers] = useState([emptyTier()]);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", "actionTypes", "items"), (snap) => {
+      setActionTypes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  function startEdit(actionType) {
+    setEditingId(actionType.id);
+    setLabel(actionType.label || "");
+    setTiers((actionType.tiers || []).map(tierToForm));
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setLabel("");
+    setTiers([emptyTier()]);
+  }
+
+  function updateTier(index, tier) {
+    setTiers((prev) => prev.map((t, i) => (i === index ? tier : t)));
+  }
+
+  function removeTier(index) {
+    setTiers((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const ref = editingId
+      ? doc(db, "worldData", "actionTypes", "items", editingId)
+      : doc(collection(db, "worldData", "actionTypes", "items"));
+
+    await setDoc(ref, { label, tiers: tiers.map(formToTier) });
+    resetForm();
+  }
+
+  return (
+    <div className="creator-section">
+      <h2>Types d'action</h2>
+
+      <ul className="creator-list">
+        {actionTypes.map((actionType) => (
+          <li key={actionType.id}>
+            <strong>{actionType.label}</strong> ({(actionType.tiers || []).length} tiers)
+            <button type="button" onClick={() => startEdit(actionType)}>
+              Modifier
+            </button>
+            <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "actionTypes", "items", actionType.id))}>
+              Supprimer
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <h3>{editingId ? "Modifier le type d'action" : "Nouveau type d'action"}</h3>
+      <form onSubmit={handleSubmit}>
+        <input placeholder="Libellé (ex: Partir en quête)" value={label} onChange={(e) => setLabel(e.target.value)} required />
+
+        {tiers.map((tier, index) => (
+          <TierEditor key={index} tier={tier} index={index} onChange={updateTier} onRemove={removeTier} />
+        ))}
+
+        <button type="button" onClick={() => setTiers([...tiers, emptyTier()])}>
+          Ajouter un tier
+        </button>
+
+        <div>
+          <button type="submit">{editingId ? "Enregistrer" : "Créer le type d'action"}</button>
+          {editingId && (
+            <button type="button" onClick={resetForm}>
+              Annuler
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}

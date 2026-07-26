@@ -194,3 +194,93 @@ button.selected {
   max-width: none;
   margin-bottom: 16px;
 }
+
+.navbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.navbar button {
+  margin-left: auto;
+}
+
+.creator-dashboard .creator-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.creator-section form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 480px;
+  margin-top: 12px;
+}
+
+.creator-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.creator-list > li {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.creator-list button {
+  margin-left: 8px;
+  padding: 4px 8px;
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+fieldset label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85em;
+  gap: 2px;
+}
+
+.tier-editor {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tier-editor-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.backgrounds-editor {
+  margin-top: 12px;
+  padding: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.character-detail ul {
+  padding-left: 20px;
+}
