@@ -142,6 +142,15 @@ button.selected {
   text-align: center;
 }
 
+.debug-button {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+  border: 1px dashed #d33;
+  color: #d33;
+  font-size: 0.8em;
+}
+
 .action-panel .last-action {
   margin-top: 16px;
   padding-top: 16px;

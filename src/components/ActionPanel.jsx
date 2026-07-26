@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
 
@@ -41,8 +41,17 @@ export default function ActionPanel({ character }) {
     }
   }
 
+  async function handleDebugAdvanceTime() {
+    await updateDoc(doc(db, "characters", character.id), { lastActionDate: null, lastActionAt: null });
+  }
+
   return (
     <div className="action-panel">
+      {/* TODO: remove this test-only button before the game goes live to real players */}
+      <button type="button" className="debug-button" onClick={handleDebugAdvanceTime}>
+        [TEST] Avancer le temps d'un jour
+      </button>
+
       {canActToday && (
         <>
           <h2>Action du jour</h2>
