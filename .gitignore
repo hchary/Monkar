@@ -15,6 +15,7 @@ dist-ssr
 functions/node_modules
 functions/lib
 functions/serviceAccountKey.json
+LOCAL_TEST_ACCOUNT.md
 
 # Claude Code local tooling (never committed)
 .claude/agents/
