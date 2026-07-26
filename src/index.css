@@ -293,3 +293,53 @@ fieldset label {
 .character-detail ul {
   padding-left: 20px;
 }
+
+.talent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.talent-card {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 2px solid var(--border);
+  cursor: default;
+}
+
+.talent-card:hover {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.talent-card.rarity-commun {
+  border-color: #fff;
+}
+
+.talent-card.rarity-peu_commun {
+  border-color: #2ecc71;
+}
+
+.talent-card.rarity-rare {
+  border-color: #3498db;
+}
+
+.talent-card.rarity-tres_rare {
+  border-color: #9b59b6;
+}
+
+.talent-card.rarity-legendaire {
+  border-color: #e67e22;
+}
+
+.talent-card.rarity-mythique {
+  border-color: #e74c3c;
+}
+
+.talent-card.rarity-divin {
+  border-color: #000;
+}
+
+.talent-card.rarity-unique {
+  border-color: transparent;
+  border-image: linear-gradient(90deg, #ff004c, #ff8a00, #ffe600, #00e676, #00b0ff, #7c4dff) 1;
+}

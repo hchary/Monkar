@@ -4,11 +4,12 @@ Design notes for features that aren't implemented yet. Not a task tracker for in
 
 ## Expanded talent system
 
-Currently `character.talents` is a flat array of strings (just the talent name), granted via `tier.talentGain` in `performAction`. This needs to become an array of richer objects to support:
+Status: **implemented** (data model, catalog, grant flow, and UI). Quality-up progression is **not** implemented yet — see "Still open" below and [Trainers](#trainers).
+
+`character.talents` moved from a flat array of strings to an array of richer objects, granted via `tier.talentGain` in `performAction`. Talents support:
 
 - **Quality**: a value from 1 to 5 (e.g. "Résistance au feu 3").
-- **Trainable flag**: a talent can be marked trainable (shown with an asterisk in the name, e.g. "Résistance au feu*"). Only trainable talents can improve through training; others only improve via a lucky roll on a quest that specifically showcases that talent.
-- **Quality progression**: trainable talents increase in quality through the "s'entraîner" action (deterministically or via a training-specific roll — not yet decided); any talent can also increase in quality via a random roll on quests relevant to it (e.g. a fire-themed quest rolling well could bump "Résistance au feu").
+- **Trainable flag**: a talent can be marked trainable (shown with an asterisk in the name, e.g. "Résistance au feu*"). Only trainable talents will (eventually) improve through training; others would only improve via a lucky roll on a quest that specifically showcases that talent. Neither progression path is implemented yet (see "Still open").
 - **Rarity**: each talent has a rarity tier, shown as a colored border around a rectangle (background stays the same color as the rest of the UI — only the border changes):
   - Commun → white
   - Peu commun → green
@@ -23,20 +24,40 @@ Currently `character.talents` is a flat array of strings (just the talent name),
   Example after a later quality-up (the whole third segment is replaced, not appended to):
   `[Résistance au feu 2][Augmente vos chances de succès lors de quêtes vous confrontant aux flammes][Obtenu le 19/03 en travaillant 7 jours et 7 nuits dans les forges de la déesse des volcans]`
   All bracketed text is in-game content, written in French.
-- **Rarity auto-upgrade from quality**: rarity isn't purely fixed at grant time — reaching a quality threshold bumps it up if it's currently lower (never downgrades it): quality 3 → at least "rare", quality 4 → at least "très rare", quality 5 → at least "légendaire". A talent can still be granted at a higher rarity than its quality would imply (e.g. a "mythique" talent starting at quality 1) — these thresholds only guarantee a floor, they don't cap it.
+- **Rarity auto-upgrade from quality**: rarity isn't purely fixed at grant time — reaching a quality threshold bumps it up if it's currently lower (never downgrades it): quality 3 → at least "rare", quality 4 → at least "très rare", quality 5 → at least "légendaire". A talent can still be granted at a higher rarity than its quality would imply (e.g. a "mythique" talent starting at quality 1) — these thresholds only guarantee a floor, they don't cap it. Applied in `performAction` at grant time (and must be re-applied by whatever future code path increases quality).
 
-**Data model implications**: `character.talents` needs to move from `[string]` to something like:
+**Talent catalog** (decided): trainable/rarity/effect are authored once in a new `worldData/talents/items/{id}` collection (creator CRUD: `TalentsManager.jsx`), the same pattern as `worldData/traits/items`. `tier.talentGain` in `worldData/actionTypes/items/{id}` (authored via `ActionTypesManager.jsx`) references a `talentId` plus a starting `quality` and a French `circumstance` string (the narrative reason for the grant — becomes the tooltip's third bracket, prefixed with the auto-generated grant date). `performAction` resolves the catalog entry into a full denormalized object copied onto `character.talents` (same convention as `character.trait`/`character.background`), so renaming a catalog entry later doesn't rewrite already-granted talents.
+
+`character.talents` shape:
 ```
 talents: [{
-  name: string,          -- e.g. "Résistance au feu", French
-  quality: number,       -- 1-5
+  id: string,             -- worldData/talents/items id this was granted from
+  name: string,           -- e.g. "Résistance au feu", French, copied at grant time
+  quality: number,        -- 1-5
   trainable: boolean,
   rarity: "commun" | "peu_commun" | "rare" | "tres_rare" | "legendaire" | "mythique" | "divin" | "unique",
-  effect: string,        -- French, shown in the tooltip's 2nd bracket
+  effect: string,         -- French, shown in the tooltip's 2nd bracket
   lastChangeDate: string,        -- date of the most recent grant or quality-up
   lastChangeCircumstance: string, -- French, narrative reason for that change; overwritten on each change, not accumulated
 }]
 ```
-`tier.talentGain` in `worldData/actionTypes/items/{id}` and the creator dashboard's `ActionTypesManager.jsx` tier editor would need to gain fields for rarity/trainable/effect when granting a talent, and the rarity-floor bump above needs to be applied wherever quality increases. Still open: the exact training mechanic (deterministic vs. a training-specific roll) and how a quest determines it's "relevant" to a given talent for the random quality-up roll on quests.
 
-Not implemented yet — `CharacterTabs.jsx`'s Talents tab currently just lists plain strings.
+`tier.talentGain` shape (success tiers only):
+```
+talentGain: {
+  talentId: string,       -- worldData/talents/items id
+  quality: number,        -- 1-5, starting quality granted
+  circumstance: string,   -- French, e.g. "en bravant le souffle ardent du terrible Syrphax"
+}
+```
+
+**Still open (deliberately deferred)**:
+- How a quest tier signals it's "relevant" to a given talent, for a random quality-up roll on quest success. Not implemented — for now, quality never changes after grant.
+- The training-driven quality-up mechanic (via a "s'entraîner" action) — deferred entirely until the trainer system itself is designed, see [Trainers](#trainers) below.
+- **Decided for whenever either path above ships**: each trigger bumps quality by a flat **+1** (no variable amounts).
+
+Known gap: granting the same talent to a character more than once (e.g. via two different tiers) currently appends a duplicate entry to `character.talents` rather than merging/bumping quality — acceptable for now since there's no quality-up path yet either.
+
+## Trainers
+
+Design note only — nothing implemented. The talent system's "s'entraîner" (train) progression path was deliberately deferred because the trainer concept itself isn't designed yet: who/what a player trains with (an NPC? a location? a standalone action type?), whether training costs anything (gold, a full day's action slot, both), whether it's restricted to talents the character already has, and how it picks *which* trainable talent to bump when a character has several. Once this is designed, revisit "Still open" in [Expanded talent system](#expanded-talent-system) above — the mechanic should reuse the existing weighted-tier roll (a success tier grants +1 quality to a designated talent) rather than introduce a second RNG system, per prior decision.

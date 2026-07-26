@@ -1,12 +1,14 @@
 import { useState } from "react";
 import RegionsManager from "../components/creator/RegionsManager";
 import TraitsManager from "../components/creator/TraitsManager";
+import TalentsManager from "../components/creator/TalentsManager";
 import ActionTypesManager from "../components/creator/ActionTypesManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 
 const SECTIONS = {
   Régions: RegionsManager,
   Traits: TraitsManager,
+  Talents: TalentsManager,
   "Types d'action": ActionTypesManager,
   Personnages: CharactersOverview,
 };
