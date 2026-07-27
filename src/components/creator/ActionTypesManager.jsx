@@ -2,15 +2,13 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-const STATS = ["force", "agilite", "intelligence", "charisme"];
-
 function emptyTier() {
   return {
     name: "",
     weight: 10,
     success: true,
     narrativeText: "",
-    bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0 },
+    cible: "",
     goldGain: 0,
     itemGainName: "",
     itemGainQty: 1,
@@ -31,7 +29,7 @@ function tierToForm(tier) {
     weight: tier.weight ?? 10,
     success: tier.success !== false,
     narrativeText: tier.narrativeText || "",
-    bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0, ...(tier.bonuses || {}) },
+    cible: tier.cible || "",
     goldGain: tier.goldGain || 0,
     itemGainName: tier.itemGain?.name || "",
     itemGainQty: tier.itemGain?.qty || 1,
@@ -47,19 +45,14 @@ function tierToForm(tier) {
 }
 
 function formToTier(form) {
-  const bonuses = Object.fromEntries(
-    Object.entries(form.bonuses)
-      .filter(([, v]) => Number(v) !== 0)
-      .map(([k, v]) => [k, Number(v)])
-  );
-
   const tier = {
     name: form.name,
     weight: Number(form.weight),
     success: form.success,
     narrativeText: form.narrativeText,
-    bonuses,
   };
+
+  if (form.cible) tier.cible = form.cible;
 
   if (form.success) {
     tier.goldGain = Number(form.goldGain) || 0;
@@ -107,24 +100,19 @@ function TierEditor({ tier, index, talents, onChange, onRemove }) {
       </div>
 
       <textarea
-        placeholder="Texte narratif"
+        placeholder="Texte narratif (utilisé tel quel si aucune cible n'est choisie ci-dessous, ou en repli si la génération procédurale ne trouve aucune combinaison)"
         value={tier.narrativeText}
         onChange={(e) => set("narrativeText", e.target.value)}
       />
 
-      <fieldset>
-        <legend>Bonus de stats (tous tiers)</legend>
-        {STATS.map((stat) => (
-          <label key={stat}>
-            {stat}
-            <input
-              type="number"
-              value={tier.bonuses[stat]}
-              onChange={(e) => set("bonuses", { ...tier.bonuses, [stat]: e.target.value })}
-            />
-          </label>
-        ))}
-      </fieldset>
+      <label>
+        Cible (génération procédurale du texte de résultat)
+        <select value={tier.cible} onChange={(e) => set("cible", e.target.value)}>
+          <option value="">Aucune (texte narratif fixe)</option>
+          <option value="groupe">Groupe</option>
+          <option value="individuel">Individuel</option>
+        </select>
+      </label>
 
       {tier.success ? (
         <fieldset>

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-
-const creatorBase = import.meta.env.BASE_URL;
 
 export const RARITIES = [
   { value: "commun", label: "Commun" },
@@ -20,32 +19,54 @@ const emptyForm = {
   trainable: false,
   rarity: "commun",
   effect: "",
-  favoredQuestTypeIds: [],
+  favoredQuestSubjectIds: [],
   trainerTypeId: "",
 };
 
+function useItems(collectionName) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", collectionName, "items"), (snap) => {
+      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, [collectionName]);
+  return items;
+}
+
+function MultiSelectField({ legend, options, selectedIds, onToggle, createLink }) {
+  return (
+    <fieldset>
+      <legend>
+        {legend}
+        {createLink && (
+          <Link to={createLink} target="_blank" rel="noopener noreferrer">
+            {" "}
+            Créer
+          </Link>
+        )}
+      </legend>
+      {options.length === 0 && <p>Aucun élément créé pour l'instant.</p>}
+      {options.map((option) => (
+        <label key={option.id}>
+          <input type="checkbox" checked={selectedIds.includes(option.id)} onChange={() => onToggle(option.id)} />
+          {option.name}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 export default function TalentsManager() {
   const [talents, setTalents] = useState([]);
-  const [questTypes, setQuestTypes] = useState([]);
-  const [trainerTypes, setTrainerTypes] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  const questSubjects = useItems("questSubjects");
+  const trainerTypes = useItems("trainerTypes");
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "talents", "items"), (snap) => {
       setTalents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-  }, []);
-
-  useEffect(() => {
-    return onSnapshot(collection(db, "worldData", "questTypes", "items"), (snap) => {
-      setQuestTypes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-  }, []);
-
-  useEffect(() => {
-    return onSnapshot(collection(db, "worldData", "trainerTypes", "items"), (snap) => {
-      setTrainerTypes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
@@ -56,7 +77,7 @@ export default function TalentsManager() {
       trainable: !!talent.trainable,
       rarity: talent.rarity || "commun",
       effect: talent.effect || "",
-      favoredQuestTypeIds: talent.favoredQuestTypeIds || [],
+      favoredQuestSubjectIds: talent.favoredQuestSubjectIds || [],
       trainerTypeId: talent.trainerTypeId || "",
     });
   }
@@ -66,12 +87,12 @@ export default function TalentsManager() {
     setForm(emptyForm);
   }
 
-  function toggleQuestType(questTypeId) {
+  function toggleQuestSubject(questSubjectId) {
     setForm((prev) => ({
       ...prev,
-      favoredQuestTypeIds: prev.favoredQuestTypeIds.includes(questTypeId)
-        ? prev.favoredQuestTypeIds.filter((id) => id !== questTypeId)
-        : [...prev.favoredQuestTypeIds, questTypeId],
+      favoredQuestSubjectIds: prev.favoredQuestSubjectIds.includes(questSubjectId)
+        ? prev.favoredQuestSubjectIds.filter((id) => id !== questSubjectId)
+        : [...prev.favoredQuestSubjectIds, questSubjectId],
     }));
   }
 
@@ -84,7 +105,7 @@ export default function TalentsManager() {
       trainable: form.trainable,
       rarity: form.rarity,
       effect: form.effect,
-      favoredQuestTypeIds: form.favoredQuestTypeIds,
+      favoredQuestSubjectIds: form.favoredQuestSubjectIds,
       trainerTypeId: form.trainable ? form.trainerTypeId : "",
     });
     resetForm();
@@ -111,11 +132,11 @@ export default function TalentsManager() {
                 <li key={talent.id}>
                   <strong>{talent.name}</strong>
                   {talent.trainable && "*"} — {talent.effect}
-                  {(talent.favoredQuestTypeIds || []).length > 0 && (
+                  {(talent.favoredQuestSubjectIds || []).length > 0 && (
                     <div>
                       Quêtes favorisées :{" "}
-                      {talent.favoredQuestTypeIds
-                        .map((id) => questTypes.find((qt) => qt.id === id)?.name || id)
+                      {talent.favoredQuestSubjectIds
+                        .map((id) => questSubjects.find((qs) => qs.id === id)?.name || id)
                         .join(", ")}
                     </div>
                   )}
@@ -164,33 +185,22 @@ export default function TalentsManager() {
           Entraînable
         </label>
 
-        <fieldset>
-          <legend>
-            Types de quête favorisés{" "}
-            <a href={`${creatorBase}creator?section=${encodeURIComponent("Types de quête")}`} target="_blank" rel="noopener noreferrer">
-              (créer un type de quête)
-            </a>
-          </legend>
-          {questTypes.length === 0 && <span>Aucun type de quête créé pour l'instant.</span>}
-          {questTypes.map((questType) => (
-            <label key={questType.id}>
-              <input
-                type="checkbox"
-                checked={form.favoredQuestTypeIds.includes(questType.id)}
-                onChange={() => toggleQuestType(questType.id)}
-              />
-              {questType.name}
-            </label>
-          ))}
-        </fieldset>
+        <MultiSelectField
+          legend="Sujets de quête favorisés"
+          options={questSubjects}
+          selectedIds={form.favoredQuestSubjectIds}
+          onToggle={toggleQuestSubject}
+          createLink={`/creator?section=${encodeURIComponent("Sujets de quête")}`}
+        />
 
         {form.trainable && (
           <fieldset>
             <legend>
-              Entraîneur requis{" "}
-              <a href={`${creatorBase}creator?section=${encodeURIComponent("Types d'entraîneur")}`} target="_blank" rel="noopener noreferrer">
-                (créer un type d'entraîneur)
-              </a>
+              Entraîneur requis
+              <Link to={`/creator?section=${encodeURIComponent("Types d'entraîneur")}`} target="_blank" rel="noopener noreferrer">
+                {" "}
+                Créer
+              </Link>
             </legend>
             <label>
               Type d'entraîneur

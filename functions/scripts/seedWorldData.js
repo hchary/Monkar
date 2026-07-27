@@ -59,19 +59,16 @@ async function seed() {
   await traitsRef.doc("robuste").set({
     name: "Robuste",
     description: "Un corps endurci par les épreuves.",
-    bonuses: { force: 2 },
     weight: 40,
   });
   await traitsRef.doc("vif-esprit").set({
     name: "Vif d'esprit",
     description: "Toujours une longueur d'avance.",
-    bonuses: { intelligence: 2 },
     weight: 30,
   });
   await traitsRef.doc("chanceux").set({
     name: "Chanceux",
     description: "La fortune lui sourit souvent.",
-    bonuses: { charisme: 1, agilite: 1 },
     weight: 30,
   });
 
@@ -98,7 +95,6 @@ async function seed() {
         weight: 55,
         success: true,
         narrativeText: "Tu reviens victorieux, quelques pièces et un peu plus d'expérience en poche.",
-        bonuses: { force: 1 },
         goldGain: 5,
         reputationGain: 1,
       },
@@ -107,7 +103,6 @@ async function seed() {
         weight: 20,
         success: true,
         narrativeText: "Un exploit dont on parlera dans toutes les tavernes de la région !",
-        bonuses: { force: 2, charisme: 1 },
         goldGain: 15,
         itemGain: { name: "Trophée de chasse", qty: 1 },
         reputationGain: 5,

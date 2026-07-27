@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { generateResultText } = require("./textGeneration");
 
 initializeApp();
 const db = getFirestore();
@@ -19,8 +20,6 @@ function rollWeighted(items) {
   }
   return items[items.length - 1];
 }
-
-const BASE_STATS = { force: 5, agilite: 5, intelligence: 5, charisme: 5 };
 
 const RARITY_ORDER = ["commun", "peu_commun", "rare", "tres_rare", "legendaire", "mythique", "divin", "unique"];
 
@@ -63,11 +62,6 @@ exports.createCharacter = onCall(async (request) => {
   if (traitsSnap.empty) throw new HttpsError("failed-precondition", "No traits configured.");
   const trait = rollWeighted(traitsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
 
-  const stats = { ...BASE_STATS };
-  for (const [stat, amount] of Object.entries(trait.bonuses || {})) {
-    stats[stat] = (stats[stat] || 0) + amount;
-  }
-
   const characterRef = db.collection("characters").doc();
   await characterRef.set({
     ownerUid: uid,
@@ -81,7 +75,6 @@ exports.createCharacter = onCall(async (request) => {
     reputation: background.reputationStart || 0,
     legendLevel: null,
     alive: true,
-    stats,
     gold: background.startingGold || 0,
     inventory: background.startingItems || [],
     talents: [],
@@ -119,6 +112,13 @@ exports.performAction = onCall(async (request) => {
   if (!actionTypeSnap.exists) throw new HttpsError("not-found", "Unknown action type.");
   const actionType = actionTypeSnap.data();
 
+  const [narrativeSubjectsSnap, verbPhrasesSnap] = await Promise.all([
+    db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
+    db.collection("worldData").doc("verbPhrases").collection("items").get(),
+  ]);
+  const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => d.data());
+  const verbPhrases = verbPhrasesSnap.docs.map((d) => d.data());
+
   const today = todayUTC();
 
   await db.runTransaction(async (tx) => {
@@ -131,7 +131,6 @@ exports.performAction = onCall(async (request) => {
 
     const tier = rollWeighted(actionType.tiers);
     const success = tier.success !== false;
-    const bonusesApplied = tier.bonuses || {};
 
     let talentGained = null;
     if (success && tier.talentGain?.talentId) {
@@ -153,6 +152,17 @@ exports.performAction = onCall(async (request) => {
       }
     }
 
+    let narrativeText = tier.narrativeText || "";
+    if (tier.cible) {
+      const generated = generateResultText({
+        resultat: success ? "victoire" : "echec",
+        cible: tier.cible,
+        subjects: narrativeSubjects,
+        verbPhrases,
+      });
+      if (generated) narrativeText = generated;
+    }
+
     const updates = {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
@@ -161,8 +171,7 @@ exports.performAction = onCall(async (request) => {
         date: today,
         tierName: tier.name,
         success,
-        narrativeText: tier.narrativeText || "",
-        bonusesApplied,
+        narrativeText,
         goldGain: tier.goldGain || 0,
         itemGain: tier.itemGain || null,
         talentGain: talentGained,
@@ -171,10 +180,6 @@ exports.performAction = onCall(async (request) => {
         consequence: tier.consequence || null,
       },
     };
-
-    for (const [stat, amount] of Object.entries(bonusesApplied)) {
-      updates[`stats.${stat}`] = FieldValue.increment(amount);
-    }
 
     if (success) {
       if (tier.goldGain) updates.gold = FieldValue.increment(tier.goldGain);
@@ -204,8 +209,7 @@ exports.performAction = onCall(async (request) => {
       date: today,
       tierName: tier.name,
       success,
-      bonusesApplied,
-      narrativeText: tier.narrativeText || "",
+      narrativeText,
       consequence: tier.consequence || null,
       createdAt: FieldValue.serverTimestamp(),
     });

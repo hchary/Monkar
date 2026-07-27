@@ -58,13 +58,6 @@ input {
   color: var(--text);
 }
 
-.stats {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 16px;
-}
-
 .error {
   color: #d33;
 }
