@@ -5,6 +5,7 @@ import { db } from "../../lib/firebase";
 import { OBJECTIVE_TAG, matchesQuestObjective } from "./QuestObjectivesManager";
 import { matchesVerbPhrase } from "./TextGenerationManager";
 import { matchesRegion } from "./RegionsManager";
+import { matchesTag } from "./TagsManager";
 import { capitalizeSubject } from "./NarrativeSubjectList";
 import MultiSelectModalField from "./MultiSelectModalField";
 
@@ -35,6 +36,7 @@ const emptyForm = {
   failurePhraseIds: [],
   regionIds: [],
   locationId: "",
+  tagIds: [],
 };
 
 function useItems(collectionName) {
@@ -88,6 +90,8 @@ export default function QuestsManager() {
   const verbPhrases = useItems("verbPhrases");
   const successPhrases = verbPhrases.filter((vp) => vp.resultat === "victoire");
   const failurePhrases = verbPhrases.filter((vp) => vp.resultat === "echec");
+  const tags = useItems("tags");
+  const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "quests", "items"), (snap) => {
@@ -140,6 +144,7 @@ export default function QuestsManager() {
       failurePhraseIds: quest.failurePhraseIds || [],
       regionIds: quest.regionIds || [],
       locationId: quest.locationId || "",
+      tagIds: quest.tagIds || [],
     });
     setPanelOpen(true);
   }
@@ -176,6 +181,7 @@ export default function QuestsManager() {
       failurePhraseIds: form.failurePhraseIds,
       regionIds: form.regionIds,
       locationId: form.locationId,
+      tagIds: form.tagIds,
     });
     resetForm();
   }
@@ -247,6 +253,9 @@ export default function QuestsManager() {
             <div>
               Phrases de réussite : {(quest.successPhraseIds || []).length} — Phrases d'échec :{" "}
               {(quest.failurePhraseIds || []).length}
+            </div>
+            <div>
+              Tags : {(quest.tagIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") || "aucun"}
             </div>
             <button type="button" onClick={() => startEdit(quest)}>
               Modifier
@@ -327,6 +336,17 @@ export default function QuestsManager() {
               ))}
             </select>
           </fieldset>
+
+          <MultiSelectModalField
+            legend="Tags"
+            options={sortedTags}
+            selectedIds={form.tagIds}
+            onToggle={(id) => toggleIn("tagIds", id)}
+            createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+            matchesFilter={matchesTag}
+            filterPlaceholder="Filtrer par nom..."
+            buttonLabel="Ajouter tags"
+          />
 
           <div>
             <button type="submit">{editingId ? "Enregistrer" : "Créer la quête"}</button>

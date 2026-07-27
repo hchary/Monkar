@@ -14,6 +14,7 @@ export default function MultiSelectModalField({
   getTooltip,
   filterPlaceholder = "Filtrer...",
   matchesFilter = defaultMatchesFilter,
+  buttonLabel = "Choisir",
 }) {
   const dialogRef = useRef(null);
   const searchRef = useRef(null);
@@ -33,7 +34,7 @@ export default function MultiSelectModalField({
       <div className="modal-select-header">
         <span>{legend}</span>
         <button type="button" onClick={open}>
-          Choisir ({selectedIds.length})
+          {buttonLabel} ({selectedIds.length})
         </button>
         {createLink && (
           <Link to={createLink} target="_blank" rel="noopener noreferrer">
