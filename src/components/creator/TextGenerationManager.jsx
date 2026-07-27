@@ -1,24 +1,16 @@
 import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import NarrativeSubjectList from "./NarrativeSubjectList";
 
-const emptySubjectForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel" };
+const emptySubjectForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tags: "" };
 const emptyVerbPhraseForm = { resultat: "victoire", cible: "groupe", template: "", tags: "" };
-
-const SUBJECT_TYPES = [
-  { value: "groupe", label: "Groupe" },
-  { value: "individuel", label: "Individuel" },
-];
 
 function parseTags(tags) {
   return tags
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
-}
-
-function capitalize(s) {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
 function SubjectsManager() {
@@ -40,6 +32,7 @@ function SubjectsManager() {
       nom: subject.nom || "",
       genre: subject.genre || "m",
       nombre: subject.nombre || "pluriel",
+      tags: (subject.tags || []).join(", "),
     });
   }
 
@@ -60,6 +53,7 @@ function SubjectsManager() {
       nom: form.nom,
       genre: form.genre,
       nombre: form.nombre,
+      tags: parseTags(form.tags),
     });
     resetForm();
   }
@@ -67,85 +61,71 @@ function SubjectsManager() {
   return (
     <div className="creator-section">
       <h3>Sujets narratifs (cibles de résultat)</h3>
+      <p>
+        La création d'un sujet se fait depuis l'onglet du type de sujet concerné (ex : "Objectifs de quête"). Cette
+        section permet de consulter et modifier les sujets existants, tous types confondus.
+      </p>
 
-      {SUBJECT_TYPES.map((subjectType) => {
-        const subjectsForType = subjects
-          .filter((subject) => (subject.type || "groupe") === subjectType.value)
-          .sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr"));
+      <NarrativeSubjectList
+        subjects={subjects}
+        onEdit={startEdit}
+        onDelete={(subject) => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}
+      />
 
-        if (subjectsForType.length === 0) return null;
-
-        return (
-          <details key={subjectType.value} className="collapsible-group">
-            <summary>
-              {subjectType.label} ({subjectsForType.length})
-            </summary>
-            <ul className="creator-list">
-              {subjectsForType.map((subject) => (
-                <li key={subject.id}>
-                  <strong>
-                    {capitalize(subject.nom)} ({capitalize(subject.article)})
-                  </strong>
-                  <button type="button" onClick={() => startEdit(subject)}>
-                    Modifier
-                  </button>
-                  <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}>
-                    Supprimer
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </details>
-        );
-      })}
-
-      <h4>{editingId ? "Modifier le sujet" : "Nouveau sujet"}</h4>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Type
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-            <option value="groupe">Groupe</option>
-            <option value="individuel">Individuel</option>
-          </select>
-        </label>
-        <label>
-          Article (avant "de")
-          <select value={form.article} onChange={(e) => setForm({ ...form, article: e.target.value })}>
-            <option value="le">le</option>
-            <option value="la">la</option>
-            <option value="les">les</option>
-            <option value="l'">l'</option>
-          </select>
-        </label>
-        <input
-          placeholder='Nom (ex: "bandits", "chef des bandits")'
-          value={form.nom}
-          onChange={(e) => setForm({ ...form, nom: e.target.value })}
-          required
-        />
-        <label>
-          Genre
-          <select value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}>
-            <option value="m">masculin</option>
-            <option value="f">féminin</option>
-          </select>
-        </label>
-        <label>
-          Nombre
-          <select value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}>
-            <option value="singulier">singulier</option>
-            <option value="pluriel">pluriel</option>
-          </select>
-        </label>
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer le sujet"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+      {editingId && (
+        <>
+          <h4>Modifier le sujet</h4>
+          <form onSubmit={handleSubmit}>
+            <label>
+              Type
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <option value="groupe">Groupe</option>
+                <option value="individuel">Individuel</option>
+              </select>
+            </label>
+            <label>
+              Article (avant "de")
+              <select value={form.article} onChange={(e) => setForm({ ...form, article: e.target.value })}>
+                <option value="le">le</option>
+                <option value="la">la</option>
+                <option value="les">les</option>
+                <option value="l'">l'</option>
+              </select>
+            </label>
+            <input
+              placeholder='Nom (ex: "bandits", "chef des bandits")'
+              value={form.nom}
+              onChange={(e) => setForm({ ...form, nom: e.target.value })}
+              required
+            />
+            <label>
+              Genre
+              <select value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}>
+                <option value="m">masculin</option>
+                <option value="f">féminin</option>
+              </select>
+            </label>
+            <label>
+              Nombre
+              <select value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}>
+                <option value="singulier">singulier</option>
+                <option value="pluriel">pluriel</option>
+              </select>
+            </label>
+            <input
+              placeholder="Tags (séparés par des virgules, ex: hostile, humanoïde)"
+              value={form.tags}
+              onChange={(e) => setForm({ ...form, tags: e.target.value })}
+            />
+            <div>
+              <button type="submit">Enregistrer</button>
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            </div>
+          </form>
+        </>
+      )}
     </div>
   );
 }
