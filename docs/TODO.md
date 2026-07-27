@@ -76,8 +76,8 @@ Not implemented yet beyond the name-only stub described above.
 Currently only a name-only stub exists: `worldData/quests/items` via `QuestsManager.jsx` (the same bare-CRUD pattern as `TrainerTypesManager.jsx`), registered as the "Quêtes" tab in `CreatorDashboard.jsx`.
 
 - It's already referenced by `TalentsManager.jsx`'s `favoredQuestIds` multi-select (a talent can be tagged as favoring certain quests), but that link is purely informational today — nothing consumes it to influence quest generation, selection, or rewards.
-- A full quest entity needs its remaining fields designed, at minimum: an objective (possibly drawn from the standalone `worldData/questObjectives` catalog — see below), a région link, rewards, and difficulty/weighting.
-- `worldData/questObjectives/items` (renamed from the former région/talent-linked "questSubjects" catalog) is now a standalone `name`/`description` list, managed via `QuestObjectivesManager.jsx`. It isn't wired into régions, talents, or quests anymore — whether/how a quest's objective should draw from it is an open question for this entry.
+- A full quest entity needs its remaining fields designed, at minimum: an objective, a région link, rewards, and difficulty/weighting.
+- "Objectifs de quête" (`QuestObjectivesManager.jsx`) are quest-themed `worldData/narrativeSubjects/items` tagged `"objectif de quête"` — not a separate collection (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). Whether/how a quest's objective field should draw from that tagged set is an open question for this entry.
 - How `favoredQuestIds` on a talent should eventually affect gameplay (e.g. weighting which quest gets offered, or which quest can trigger that talent's quality-up) is also undecided.
 
 **Data model implications**:

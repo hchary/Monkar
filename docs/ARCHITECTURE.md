@@ -80,15 +80,16 @@ worldData/actionTypes/items/{id}
   }]
   -- weight is a relative weight; performAction sums all tiers' weights and rolls against that total
 
-worldData/narrativeSubjects/items/{id}   -- procedural narrativeText generation, see below (distinct
-                                          -- from worldData/questObjectives, a standalone quest-theme
-                                          -- catalog not wired into any other collection yet)
+worldData/narrativeSubjects/items/{id}   -- procedural narrativeText generation, see below
   type: "groupe" | "individuel"
   article: "le" | "la" | "les" | "l'"    -- elided with a following "de" (du/de la/des/de l')
   nom: string                            -- French, e.g. "bandits", "chef des bandits"
   genre: "m" | "f"
   nombre: "singulier" | "pluriel"
-  tags: [string]                         -- e.g. ["hostile", "humanoïde"]
+  tags: [string]                         -- e.g. ["hostile", "humanoïde"]; "objectif de quête" is a
+                                          -- reserved tag value that makes a subject show up as a
+                                          -- quest objective (see QuestObjectivesManager.jsx below) —
+                                          -- there is no separate questObjectives collection
 
 worldData/verbPhrases/items/{id}     -- procedural narrativeText generation, see below
   resultat: "victoire" | "echec" | "partielle"   -- only "victoire"/"echec" are produced today,
@@ -113,12 +114,6 @@ worldData/talents/items/{id}
   effect: string                   -- French, shown in the character sheet tooltip
   favoredQuestIds: [string]        -- worldData/quests/items ids, purely informational for now
   trainerTypeId: string            -- worldData/trainerTypes/items id, only meaningful when trainable
-
-worldData/questObjectives/items/{id}   -- standalone quest-theme catalog, not linked to régions,
-                                        -- talents, or quests yet (renamed from the former
-                                        -- région/talent-linked "questSubjects")
-  name: string
-  description: string
 
 worldData/quests/items/{id}      -- name-only stub, see docs/TODO.md ("Quest creation and editing")
   name: string
@@ -186,8 +181,8 @@ No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute
 - **`RegionsManager.jsx`**: CRUD for `worldData/regions/items`, and per-region CRUD for the nested `backgrounds` subcollection (expand a region to manage its own background pool inline).
 - **`TalentsManager.jsx`**: CRUD for the global `worldData/talents/items` catalog (name, trainable flag, rarity, effect text, a `favoredQuestIds` multi-select against `worldData/quests/items`, and a `trainerTypeId` single-select shown when trainable) — see [docs/TODO.md](TODO.md) for the full talent system design.
 - **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above. The talent grant fields are a select over `worldData/talents/items` (populated live) plus a starting quality and a French circumstance string, mapping to the `tier.talentGain` shape above. A tier's optional `cible` select opts it into the procedural `narrativeText` generation described below instead of using the tier's own fixed text.
-- **`TextGenerationManager.jsx`**: CRUD for `worldData/narrativeSubjects/items` (grouped by `type` into collapsible, alphabetically sorted sections) and `worldData/verbPhrases/items` (see "Procedural quest-result text" below) — two sub-forms in one section, following the same pattern as the other managers.
-- **`QuestObjectivesManager.jsx`**: bare CRUD (name, description) for the standalone `worldData/questObjectives/items` catalog — not currently referenced by any other collection.
+- **`TextGenerationManager.jsx`**: read/edit/delete for all of `worldData/narrativeSubjects/items` (grouped by `type` into collapsible, alphabetically sorted sections via the shared `NarrativeSubjectList.jsx`) plus full CRUD for `worldData/verbPhrases/items` (see "Procedural quest-result text" below). Creating a *new* narrative subject isn't done here — see `QuestObjectivesManager.jsx` below, currently the only type-specific creation entry point.
+- **`QuestObjectivesManager.jsx`**: also reads/writes `worldData/narrativeSubjects/items` (via `NarrativeSubjectList.jsx`), filtered to those tagged `"objectif de quête"`; its create/edit form always sets that tag on submit. Quest objectives are a *type* of narrative subject, not a separate collection.
 - **`QuestsManager.jsx`** and **`TrainerTypesManager.jsx`**: name-only stubs for `worldData/quests/items` and `worldData/trainerTypes/items` respectively — see [docs/TODO.md](TODO.md) for what each still needs.
 - **`CharactersOverview.jsx`**: lists every character (any `alive` state) and, on click, shows the full character sheet plus its complete `actionsLog` history. Reads all of `characters`/`actionsLog` unfiltered, which the rules permit for the creator role — see the `actionsLog` list-query note above for why a *player's own* history tab needs an `ownerUid` filter but the creator's doesn't (the rule's `isCreator()` branch doesn't depend on `resource.data`, so it authorizes any query shape once true).
 
