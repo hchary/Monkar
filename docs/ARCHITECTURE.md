@@ -104,6 +104,12 @@ worldData/verbPhrases/items/{id}     -- procedural narrativeText generation, see
   tags: [string]                         -- optional; when set, only pairs with subjects sharing
                                           -- at least one tag
 
+worldData/tags/items/{id}          -- standalone label catalog, "Narration" creator tab; not yet
+  name: string                        referenced by id from any other collection (narrativeSubjects
+                                       and verbPhrases above still store their own free-text `tags`
+                                       arrays) -- deleting a tag is a plain doc delete for now; a future
+                                       feature that references tag ids must add its own cleanup on delete
+
 worldData/regions/items/{id}
   name: string
   nameSuggestions: [string]         -- shown to the player when naming their character

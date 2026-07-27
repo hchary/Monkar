@@ -10,6 +10,7 @@ import TalentsManager from "../components/creator/TalentsManager";
 import TrainerTypesManager from "../components/creator/TrainerTypesManager";
 import QuestsManager from "../components/creator/QuestsManager";
 import TextGenerationManager from "../components/creator/TextGenerationManager";
+import TagsManager from "../components/creator/TagsManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 
 const DEFAULT_SECTION = "Régions";
@@ -35,6 +36,7 @@ const GROUPS = [
     name: "Narration",
     tabs: {
       "Génération de texte": TextGenerationManager,
+      Tag: TagsManager,
     },
   },
   {
