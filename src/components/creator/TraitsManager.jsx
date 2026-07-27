@@ -2,13 +2,10 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-const STATS = ["force", "agilite", "intelligence", "charisme"];
-
 const emptyForm = {
   name: "",
   description: "",
   weight: 10,
-  bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0 },
 };
 
 export default function TraitsManager() {
@@ -28,7 +25,6 @@ export default function TraitsManager() {
       name: trait.name || "",
       description: trait.description || "",
       weight: trait.weight || 10,
-      bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0, ...(trait.bonuses || {}) },
     });
   }
 
@@ -39,11 +35,9 @@ export default function TraitsManager() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const bonuses = Object.fromEntries(Object.entries(form.bonuses).filter(([, v]) => Number(v) !== 0).map(([k, v]) => [k, Number(v)]));
-
     const ref = editingId ? doc(db, "worldData", "traits", "items", editingId) : doc(collection(db, "worldData", "traits", "items"));
 
-    await setDoc(ref, { name: form.name, description: form.description, weight: Number(form.weight), bonuses });
+    await setDoc(ref, { name: form.name, description: form.description, weight: Number(form.weight) });
     resetForm();
   }
 
@@ -77,20 +71,6 @@ export default function TraitsManager() {
           Poids (tirage)
           <input type="number" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} required />
         </label>
-
-        <fieldset>
-          <legend>Bonus de stats</legend>
-          {STATS.map((stat) => (
-            <label key={stat}>
-              {stat}
-              <input
-                type="number"
-                value={form.bonuses[stat]}
-                onChange={(e) => setForm({ ...form, bonuses: { ...form.bonuses, [stat]: e.target.value } })}
-              />
-            </label>
-          ))}
-        </fieldset>
 
         <div>
           <button type="submit">{editingId ? "Enregistrer" : "Créer le trait"}</button>

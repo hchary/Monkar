@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-const STATS = ["force", "agilite", "intelligence", "charisme"];
-
 function emptyTier() {
   return {
     name: "",
@@ -11,7 +9,6 @@ function emptyTier() {
     success: true,
     narrativeText: "",
     cible: "",
-    bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0 },
     goldGain: 0,
     itemGainName: "",
     itemGainQty: 1,
@@ -33,7 +30,6 @@ function tierToForm(tier) {
     success: tier.success !== false,
     narrativeText: tier.narrativeText || "",
     cible: tier.cible || "",
-    bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0, ...(tier.bonuses || {}) },
     goldGain: tier.goldGain || 0,
     itemGainName: tier.itemGain?.name || "",
     itemGainQty: tier.itemGain?.qty || 1,
@@ -49,18 +45,11 @@ function tierToForm(tier) {
 }
 
 function formToTier(form) {
-  const bonuses = Object.fromEntries(
-    Object.entries(form.bonuses)
-      .filter(([, v]) => Number(v) !== 0)
-      .map(([k, v]) => [k, Number(v)])
-  );
-
   const tier = {
     name: form.name,
     weight: Number(form.weight),
     success: form.success,
     narrativeText: form.narrativeText,
-    bonuses,
   };
 
   if (form.cible) tier.cible = form.cible;
@@ -124,20 +113,6 @@ function TierEditor({ tier, index, talents, onChange, onRemove }) {
           <option value="individuel">Individuel</option>
         </select>
       </label>
-
-      <fieldset>
-        <legend>Bonus de stats (tous tiers)</legend>
-        {STATS.map((stat) => (
-          <label key={stat}>
-            {stat}
-            <input
-              type="number"
-              value={tier.bonuses[stat]}
-              onChange={(e) => set("bonuses", { ...tier.bonuses, [stat]: e.target.value })}
-            />
-          </label>
-        ))}
-      </fieldset>
 
       {tier.success ? (
         <fieldset>

@@ -21,8 +21,6 @@ function rollWeighted(items) {
   return items[items.length - 1];
 }
 
-const BASE_STATS = { force: 5, agilite: 5, intelligence: 5, charisme: 5 };
-
 const RARITY_ORDER = ["commun", "peu_commun", "rare", "tres_rare", "legendaire", "mythique", "divin", "unique"];
 
 function rarityFloor(rarity, quality) {
@@ -64,11 +62,6 @@ exports.createCharacter = onCall(async (request) => {
   if (traitsSnap.empty) throw new HttpsError("failed-precondition", "No traits configured.");
   const trait = rollWeighted(traitsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
 
-  const stats = { ...BASE_STATS };
-  for (const [stat, amount] of Object.entries(trait.bonuses || {})) {
-    stats[stat] = (stats[stat] || 0) + amount;
-  }
-
   const characterRef = db.collection("characters").doc();
   await characterRef.set({
     ownerUid: uid,
@@ -82,7 +75,6 @@ exports.createCharacter = onCall(async (request) => {
     reputation: background.reputationStart || 0,
     legendLevel: null,
     alive: true,
-    stats,
     gold: background.startingGold || 0,
     inventory: background.startingItems || [],
     talents: [],
@@ -139,7 +131,6 @@ exports.performAction = onCall(async (request) => {
 
     const tier = rollWeighted(actionType.tiers);
     const success = tier.success !== false;
-    const bonusesApplied = tier.bonuses || {};
 
     let talentGained = null;
     if (success && tier.talentGain?.talentId) {
@@ -181,7 +172,6 @@ exports.performAction = onCall(async (request) => {
         tierName: tier.name,
         success,
         narrativeText,
-        bonusesApplied,
         goldGain: tier.goldGain || 0,
         itemGain: tier.itemGain || null,
         talentGain: talentGained,
@@ -190,10 +180,6 @@ exports.performAction = onCall(async (request) => {
         consequence: tier.consequence || null,
       },
     };
-
-    for (const [stat, amount] of Object.entries(bonusesApplied)) {
-      updates[`stats.${stat}`] = FieldValue.increment(amount);
-    }
 
     if (success) {
       if (tier.goldGain) updates.gold = FieldValue.increment(tier.goldGain);
@@ -223,7 +209,6 @@ exports.performAction = onCall(async (request) => {
       date: today,
       tierName: tier.name,
       success,
-      bonusesApplied,
       narrativeText,
       consequence: tier.consequence || null,
       createdAt: FieldValue.serverTimestamp(),
