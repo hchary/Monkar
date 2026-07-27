@@ -6,6 +6,8 @@ export default function TrainerTypesManager() {
   const [trainerTypes, setTrainerTypes] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "trainerTypes", "items"), (snap) => {
@@ -13,9 +15,15 @@ export default function TrainerTypesManager() {
     });
   }, []);
 
+  const filteredTrainerTypes = trainerTypes.filter((trainerType) => {
+    const q = filterText.toLowerCase();
+    return !q || (trainerType.name || "").toLowerCase().includes(q);
+  });
+
   function startEdit(trainerType) {
     setEditingId(trainerType.id);
     setName(trainerType.name || "");
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -40,8 +48,16 @@ export default function TrainerTypesManager() {
         Stub minimal : voir la TODO "Entraîneurs" pour la version complète (description, région, disponibilité...).
       </p>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input placeholder="Rechercher par nom..." value={filterText} onChange={(e) => setFilterText(e.target.value)} />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {trainerTypes.map((trainerType) => (
+        {filteredTrainerTypes.map((trainerType) => (
           <li key={trainerType.id}>
             <strong>{trainerType.name}</strong>
             <button type="button" onClick={() => startEdit(trainerType)}>
@@ -54,19 +70,21 @@ export default function TrainerTypesManager() {
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier le type d'entraîneur" : "Nouveau type d'entraîneur"}</h3>
-      <form onSubmit={handleSubmit}>
-        <input placeholder="Nom" value={name} onChange={(e) => setName(e.target.value)} required />
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier le type d'entraîneur" : "Nouveau type d'entraîneur"}</summary>
+        <form onSubmit={handleSubmit}>
+          <input placeholder="Nom" value={name} onChange={(e) => setName(e.target.value)} required />
 
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer le type d'entraîneur"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer le type d'entraîneur"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

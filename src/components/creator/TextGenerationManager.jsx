@@ -28,12 +28,22 @@ function SubjectsManager() {
   const [subjects, setSubjects] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptySubjectForm);
+  const [filterText, setFilterText] = useState("");
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "narrativeSubjects", "items"), (snap) => {
       setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  const filteredSubjects = subjects.filter((subject) => {
+    const q = filterText.toLowerCase();
+    return (
+      !q ||
+      (subject.nom || "").toLowerCase().includes(q) ||
+      (subject.tags || []).some((tag) => tag.toLowerCase().includes(q))
+    );
+  });
 
   function startEdit(subject) {
     setEditingId(subject.id);
@@ -77,15 +87,27 @@ function SubjectsManager() {
         section permet de consulter et modifier les sujets existants, tous types confondus.
       </p>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input
+          placeholder="Rechercher par nom ou tag..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <NarrativeSubjectList
-        subjects={subjects}
+        subjects={filteredSubjects}
         onEdit={startEdit}
         onDelete={(subject) => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}
       />
 
       {editingId && (
-        <>
-          <h4>Modifier le sujet</h4>
+        <details className="collapsible-group" open>
+          <summary>Modifier le sujet</summary>
           <form onSubmit={handleSubmit}>
             <label>
               Type
@@ -135,22 +157,31 @@ function SubjectsManager() {
               </button>
             </div>
           </form>
-        </>
+        </details>
       )}
     </div>
   );
 }
 
+const emptyVerbPhraseFilters = { resultat: "", text: "" };
+
 function VerbPhrasesManager() {
   const [verbPhrases, setVerbPhrases] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyVerbPhraseForm);
+  const [filters, setFilters] = useState(emptyVerbPhraseFilters);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "verbPhrases", "items"), (snap) => {
       setVerbPhrases(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  const filteredVerbPhrases = verbPhrases.filter((verbPhrase) => {
+    if (filters.resultat && verbPhrase.resultat !== filters.resultat) return false;
+    return matchesVerbPhrase({ name: verbPhrase.template, cible: verbPhrase.cible, tags: verbPhrase.tags }, filters.text);
+  });
 
   function startEdit(verbPhrase) {
     setEditingId(verbPhrase.id);
@@ -160,6 +191,7 @@ function VerbPhrasesManager() {
       template: verbPhrase.template || "",
       tags: (verbPhrase.tags || []).join(", "),
     });
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -187,8 +219,29 @@ function VerbPhrasesManager() {
     <div className="creator-section">
       <h3>Phrases-verbes</h3>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <label>
+          Résultat
+          <select value={filters.resultat} onChange={(e) => setFilters({ ...filters, resultat: e.target.value })}>
+            <option value="">Tous</option>
+            <option value="victoire">Victoire</option>
+            <option value="echec">Échec</option>
+            <option value="partielle">Partielle</option>
+          </select>
+        </label>
+        <input
+          placeholder="Rechercher par texte, cible ou tag..."
+          value={filters.text}
+          onChange={(e) => setFilters({ ...filters, text: e.target.value })}
+        />
+        <button type="button" onClick={() => setFilters(emptyVerbPhraseFilters)}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {verbPhrases.map((verbPhrase) => (
+        {filteredVerbPhrases.map((verbPhrase) => (
           <li key={verbPhrase.id}>
             <strong>{verbPhrase.template}</strong> ({verbPhrase.resultat}, {verbPhrase.cible})
             {verbPhrase.tags?.length > 0 && ` — tags : ${verbPhrase.tags.join(", ")}`}
@@ -202,44 +255,46 @@ function VerbPhrasesManager() {
         ))}
       </ul>
 
-      <h4>{editingId ? "Modifier la phrase-verbe" : "Nouvelle phrase-verbe"}</h4>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Résultat
-          <select value={form.resultat} onChange={(e) => setForm({ ...form, resultat: e.target.value })}>
-            <option value="victoire">Victoire</option>
-            <option value="echec">Échec</option>
-            <option value="partielle">Partielle</option>
-          </select>
-        </label>
-        <label>
-          Cible
-          <select value={form.cible} onChange={(e) => setForm({ ...form, cible: e.target.value })}>
-            <option value="groupe">Groupe</option>
-            <option value="individuel">Individuel</option>
-            <option value="les_deux">Les deux</option>
-          </select>
-        </label>
-        <input
-          placeholder='Modèle (ex: "avez triomphé de {sujet}")'
-          value={form.template}
-          onChange={(e) => setForm({ ...form, template: e.target.value })}
-          required
-        />
-        <input
-          placeholder="Tags requis chez le sujet (optionnel, séparés par des virgules)"
-          value={form.tags}
-          onChange={(e) => setForm({ ...form, tags: e.target.value })}
-        />
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer la phrase-verbe"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier la phrase-verbe" : "Nouvelle phrase-verbe"}</summary>
+        <form onSubmit={handleSubmit}>
+          <label>
+            Résultat
+            <select value={form.resultat} onChange={(e) => setForm({ ...form, resultat: e.target.value })}>
+              <option value="victoire">Victoire</option>
+              <option value="echec">Échec</option>
+              <option value="partielle">Partielle</option>
+            </select>
+          </label>
+          <label>
+            Cible
+            <select value={form.cible} onChange={(e) => setForm({ ...form, cible: e.target.value })}>
+              <option value="groupe">Groupe</option>
+              <option value="individuel">Individuel</option>
+              <option value="les_deux">Les deux</option>
+            </select>
+          </label>
+          <input
+            placeholder='Modèle (ex: "avez triomphé de {sujet}")'
+            value={form.template}
+            onChange={(e) => setForm({ ...form, template: e.target.value })}
+            required
+          />
+          <input
+            placeholder="Tags requis chez le sujet (optionnel, séparés par des virgules)"
+            value={form.tags}
+            onChange={(e) => setForm({ ...form, tags: e.target.value })}
+          />
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer la phrase-verbe"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

@@ -21,6 +21,8 @@ export default function QuestObjectivesManager() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [otherTags, setOtherTags] = useState([]);
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "narrativeSubjects", "items"), (snap) => {
@@ -29,6 +31,9 @@ export default function QuestObjectivesManager() {
   }, []);
 
   const objectives = subjects.filter((subject) => (subject.tags || []).includes(OBJECTIVE_TAG));
+  const filteredObjectives = objectives.filter((subject) =>
+    matchesQuestObjective({ name: subject.nom, tags: subject.tags }, filterText)
+  );
 
   function startEdit(subject) {
     setEditingId(subject.id);
@@ -40,6 +45,7 @@ export default function QuestObjectivesManager() {
       nombre: subject.nombre || "pluriel",
     });
     setOtherTags((subject.tags || []).filter((t) => t !== OBJECTIVE_TAG));
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -72,59 +78,73 @@ export default function QuestObjectivesManager() {
         Un objectif de quête est un sujet narratif (voir "Génération de texte") taggé "{OBJECTIVE_TAG}".
       </p>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input
+          placeholder="Rechercher par nom ou tag..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <NarrativeSubjectList
-        subjects={objectives}
+        subjects={filteredObjectives}
         onEdit={startEdit}
         onDelete={(subject) => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}
       />
 
-      <h3>{editingId ? "Modifier l'objectif de quête" : "Nouvel objectif de quête"}</h3>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Type
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-            <option value="groupe">Groupe</option>
-            <option value="individuel">Individuel</option>
-          </select>
-        </label>
-        <label>
-          Article (avant "de")
-          <select value={form.article} onChange={(e) => setForm({ ...form, article: e.target.value })}>
-            <option value="le">le</option>
-            <option value="la">la</option>
-            <option value="les">les</option>
-            <option value="l'">l'</option>
-          </select>
-        </label>
-        <input
-          placeholder='Nom (ex: "bandits", "chef des bandits")'
-          value={form.nom}
-          onChange={(e) => setForm({ ...form, nom: e.target.value })}
-          required
-        />
-        <label>
-          Genre
-          <select value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}>
-            <option value="m">masculin</option>
-            <option value="f">féminin</option>
-          </select>
-        </label>
-        <label>
-          Nombre
-          <select value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}>
-            <option value="singulier">singulier</option>
-            <option value="pluriel">pluriel</option>
-          </select>
-        </label>
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer l'objectif de quête"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier l'objectif de quête" : "Nouvel objectif de quête"}</summary>
+        <form onSubmit={handleSubmit}>
+          <label>
+            Type
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+              <option value="groupe">Groupe</option>
+              <option value="individuel">Individuel</option>
+            </select>
+          </label>
+          <label>
+            Article (avant "de")
+            <select value={form.article} onChange={(e) => setForm({ ...form, article: e.target.value })}>
+              <option value="le">le</option>
+              <option value="la">la</option>
+              <option value="les">les</option>
+              <option value="l'">l'</option>
+            </select>
+          </label>
+          <input
+            placeholder='Nom (ex: "bandits", "chef des bandits")'
+            value={form.nom}
+            onChange={(e) => setForm({ ...form, nom: e.target.value })}
+            required
+          />
+          <label>
+            Genre
+            <select value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}>
+              <option value="m">masculin</option>
+              <option value="f">féminin</option>
+            </select>
+          </label>
+          <label>
+            Nombre
+            <select value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}>
+              <option value="singulier">singulier</option>
+              <option value="pluriel">pluriel</option>
+            </select>
+          </label>
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer l'objectif de quête"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

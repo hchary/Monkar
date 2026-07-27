@@ -8,6 +8,8 @@ export default function OriginsManager() {
   const [origins, setOrigins] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "origins", "items"), (snap) => {
@@ -15,9 +17,15 @@ export default function OriginsManager() {
     });
   }, []);
 
+  const filteredOrigins = origins.filter((origin) => {
+    const q = filterText.toLowerCase();
+    return !q || (origin.name || "").toLowerCase().includes(q) || (origin.description || "").toLowerCase().includes(q);
+  });
+
   function startEdit(origin) {
     setEditingId(origin.id);
     setForm({ name: origin.name || "", description: origin.description || "" });
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -39,8 +47,20 @@ export default function OriginsManager() {
     <div className="creator-section">
       <h2>Origines</h2>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input
+          placeholder="Rechercher par nom ou description..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {origins.map((origin) => (
+        {filteredOrigins.map((origin) => (
           <li key={origin.id}>
             <strong>{origin.name}</strong> — {origin.description}
             <button type="button" onClick={() => startEdit(origin)}>
@@ -53,23 +73,25 @@ export default function OriginsManager() {
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier l'origine" : "Nouvelle origine"}</h3>
-      <form onSubmit={handleSubmit}>
-        <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <input
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer l'origine"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier l'origine" : "Nouvelle origine"}</summary>
+        <form onSubmit={handleSubmit}>
+          <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <input
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer l'origine"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

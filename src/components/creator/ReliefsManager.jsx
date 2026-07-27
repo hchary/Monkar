@@ -8,6 +8,8 @@ export default function ReliefsManager() {
   const [reliefs, setReliefs] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "reliefs", "items"), (snap) => {
@@ -15,9 +17,15 @@ export default function ReliefsManager() {
     });
   }, []);
 
+  const filteredReliefs = reliefs.filter((relief) => {
+    const q = filterText.toLowerCase();
+    return !q || (relief.name || "").toLowerCase().includes(q) || (relief.description || "").toLowerCase().includes(q);
+  });
+
   function startEdit(relief) {
     setEditingId(relief.id);
     setForm({ name: relief.name || "", description: relief.description || "" });
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -39,8 +47,20 @@ export default function ReliefsManager() {
     <div className="creator-section">
       <h2>Reliefs</h2>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input
+          placeholder="Rechercher par nom ou description..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {reliefs.map((relief) => (
+        {filteredReliefs.map((relief) => (
           <li key={relief.id}>
             <strong>{relief.name}</strong> — {relief.description}
             <button type="button" onClick={() => startEdit(relief)}>
@@ -53,23 +73,25 @@ export default function ReliefsManager() {
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier le relief" : "Nouveau relief"}</h3>
-      <form onSubmit={handleSubmit}>
-        <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <input
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer le relief"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier le relief" : "Nouveau relief"}</summary>
+        <form onSubmit={handleSubmit}>
+          <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <input
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer le relief"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }
