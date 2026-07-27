@@ -406,6 +406,89 @@ fieldset label {
   border-image: linear-gradient(90deg, #ff004c, #ff8a00, #ffe600, #00e676, #00b0ff, #7c4dff) 1;
 }
 
+/* Quest difficulty — colors the "Action de la veille" panel and the "Succès" text when
+   the drawn quest carries one. Its own 6-tier scale, separate from talent rarity above. */
+.last-action[class*="difficulty-"] {
+  border: 2px solid;
+  clip-path: var(--pixel-frame);
+  padding: 12px;
+}
+
+.last-action.difficulty-facile {
+  border-color: #2ecc71;
+}
+
+.last-action.difficulty-moyen {
+  border-color: #f1c40f;
+}
+
+.last-action.difficulty-difficile {
+  border-color: #e67e22;
+}
+
+.last-action.difficulty-tres_difficile {
+  border-color: #ff6b6b;
+}
+
+.last-action.difficulty-epique {
+  border-color: #d4af37;
+  position: relative;
+  overflow: hidden;
+}
+
+.last-action.difficulty-epique::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 30%;
+  height: 200%;
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.3) 0 3px, transparent 3px 6px);
+  animation: epique-shine 2.5s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes epique-shine {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+.last-action.difficulty-mythique {
+  border-color: transparent;
+  border-image: linear-gradient(135deg, #d4af37, #c0c0c0, #d4af37) 1;
+}
+
+.difficulty-text-facile {
+  color: #2ecc71;
+}
+
+.difficulty-text-moyen {
+  color: #f1c40f;
+}
+
+.difficulty-text-difficile {
+  color: #e67e22;
+}
+
+.difficulty-text-tres_difficile {
+  color: #ff6b6b;
+}
+
+.difficulty-text-epique {
+  color: #d4af37;
+}
+
+.difficulty-text-mythique {
+  background: linear-gradient(135deg, #d4af37, #c0c0c0, #d4af37);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .modal-select-field {
   border: 1px solid var(--border);
   clip-path: var(--pixel-frame);

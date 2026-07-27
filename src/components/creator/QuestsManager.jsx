@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { RARITIES } from "./TalentsManager";
 import { OBJECTIVE_TAG, matchesQuestObjective } from "./QuestObjectivesManager";
 import { matchesVerbPhrase } from "./TextGenerationManager";
 import { matchesRegion } from "./RegionsManager";
@@ -15,12 +14,23 @@ export function matchesQuest(option, query) {
   return !q || (option.name || "").toLowerCase().includes(q);
 }
 
-const emptyFilters = { objectiveIds: [], rarities: [], regionIds: [], locationId: "" };
+// Own 6-tier scale (not the 8-tier rarity enum shared by talents) since only some tiers
+// carry over semantically to "how hard is this quest" — see docs/TODO.md.
+export const DIFFICULTIES = [
+  { value: "facile", label: "Facile" },
+  { value: "moyen", label: "Moyen" },
+  { value: "difficile", label: "Difficile" },
+  { value: "tres_difficile", label: "Très difficile" },
+  { value: "epique", label: "Épique" },
+  { value: "mythique", label: "Mythique" },
+];
+
+const emptyFilters = { objectiveIds: [], difficulties: [], regionIds: [], locationId: "" };
 
 const emptyForm = {
   name: "",
   objectiveIds: [],
-  rarities: [],
+  difficulties: [],
   successPhraseIds: [],
   failurePhraseIds: [],
   regionIds: [],
@@ -91,7 +101,7 @@ export default function QuestsManager() {
     setForm((prev) => ({
       ...prev,
       objectiveIds: filters.objectiveIds,
-      rarities: filters.rarities,
+      difficulties: filters.difficulties,
       regionIds: filters.regionIds,
       locationId: filters.locationId,
     }));
@@ -101,7 +111,7 @@ export default function QuestsManager() {
     if (filters.objectiveIds.length > 0 && !(quest.objectiveIds || []).some((id) => filters.objectiveIds.includes(id))) {
       return false;
     }
-    if (filters.rarities.length > 0 && !(quest.rarities || []).some((r) => filters.rarities.includes(r))) {
+    if (filters.difficulties.length > 0 && !(quest.difficulties || []).some((d) => filters.difficulties.includes(d))) {
       return false;
     }
     if (filters.regionIds.length > 0 && !(quest.regionIds || []).some((id) => filters.regionIds.includes(id))) {
@@ -125,7 +135,7 @@ export default function QuestsManager() {
     setForm({
       name: quest.name || "",
       objectiveIds: quest.objectiveIds || [],
-      rarities: quest.rarities || [],
+      difficulties: quest.difficulties || [],
       successPhraseIds: quest.successPhraseIds || [],
       failurePhraseIds: quest.failurePhraseIds || [],
       regionIds: quest.regionIds || [],
@@ -139,7 +149,7 @@ export default function QuestsManager() {
     setForm({
       ...emptyForm,
       objectiveIds: filters.objectiveIds,
-      rarities: filters.rarities,
+      difficulties: filters.difficulties,
       regionIds: filters.regionIds,
       locationId: filters.locationId,
     });
@@ -161,7 +171,7 @@ export default function QuestsManager() {
     await setDoc(ref, {
       name: form.name,
       objectiveIds: form.objectiveIds,
-      rarities: form.rarities,
+      difficulties: form.difficulties,
       successPhraseIds: form.successPhraseIds,
       failurePhraseIds: form.failurePhraseIds,
       regionIds: form.regionIds,
@@ -183,10 +193,10 @@ export default function QuestsManager() {
           onToggle={(id) => toggleFilter("objectiveIds", id)}
         />
         <MultiSelectField
-          legend="Raretés"
-          options={RARITIES.map((r) => ({ id: r.value, name: r.label }))}
-          selectedIds={filters.rarities}
-          onToggle={(id) => toggleFilter("rarities", id)}
+          legend="Niveau de difficulté"
+          options={DIFFICULTIES.map((d) => ({ id: d.value, name: d.label }))}
+          selectedIds={filters.difficulties}
+          onToggle={(id) => toggleFilter("difficulties", id)}
         />
         <MultiSelectField
           legend="Régions possibles"
@@ -224,10 +234,10 @@ export default function QuestsManager() {
                 .join(", ") || "aucun"}
             </div>
             <div>
-              Raretés :{" "}
-              {(quest.rarities || [])
-                .map((value) => RARITIES.find((r) => r.value === value)?.label || value)
-                .join(", ") || "aucune"}
+              Niveau de difficulté :{" "}
+              {(quest.difficulties || [])
+                .map((value) => DIFFICULTIES.find((d) => d.value === value)?.label || value)
+                .join(", ") || "aucun"}
             </div>
             <div>
               Régions possibles :{" "}
@@ -264,10 +274,10 @@ export default function QuestsManager() {
           />
 
           <MultiSelectField
-            legend="Raretés possibles"
-            options={RARITIES.map((r) => ({ id: r.value, name: r.label }))}
-            selectedIds={form.rarities}
-            onToggle={(id) => toggleIn("rarities", id)}
+            legend="Niveau de difficulté possible"
+            options={DIFFICULTIES.map((d) => ({ id: d.value, name: d.label }))}
+            selectedIds={form.difficulties}
+            onToggle={(id) => toggleIn("difficulties", id)}
           />
 
           <MultiSelectModalField
