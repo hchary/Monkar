@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, deleteDoc, setDoc, onSnapshot, getDocs, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+
+// Matches a tag's name — for use as MultiSelectModalField's matchesFilter (e.g. QuestsManager's tagIds).
+export function matchesTag(option, search) {
+  const q = search.toLowerCase();
+  return !q || (option.name || "").toLowerCase().includes(q);
+}
 
 export default function TagsManager() {
   const [tags, setTags] = useState([]);
@@ -46,6 +52,14 @@ export default function TagsManager() {
 
   async function handleDelete() {
     if (!selectedTag) return;
+    const referencingQuests = await getDocs(
+      query(collection(db, "worldData", "quests", "items"), where("tagIds", "array-contains", selectedTag.id))
+    );
+    await Promise.all(
+      referencingQuests.docs.map((questDoc) =>
+        updateDoc(questDoc.ref, { tagIds: (questDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
+      )
+    );
     await deleteDoc(doc(db, "worldData", "tags", "items", selectedTag.id));
     closeDialog();
   }
