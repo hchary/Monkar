@@ -234,7 +234,6 @@ src/
     creator/
       RegionsManager.jsx     regions + nested per-region backgrounds CRUD
       TalentsManager.jsx     global talent catalog CRUD (name/trainable/rarity/effect)
-      ActionTypesManager.jsx actionTypes CRUD with a structured tiers sub-form
       TextGenerationManager.jsx narrativeSubjects + verbPhrases CRUD for procedural narrativeText
       CharactersOverview.jsx list of every character -> full sheet + history on click
   pages/
@@ -263,6 +262,6 @@ Current deployed project: `monkar-rpg` (Firebase, Blaze plan — required for Cl
 
 ## Known gaps (as of this writing)
 
-- The creator dashboard has CRUD for regions/backgrounds/talents/actionTypes only (the data the game actually consumes today). Factions, gods, and creatures have no CRUD yet and still have to be created by hand in the Firestore console — deliberately deferred since nothing in the app reads them yet either.
+- The creator dashboard has CRUD for regions/backgrounds/talents only (the data the game actually consumes today). `actionTypes` has no CRUD UI (removed — out of scope for now) and, like factions, gods, and creatures, has to be created by hand in the Firestore console.
 - `title`, `legendLevel` progression beyond the raw counter, `blessings`, `curses`, quest journal, world-knowledge lore, and messaging are all stubs — visually present (or, for messaging, not even that) but not wired to real game logic yet, by design (deferred until the underlying systems are designed).
 - Procedural `narrativeText` generation (see "Procedural quest-result text" above) only covers `"victoire"`/`"echec"` outcomes; tiers still need a hand-authored `narrativeText` fallback for when no subject/verb-phrase pair is populated for a given target. No visual theme/styling pass yet.
