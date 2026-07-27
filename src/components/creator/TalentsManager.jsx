@@ -23,6 +23,17 @@ const emptyForm = {
   trainerTypeId: "",
 };
 
+// Matches a talent's name, effect text, or rarity — for use as MultiSelectModalField's matchesFilter.
+export function matchesTalent(option, query) {
+  const q = query.toLowerCase();
+  if (!q) return true;
+  return (
+    (option.name || "").toLowerCase().includes(q) ||
+    (option.effect || "").toLowerCase().includes(q) ||
+    (option.rarity || "").toLowerCase().includes(q)
+  );
+}
+
 function useItems(collectionName) {
   const [items, setItems] = useState([]);
   useEffect(() => {

@@ -3,9 +3,18 @@ import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firesto
 import { db } from "../../lib/firebase";
 import NarrativeSubjectList from "./NarrativeSubjectList";
 
-const OBJECTIVE_TAG = "objectif de quête";
+export const OBJECTIVE_TAG = "objectif de quête";
 
 const emptyForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel" };
+
+// Matches a quest objective's display name or tags — for use as MultiSelectModalField's matchesFilter.
+export function matchesQuestObjective(option, query) {
+  const q = query.toLowerCase();
+  if (!q) return true;
+  return (
+    (option.name || "").toLowerCase().includes(q) || (option.tags || []).some((tag) => tag.toLowerCase().includes(q))
+  );
+}
 
 export default function QuestObjectivesManager() {
   const [subjects, setSubjects] = useState([]);

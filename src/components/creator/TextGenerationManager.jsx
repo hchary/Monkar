@@ -13,6 +13,17 @@ function parseTags(tags) {
     .filter(Boolean);
 }
 
+// Matches a verb phrase's template text, cible, or tags — for use as MultiSelectModalField's matchesFilter.
+export function matchesVerbPhrase(option, query) {
+  const q = query.toLowerCase();
+  if (!q) return true;
+  return (
+    (option.name || "").toLowerCase().includes(q) ||
+    (option.cible || "").toLowerCase().includes(q) ||
+    (option.tags || []).some((tag) => tag.toLowerCase().includes(q))
+  );
+}
+
 function SubjectsManager() {
   const [subjects, setSubjects] = useState([]);
   const [editingId, setEditingId] = useState(null);

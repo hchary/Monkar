@@ -10,6 +10,13 @@ const DIRECTIONS = [
   { value: "ouest", label: "Ouest" },
 ];
 
+// Matches a region's name or description — for use as MultiSelectModalField's matchesFilter.
+export function matchesRegion(option, query) {
+  const q = query.toLowerCase();
+  if (!q) return true;
+  return (option.name || "").toLowerCase().includes(q) || (option.description || "").toLowerCase().includes(q);
+}
+
 const emptyRegionForm = {
   name: "",
   nameSuggestions: "",
@@ -384,11 +391,11 @@ export default function RegionsManager() {
         />
 
         <MultiSelectField
-          legend="Zones d'aventures"
+          legend="Lieux de quête"
           options={adventureZones}
           selectedIds={form.adventureZoneIds}
           onToggle={(id) => toggleIn("adventureZoneIds", id)}
-          createLink={`/creator?section=${encodeURIComponent("Zones d'aventures")}`}
+          createLink={`/creator?section=${encodeURIComponent("Lieux de quête")}`}
         />
 
         <MultiSelectField
