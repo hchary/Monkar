@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { generateResultText } = require("./textGeneration");
 
 initializeApp();
 const db = getFirestore();
@@ -119,6 +120,13 @@ exports.performAction = onCall(async (request) => {
   if (!actionTypeSnap.exists) throw new HttpsError("not-found", "Unknown action type.");
   const actionType = actionTypeSnap.data();
 
+  const [narrativeSubjectsSnap, verbPhrasesSnap] = await Promise.all([
+    db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
+    db.collection("worldData").doc("verbPhrases").collection("items").get(),
+  ]);
+  const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => d.data());
+  const verbPhrases = verbPhrasesSnap.docs.map((d) => d.data());
+
   const today = todayUTC();
 
   await db.runTransaction(async (tx) => {
@@ -153,6 +161,17 @@ exports.performAction = onCall(async (request) => {
       }
     }
 
+    let narrativeText = tier.narrativeText || "";
+    if (tier.cible) {
+      const generated = generateResultText({
+        resultat: success ? "victoire" : "echec",
+        cible: tier.cible,
+        subjects: narrativeSubjects,
+        verbPhrases,
+      });
+      if (generated) narrativeText = generated;
+    }
+
     const updates = {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
@@ -161,7 +180,7 @@ exports.performAction = onCall(async (request) => {
         date: today,
         tierName: tier.name,
         success,
-        narrativeText: tier.narrativeText || "",
+        narrativeText,
         bonusesApplied,
         goldGain: tier.goldGain || 0,
         itemGain: tier.itemGain || null,
@@ -205,7 +224,7 @@ exports.performAction = onCall(async (request) => {
       tierName: tier.name,
       success,
       bonusesApplied,
-      narrativeText: tier.narrativeText || "",
+      narrativeText,
       consequence: tier.consequence || null,
       createdAt: FieldValue.serverTimestamp(),
     });

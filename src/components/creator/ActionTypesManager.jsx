@@ -10,6 +10,7 @@ function emptyTier() {
     weight: 10,
     success: true,
     narrativeText: "",
+    cible: "",
     bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0 },
     goldGain: 0,
     itemGainName: "",
@@ -31,6 +32,7 @@ function tierToForm(tier) {
     weight: tier.weight ?? 10,
     success: tier.success !== false,
     narrativeText: tier.narrativeText || "",
+    cible: tier.cible || "",
     bonuses: { force: 0, agilite: 0, intelligence: 0, charisme: 0, ...(tier.bonuses || {}) },
     goldGain: tier.goldGain || 0,
     itemGainName: tier.itemGain?.name || "",
@@ -60,6 +62,8 @@ function formToTier(form) {
     narrativeText: form.narrativeText,
     bonuses,
   };
+
+  if (form.cible) tier.cible = form.cible;
 
   if (form.success) {
     tier.goldGain = Number(form.goldGain) || 0;
@@ -107,10 +111,19 @@ function TierEditor({ tier, index, talents, onChange, onRemove }) {
       </div>
 
       <textarea
-        placeholder="Texte narratif"
+        placeholder="Texte narratif (utilisé tel quel si aucune cible n'est choisie ci-dessous, ou en repli si la génération procédurale ne trouve aucune combinaison)"
         value={tier.narrativeText}
         onChange={(e) => set("narrativeText", e.target.value)}
       />
+
+      <label>
+        Cible (génération procédurale du texte de résultat)
+        <select value={tier.cible} onChange={(e) => set("cible", e.target.value)}>
+          <option value="">Aucune (texte narratif fixe)</option>
+          <option value="groupe">Groupe</option>
+          <option value="individuel">Individuel</option>
+        </select>
+      </label>
 
       <fieldset>
         <legend>Bonus de stats (tous tiers)</legend>
