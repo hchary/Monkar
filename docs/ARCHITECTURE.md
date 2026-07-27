@@ -148,11 +148,13 @@ worldData/quests/items/{id}
   -- lootTableId: TBD -- quests don't reference a loot table yet, see docs/TODO.md
 
 worldData/objects/items/{id}       -- general item catalog: weapons, armor, components, knowledge
-  name: string                     -- tomes, magic items, currency, property deeds, etc. are all
-  description: string               -- expected to be tagged rather than modeled as separate fields
+  name: string                     -- tomes, magic items, currency, property deeds, etc.
+  description: string
   rarity: string                   -- one of the 8-tier rarity enum shared with talents, above
-  tagIds: [string]                 -- worldData/tags/items ids; the object's "type" (arme, armure, ...)
-                                    -- is just a tag today, same mechanism as any other tag
+  type: string                     -- one of the fixed OBJECT_TYPES enum (ObjectsManager.jsx):
+                                    -- arme, armure, consommable, composant, ingredient, grimoire,
+                                    -- parchemin, objet_magique, titre_propriete, vetement
+  tagIds: [string]                 -- worldData/tags/items ids
   -- not yet consumed by any Cloud Function or linked to a character's inventory, see docs/TODO.md
 
 worldData/lootTables/items/{id}    -- loot table catalog: a named, tagged pool of objects a quest

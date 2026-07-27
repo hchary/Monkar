@@ -6,7 +6,21 @@ import { RARITIES } from "./TalentsManager";
 import { matchesTag } from "./TagsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
 
-// Matches an object's name, description, or rarity — for use as MultiSelectModalField's
+// Fixed catalog of item types — no creator UI to add new ones for now.
+export const OBJECT_TYPES = [
+  { value: "arme", label: "Armes" },
+  { value: "armure", label: "Armures" },
+  { value: "consommable", label: "Consommables" },
+  { value: "composant", label: "Composants" },
+  { value: "ingredient", label: "Ingrédient" },
+  { value: "grimoire", label: "Grimoires" },
+  { value: "parchemin", label: "Parchemin" },
+  { value: "objet_magique", label: "Objet magique" },
+  { value: "titre_propriete", label: "Titres de propriété" },
+  { value: "vetement", label: "Vêtement" },
+];
+
+// Matches an object's name, description, rarity, or type — for use as MultiSelectModalField's
 // matchesFilter (e.g. a future Instance manager picking from this catalog).
 export function matchesObject(option, query) {
   const q = query.toLowerCase();
@@ -14,7 +28,8 @@ export function matchesObject(option, query) {
   return (
     (option.name || "").toLowerCase().includes(q) ||
     (option.description || "").toLowerCase().includes(q) ||
-    (option.rarity || "").toLowerCase().includes(q)
+    (option.rarity || "").toLowerCase().includes(q) ||
+    (option.type || "").toLowerCase().includes(q)
   );
 }
 
@@ -43,8 +58,8 @@ function MultiSelectField({ legend, options, selectedIds, onToggle }) {
   );
 }
 
-const emptyFilters = { rarities: [], tagIds: [], text: "" };
-const emptyForm = { name: "", description: "", rarity: "commun", tagIds: [] };
+const emptyFilters = { rarities: [], types: [], tagIds: [], text: "" };
+const emptyForm = { name: "", description: "", rarity: "commun", type: OBJECT_TYPES[0].value, tagIds: [] };
 
 export default function ObjectsManager() {
   const [objects, setObjects] = useState([]);
@@ -83,6 +98,7 @@ export default function ObjectsManager() {
 
   const filteredObjects = objects.filter((object) => {
     if (filters.rarities.length > 0 && !filters.rarities.includes(object.rarity || "commun")) return false;
+    if (filters.types.length > 0 && !filters.types.includes(object.type)) return false;
     if (filters.tagIds.length > 0 && !(object.tagIds || []).some((id) => filters.tagIds.includes(id))) return false;
     if (!matchesObject(object, filters.text)) return false;
     return true;
@@ -92,6 +108,13 @@ export default function ObjectsManager() {
     setFilters((prev) => ({
       ...prev,
       rarities: prev.rarities.includes(value) ? prev.rarities.filter((r) => r !== value) : [...prev.rarities, value],
+    }));
+  }
+
+  function toggleFilterType(value) {
+    setFilters((prev) => ({
+      ...prev,
+      types: prev.types.includes(value) ? prev.types.filter((t) => t !== value) : [...prev.types, value],
     }));
   }
 
@@ -108,6 +131,7 @@ export default function ObjectsManager() {
       name: object.name || "",
       description: object.description || "",
       rarity: object.rarity || "commun",
+      type: object.type || OBJECT_TYPES[0].value,
       tagIds: object.tagIds || [],
     });
     setPanelOpen(true);
@@ -147,6 +171,7 @@ export default function ObjectsManager() {
       name: form.name,
       description: form.description,
       rarity: form.rarity,
+      type: form.type,
       tagIds: form.tagIds,
     });
     resetForm();
@@ -164,6 +189,12 @@ export default function ObjectsManager() {
           selectedIds={filters.rarities}
           onToggle={toggleFilterRarity}
         />
+        <MultiSelectField
+          legend="Types"
+          options={OBJECT_TYPES.map((t) => ({ id: t.value, name: t.label }))}
+          selectedIds={filters.types}
+          onToggle={toggleFilterType}
+        />
         <MultiSelectField legend="Tags" options={sortedTags} selectedIds={filters.tagIds} onToggle={toggleFilterTag} />
         <input
           placeholder="Rechercher par nom ou description..."
@@ -179,7 +210,8 @@ export default function ObjectsManager() {
         {filteredObjects.length === 0 && <li className="empty-state">Aucun objet.</li>}
         {filteredObjects.map((object) => (
           <li key={object.id}>
-            <strong>{object.name}</strong> — {RARITIES.find((r) => r.value === object.rarity)?.label || object.rarity}
+            <strong>{object.name}</strong> — {RARITIES.find((r) => r.value === object.rarity)?.label || object.rarity} —{" "}
+            {OBJECT_TYPES.find((t) => t.value === object.type)?.label || object.type}
             <div>{object.description}</div>
             <div>
               Tags :{" "}
@@ -210,6 +242,17 @@ export default function ObjectsManager() {
               {RARITIES.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Type
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+              {OBJECT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
                 </option>
               ))}
             </select>
