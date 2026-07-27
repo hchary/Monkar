@@ -156,7 +156,16 @@ worldData/objects/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- **Instance**: the components that specialize Objet (weapon, armor, etc.) will be a separate `Instance` component — an object plus a date of acquisition, potentially other particulars, and a link to a character's inventory. Not implemented at all yet — no object is attached to any character.
+- **Instance**: implemented as a display-only component (`Instance.jsx`, `InventoryTab.jsx`) — an Instance is an Object owned by a character, with an acquisition date, an owner (`characterId`), and a condition (neuf, usé, endommagé, cassé). Shown under the object's name in the character page's "Inventaire" tab, filterable by type, tag, and rarity, in a scrollable (non-growing) list. No creation UI yet — instance documents must be added directly in Firestore.
+
+**Data model implications (Instance)**:
+```
+instances/{id}
+  objectId: string        -- worldData/objects/items id
+  characterId: string     -- characters/{id} id, the owner
+  acquisitionDate: string -- "YYYY-MM-DD"
+  condition: string        -- one of: neuf, use, endommage, casse
+```
 
 ## Loot table creation
 
