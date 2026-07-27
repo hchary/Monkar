@@ -1,6 +1,7 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
 const { rollWeighted, rarityFloor } = require("../lib/rolls");
+const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 const { generateResultText } = require("../textGeneration");
 
 const ACTION_TYPE_ID = "partir-en-quete";
@@ -64,18 +65,58 @@ async function prepare({ db, character, actionType }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  const [narrativeSubjectsSnap, verbPhrasesSnap] = await Promise.all([
+  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap] = await Promise.all([
     db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
     db.collection("worldData").doc("verbPhrases").collection("items").get(),
+    db.collection("worldData").doc("lootTables").collection("items").get(),
+    db.collection("worldData").doc("objects").collection("items").get(),
   ]);
   const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { quest, locationName, narrativeSubjects, verbPhrases };
+  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects };
+}
+
+// Draws the quest's loot: one loot table per item, picked among those sharing at least one
+// tag with the quest or the (randomly chosen, per item) quest objective and matching that
+// objective's rarity - then a uniform item draw within that table. Items with no matching
+// table/objective are silently skipped rather than failing the whole quest (content gap).
+function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects, accomplishmentMessage }) {
+  const count = LOOT_COUNT_BY_DIFFICULTY[difficulty] || 0;
+  const loot = [];
+  for (let i = 0; i < count; i++) {
+    const objective = pickRandomLoot(questObjectives);
+    if (!objective) continue;
+
+    const relevantTagIds = new Set([...(quest.tagIds || []), ...(objective.tagIds || [])]);
+    const candidateTables = lootTables.filter(
+      (table) => table.rarity === objective.rarity && (table.tagIds || []).some((id) => relevantTagIds.has(id))
+    );
+    const table = pickRandomLoot(candidateTables);
+    if (!table) continue;
+
+    const objectId = drawLootTableItemId(table);
+    const object = objects.find((o) => o.id === objectId);
+    if (!object) continue;
+
+    loot.push({
+      objectId: object.id,
+      name: object.name,
+      rarity: object.rarity,
+      type: object.type,
+      tagIds: object.tagIds || [],
+      tableId: table.id,
+      tableName: table.name,
+      description: `${object.description || ""} [Obtenue lorsque ${accomplishmentMessage}]`.trim(),
+    });
+  }
+  return loot;
 }
 
 async function resolve({ tx, db, character, actionType, today, context }) {
-  const { quest, locationName, narrativeSubjects, verbPhrases } = context;
+  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects } = context;
 
   const tier = rollWeighted(actionType.tiers);
   const success = tier.success !== false;
@@ -100,6 +141,8 @@ async function resolve({ tx, db, character, actionType, today, context }) {
     }
   }
 
+  const questObjectives = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
+
   // The quest's own objective/phrase pools are tried first so the result text stays
   // on-theme with the drawn quest; if the quest has no pool for this outcome, fall
   // back to the global pools exactly like a quest-less action would.
@@ -107,14 +150,24 @@ async function resolve({ tx, db, character, actionType, today, context }) {
   if (tier.cible) {
     const resultat = success ? "victoire" : "echec";
     const questPhraseIds = resultat === "victoire" ? quest.successPhraseIds : quest.failurePhraseIds;
-    const questSubjects = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
     const questVerbPhrases = verbPhrases.filter((v) => (questPhraseIds || []).includes(v.id));
-    let generated = generateResultText({ resultat, cible: tier.cible, subjects: questSubjects, verbPhrases: questVerbPhrases });
+    let generated = generateResultText({ resultat, cible: tier.cible, subjects: questObjectives, verbPhrases: questVerbPhrases });
     if (!generated) {
       generated = generateResultText({ resultat, cible: tier.cible, subjects: narrativeSubjects, verbPhrases });
     }
     if (generated) narrativeText = generated;
   }
+
+  const loot = success
+    ? drawQuestLoot({
+        quest,
+        difficulty: quest.difficulty,
+        questObjectives,
+        lootTables,
+        objects,
+        accomplishmentMessage: narrativeText,
+      })
+    : [];
 
   const questSummary = {
     id: quest.id,
@@ -140,6 +193,8 @@ async function resolve({ tx, db, character, actionType, today, context }) {
       legendary: !!tier.legendary,
       consequence: tier.consequence || null,
       quest: questSummary,
+      loot,
+      lootClaimed: false,
     },
   };
 

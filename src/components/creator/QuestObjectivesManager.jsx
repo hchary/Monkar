@@ -4,10 +4,11 @@ import { db } from "../../lib/firebase";
 import NarrativeSubjectList from "./NarrativeSubjectList";
 import MultiSelectModalField from "./MultiSelectModalField";
 import { matchesTag } from "./TagsManager";
+import { RARITIES } from "./TalentsManager";
 
 export const OBJECTIVE_TAG = "objectif de quête";
 
-const emptyForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tagIds: [] };
+const emptyForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tagIds: [], rarity: "commun" };
 
 // Matches a quest objective's display name or tags — for use as MultiSelectModalField's matchesFilter.
 export function matchesQuestObjective(option, query) {
@@ -55,6 +56,7 @@ export default function QuestObjectivesManager() {
       genre: subject.genre || "m",
       nombre: subject.nombre || "pluriel",
       tagIds: subject.tagIds || [],
+      rarity: subject.rarity || "commun",
     });
     setOtherTags((subject.tags || []).filter((t) => t !== OBJECTIVE_TAG));
     setPanelOpen(true);
@@ -80,6 +82,7 @@ export default function QuestObjectivesManager() {
       nombre: form.nombre,
       tags: [...otherTags, OBJECTIVE_TAG],
       tagIds: form.tagIds,
+      rarity: form.rarity,
     });
     resetForm();
   }
@@ -154,6 +157,16 @@ export default function QuestObjectivesManager() {
             <select value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}>
               <option value="singulier">singulier</option>
               <option value="pluriel">pluriel</option>
+            </select>
+          </label>
+          <label title="Utilisée pour choisir la table de tirage lors du butin de quête (voir Tables de tirage).">
+            Rareté
+            <select value={form.rarity} onChange={(e) => setForm({ ...form, rarity: e.target.value })}>
+              {RARITIES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
             </select>
           </label>
 

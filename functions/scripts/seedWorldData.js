@@ -77,7 +77,7 @@ async function seed() {
         name: "Réussite",
         weight: 55,
         success: true,
-        narrativeText: "Tu reviens victorieux, quelques pièces et un peu plus d'expérience en poche.",
+        narrativeText: "Votre réputation et vos compétences grandissent, vous avez bien mérité de vous reposer",
         goldGain: 5,
         reputationGain: 1,
       },

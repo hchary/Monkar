@@ -73,7 +73,7 @@ Not implemented yet beyond the name-only stub described above.
 
 ## Quest creation and editing
 
-Status: **implemented**, except loot (see "Still open" below). `worldData/quests/items` via `QuestsManager.jsx`, registered as the "Quêtes" tab in `CreatorDashboard.jsx`.
+Status: **implemented**. `worldData/quests/items` via `QuestsManager.jsx`, registered as the "Quêtes" tab in `CreatorDashboard.jsx`. Loot on quest completion is a separate feature, see [Quest loot draw](#quest-loot-draw).
 
 A quest is characterized by:
 
@@ -106,8 +106,9 @@ worldData/quests/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- **Loot**: a quest should eventually single-select a loot table, but that needs a loot table creation page first (and, before that, an item creation page). Not implemented — `worldData/quests/items` has no `lootTableId` field yet, and the quest draw in `partirEnQuete.js` deliberately doesn't roll loot yet either.
 - How `favoredQuestIds` on a talent should affect gameplay is still undecided (see above).
+
+Loot is now drawn on quest resolution — see [Quest loot draw](#quest-loot-draw). It ended up not needing a `lootTableId` field on the quest: which loot table is used is resolved dynamically per draw (by tag overlap and objective rarity) rather than fixed per quest.
 
 ## Quest difficulty
 
@@ -156,15 +157,21 @@ worldData/objects/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- **Instance**: implemented as a display-only component (`Instance.jsx`, `InventoryTab.jsx`) — an Instance is an Object owned by a character, with an acquisition date, an owner (`characterId`), and a condition (neuf, usé, endommagé, cassé). Shown under the object's name in the character page's "Inventaire" tab, filterable by type, tag, and rarity, in a scrollable (non-growing) list. No creation UI yet — instance documents must be added directly in Firestore.
+- **Instance**: implemented as a display-only component (`Instance.jsx`, `InventoryTab.jsx`) — an Instance is an Object owned by a character, with an acquisition date, an owner (`characterId`), and a condition (neuf, usé, endommagé, cassé). Shown under the object's name in the character page's "Inventaire" tab, filterable by type, tag, and rarity, in a scrollable (non-growing) list. No creation UI yet — instance documents are only created by the [Quest loot draw](#quest-loot-draw) Cloud Function for now; there's still no manual/creator way to add one directly.
 
 **Data model implications (Instance)**:
 ```
 instances/{id}
   objectId: string        -- worldData/objects/items id
   characterId: string     -- characters/{id} id, the owner
+  ownerUid: string         -- characters/{id}'s ownerUid, denormalized so firestore.rules
+                            --   can check read access without a second lookup (same
+                            --   convention as actionsLog)
   acquisitionDate: string -- "YYYY-MM-DD"
   condition: string        -- one of: neuf, use, endommage, casse
+  description: string      -- optional, overrides the object's catalog description when
+                            --   set (e.g. the quest loot draw appends
+                            --   "[Obtenue lorsque {accomplishment message}]")
 ```
 
 ## Loot table creation
@@ -192,5 +199,36 @@ worldData/lootTables/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- **Quest integration**: `worldData/quests/items` has no `lootTableId` field yet, so a quest can't single-select a loot table and no loot is drawn on quest resolution (`partirEnQuete.js`) — see [Quest creation and editing](#quest-creation-and-editing).
 - **Weighted entries**: the draw is uniform across all objects in a table; per-entry weighting (like `RegionsManager.jsx`'s backgrounds) isn't supported.
+
+Quest integration is implemented — see [Quest loot draw](#quest-loot-draw).
+
+## Quest loot draw
+
+Status: **implemented**. A completed quest grants the character 1-3 random Instances (see "Still open" under [Object creation](#object-creation)), rolled server-side by `functions/src/actions/partirEnQuete.js` as part of the same `performAction` resolution as everything else (tier, gold, talent, etc.) — only committed to Firestore once the player closes the result pop-up (see "Interaction" below).
+
+- **Rarity source**: Quest Objectives (`QuestObjectivesManager.jsx`, `worldData/narrativeSubjects/items` tagged "objectif de quête") now carry their own `rarity` field (the 8-tier enum shared with talents/objects/loot tables). A quest usually has several possible objectives; the objective used for rarity matching is re-rolled independently for each loot item, not fixed once for the whole quest.
+- **Loot count**: driven by the quest's resolved difficulty (`quest.difficulty`, already rolled for quest selection — see [Quest difficulty](#quest-difficulty)), via `LOOT_COUNT_BY_DIFFICULTY` in `functions/src/lib/loot.js`: facile/moyen → 1, difficile/très difficile → 2, épique/mythique → 3.
+- **Per-item draw** (`drawQuestLoot` in `partirEnQuete.js`, one pass per item): pick a random objective from the quest's objectives → filter `worldData/lootTables/items` to those whose `rarity` matches that objective's rarity AND whose `tagIds` overlaps the union of the quest's and that objective's `tagIds` → pick a random matching table → `drawLootTableItemId` (`functions/src/lib/loot.js`, a server-side copy of `src/lib/lootTables.js`'s draw) within it. An item is silently skipped (not retried) if no objective, no matching table, or no object is found — a content gap, not an error, so it never fails the quest itself.
+- **Instance description**: each drafted loot item's description is computed at draw time as `` `${object.description} [Obtenue lorsque ${accomplishmentMessage}]` ``, where `accomplishmentMessage` is the same `narrativeText` already generated for the quest's success message. Stored per-item so it survives the object's catalog description changing later.
+
+**Mechanic — roll vs. claim**: `resolve()` always writes the drafted loot (empty array on failure) to `lastAction.loot`, plus `lastAction.lootClaimed: false`, in the same transaction as the rest of quest resolution — so the outcome is fixed as soon as the action resolves, like everything else in `lastAction`. A separate callable, `claimQuestLoot` (`functions/src/index.js`), is what actually creates the `instances/{id}` documents; it runs when the player clicks "Fermer" on the result pop-up (see below), is idempotent (checks `lastAction.lootClaimed` first), and always flips `lootClaimed` to `true` even on a failed quest (nothing to create, just acknowledges the result) so the pop-up doesn't reopen on the next visit.
+
+**Interaction — quest result pop-up**: `ActionPanel.jsx` auto-opens a `<dialog>` (via `showModal()`, not closable by Escape/backdrop click) as soon as a quest's `lastAction` is revealed (same 24h delay as the rest of "Action de la veille") and not yet claimed. It shows the quest name, "Succès"/"Échec", the narrative message, and — on success with a non-empty `loot` array — a "Butin obtenu" `<fieldset>` listing the drafted items as `.instance-card.rarity-{rarity}` chips (same colored-border treatment as the inventory tab), sorted with the rarest item first (topmost) down to the most common (bottommost). The only way to close it is the "Fermer" button, which calls `claimQuestLoot`; the dialog then stays closed for good once `lastAction.lootClaimed` flips to `true` (reactive via the existing character `onSnapshot`). The already-existing expanded "Action de la veille" detail also gained a permanent "Butin : ..." line so the loot is still visible after the pop-up is gone.
+
+**Data model implications**:
+```
+worldData/narrativeSubjects/items/{id}  -- only the addition; see Quest creation and editing
+  rarity: string    -- one of the 8-tier rarity enum shared with talents/objects/loot tables
+                     --   (only meaningful for entries tagged "objectif de quête")
+
+character.lastAction.loot: [{
+  objectId: string, name: string, rarity: string, type: string, tagIds: string[],
+  tableId: string, tableName: string, description: string,
+}]
+character.lastAction.lootClaimed: boolean   -- flips to true once claimQuestLoot runs
+```
+
+firestore.rules gained an `instances/{id}` rule (read: creator or the owning player via a denormalized `ownerUid`; write: false, Cloud Functions only) — it was missing entirely before this feature, so the "Inventaire" tab's `instances` query had no rule to authorize it.
+
+**Still open**: no creator UI surfaces which loot tables/objectives are actually reachable together (e.g. a rarity/tag combination with zero matching tables) — a content author has to cross-reference `QuestObjectivesManager.jsx` and `TablesDeTirageManager.jsx` by hand to avoid dead combinations.
