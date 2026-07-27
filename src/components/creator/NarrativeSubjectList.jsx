@@ -7,7 +7,7 @@ export function capitalizeSubject(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-export default function NarrativeSubjectList({ subjects, onEdit, onDelete }) {
+export default function NarrativeSubjectList({ subjects, onEdit, onDelete, tagsCatalog }) {
   return (
     <>
       {SUBJECT_TYPES.map((subjectType) => {
@@ -28,6 +28,13 @@ export default function NarrativeSubjectList({ subjects, onEdit, onDelete }) {
                   <strong>
                     {capitalizeSubject(subject.nom)} ({capitalizeSubject(subject.article)})
                   </strong>
+                  {tagsCatalog && (subject.tagIds || []).length > 0 && (
+                    <span>
+                      {" "}
+                      — tags :{" "}
+                      {subject.tagIds.map((id) => tagsCatalog.find((t) => t.id === id)?.name || id).join(", ")}
+                    </span>
+                  )}
                   <button type="button" onClick={() => onEdit(subject)}>
                     Modifier
                   </button>
