@@ -12,6 +12,7 @@ import QuestsManager from "../components/creator/QuestsManager";
 import TextGenerationManager from "../components/creator/TextGenerationManager";
 import TagsManager from "../components/creator/TagsManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
+import ObjectsManager from "../components/creator/ObjectsManager";
 
 const DEFAULT_SECTION = "Régions";
 
@@ -52,6 +53,7 @@ const GROUPS = [
       Personnages: CharactersOverview,
       Origines: OriginsManager,
       Talents: TalentsManager,
+      Objets: ObjectsManager,
     },
   },
 ];
