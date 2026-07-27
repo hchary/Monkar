@@ -4,7 +4,7 @@ Technical reference for how Monkar is built. For setup instructions, see [README
 
 ## Overview
 
-Monkar is a daily-action text RPG. On first login, a player picks a region, a background and a base trait are rolled for them, and they name their character. From then on they pick one action per day (quest, rest, training, shopping...); the outcome is a weighted random roll, revealed a day later, and the character can't act again until the next day. Failure can wound the character or end their life permanently (permadeath) — at which point the player goes through character creation again. A separate "creator" role can inspect every character's history and author the game world's content (regions, backgrounds, traits, action types, and eventually factions/gods/creatures).
+Monkar is a daily-action text RPG. On first login, a player picks a region, a background is rolled for them, and they name their character. From then on they pick one action per day (quest, rest, training, shopping...); the outcome is a weighted random roll, revealed a day later, and the character can't act again until the next day. Failure can wound the character or end their life permanently (permadeath) — at which point the player goes through character creation again. A separate "creator" role can inspect every character's history and author the game world's content (regions, backgrounds, talents, action types, and eventually factions/gods/creatures).
 
 GitHub Pages only serves static files, so all stateful and security-sensitive logic lives in Firebase:
 
@@ -39,7 +39,6 @@ characters/{characterId}
   age: 18                          -- fixed for every character
   region: { id, name }
   background: { id, name, profession }
-  trait: { id, name, description }
   title: string                    -- empty until the creator/game grants one (stub)
   profession: string               -- starts equal to background.profession
   reputation: number                -- starts at background.reputationStart, +N per tier.reputationGain
@@ -49,7 +48,7 @@ characters/{characterId}
   inventory: [{ name, qty }]
   talents: [{ id, name, quality, trainable, rarity, effect, lastChangeDate, lastChangeCircumstance }]
                                     -- id references worldData/talents/items; fields are a denormalized
-                                    -- copy taken at grant time, same convention as `trait`/`background` above
+                                    -- copy taken at grant time, same convention as `background` above
   blessings: [string]              -- not yet granted by any code path (stub)
   curses: [string]                 -- not yet granted by any code path (stub)
   wounds: [{ name, description, date }]
@@ -107,9 +106,6 @@ worldData/regions/items/{id}
 worldData/regions/items/{regionId}/backgrounds/{id}
   name, profession, weight, reputationStart, startingGold, startingItems: [{name, qty}]
 
-worldData/traits/items/{id}
-  name, description, weight
-
 worldData/talents/items/{id}
   name: string                     -- French, e.g. "Résistance au feu"
   trainable: boolean               -- shown with a trailing asterisk in the UI
@@ -121,7 +117,7 @@ worldData/gods/{id}                   the creator dashboard (Phase 3)
 worldData/creatures/{id}
 ```
 
-`worldData` uses a mixed depth on purpose (`actionTypes` and `regions` nest an `items` subcollection, `regions/items/{id}/backgrounds` nests one level further so each region has its own background pool, while `traits` is global and shared across regions). The Firestore rule for `worldData` uses a recursive wildcard (`{document=**}`) specifically so it authorizes reads/writes at any depth, instead of hardcoding one shape.
+`worldData` uses a mixed depth on purpose (`actionTypes` and `regions` nest an `items` subcollection, `regions/items/{id}/backgrounds` nests one level further so each region has its own background pool, while `talents` is global and shared across regions). The Firestore rule for `worldData` uses a recursive wildcard (`{document=**}`) specifically so it authorizes reads/writes at any depth, instead of hardcoding one shape.
 
 **Why `lastAction` is stored on the character doc instead of only in `actionsLog`**: the action panel needs to read "the most recent result" on every page load without an extra indexed query, and it needs `lastActionAt` (a precise instant) to compute the 24h reveal delay. `actionsLog` remains the append-only, permanent history shown in the "Historique du personnage" tab.
 
@@ -130,7 +126,7 @@ worldData/creatures/{id}
 - `users/{uid}`: a signed-in user can read their own doc, and create it once (on signup) with `role` forced to `"player"` — role escalation to `"creator"` never goes through a client write, only through the `setCreatorRole` admin script (see below). In practice `createCharacter` (Admin SDK, bypasses rules) is what actually writes/updates this doc now.
 - `characters/{id}`: a player can read/update only their own character (`ownerUid == request.auth.uid`); the creator role can read/update/delete any character.
 - `actionsLog/{id}`: read-only from the client (player sees their own, creator sees all); all writes happen inside the `performAction` transaction, never directly from the client. **Any query against this collection must filter by `ownerUid` (or be run as the creator role)** — Firestore rejects list queries outright if no query filter lines up with the rule's `resource.data` condition, regardless of whether matching documents exist.
-- `worldData/**`: any signed-in user can read (needed to show action/region/background/trait choices); only the creator role can write.
+- `worldData/**`: any signed-in user can read (needed to show action/region/background choices); only the creator role can write.
 
 The creator role itself is a **custom claim** on the Firebase Auth ID token (`request.auth.token.role == 'creator'`), not a Firestore field — Firestore rules can't trust a plain document field for authorization since a malicious client could otherwise just set `role: "creator"` on their own `users/{uid}` doc (which is why that field is only informational for the UI, and the `create` rule forces it to `"player"`).
 
@@ -138,10 +134,10 @@ The creator role itself is a **custom claim** on the Firebase Auth ID token (`re
 
 Callable, `functions/src/index.js`. Given `{ regionId, name }`:
 1. Rejects if the caller isn't authenticated, or already has a character with `alive == true` (one living character per account).
-2. Loads the chosen region, rolls a background from `worldData/regions/items/{regionId}/backgrounds` (weighted), and a trait from the global `worldData/traits/items` (weighted).
-3. Creates the `characters` doc (region/background/trait chosen or rolled as above; `title` empty, `legendLevel` null, `alive: true`, `reputation`/`gold`/`inventory` from the background) and upserts `users/{uid}` with `role: "player"` and the new `characterId`.
+2. Loads the chosen region, rolls a background from `worldData/regions/items/{regionId}/backgrounds` (weighted).
+3. Creates the `characters` doc (region chosen, background rolled as above; `title` empty, `legendLevel` null, `alive: true`, `reputation`/`gold`/`inventory` from the background) and upserts `users/{uid}` with `role: "player"` and the new `characterId`.
 
-Region is a player *choice*; background and trait are *rolled* server-side specifically so a player can't simply pick the best possible starting character.
+Region is a player *choice*; background is *rolled* server-side specifically so a player can't simply pick the best possible starting character.
 
 ## The `performAction` Cloud Function
 
@@ -170,14 +166,13 @@ There is no in-app UI for this (deliberately — it's a one-time, high-privilege
 
 ## Seeding world data
 
-`functions/scripts/seedWorldData.js` populates example regions (with nested backgrounds), traits, and one actionType (`Partir en quête`, with a death tier, a wound tier, a plain success tier, and a legendary tier) — see the script for the exact shapes, or just use it as a one-time bootstrap and then manage everything through the creator dashboard's CRUD (see below) from that point on.
+`functions/scripts/seedWorldData.js` populates example regions (with nested backgrounds) and one actionType (`Partir en quête`, with a death tier, a wound tier, a plain success tier, and a legendary tier) — see the script for the exact shapes, or just use it as a one-time bootstrap and then manage everything through the creator dashboard's CRUD (see below) from that point on.
 
 ## Creator dashboard (`CreatorDashboard.jsx`)
 
 No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute requireCreator` and by the same `worldData`/`characters`/`actionsLog` Firestore rules described above (writes to `worldData` require the creator custom claim; there's no Cloud Function in this path since, unlike player-facing rolls, there's no anti-cheat concern — the creator is the trusted party rules already gate). Several sections, switched locally (no sub-routing), including:
 
 - **`RegionsManager.jsx`**: CRUD for `worldData/regions/items`, and per-region CRUD for the nested `backgrounds` subcollection (expand a region to manage its own background pool inline).
-- **`TraitsManager.jsx`**: CRUD for the global `worldData/traits/items`.
 - **`TalentsManager.jsx`**: CRUD for the global `worldData/talents/items` catalog (name, trainable flag, rarity, effect text) — see [docs/TODO.md](TODO.md) for the full talent system design.
 - **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above. The talent grant fields are a select over `worldData/talents/items` (populated live) plus a starting quality and a French circumstance string, mapping to the `tier.talentGain` shape above. A tier's optional `cible` select opts it into the procedural `narrativeText` generation described below instead of using the tier's own fixed text.
 - **`TextGenerationManager.jsx`**: CRUD for `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items` (see "Procedural quest-result text" below) — two sub-forms in one section, following the same pattern as the other managers.
@@ -214,7 +209,6 @@ src/
                              action status with the 24h reveal gate described above
     creator/
       RegionsManager.jsx     regions + nested per-region backgrounds CRUD
-      TraitsManager.jsx      global traits CRUD
       TalentsManager.jsx     global talent catalog CRUD (name/trainable/rarity/effect)
       ActionTypesManager.jsx actionTypes CRUD with a structured tiers sub-form
       TextGenerationManager.jsx narrativeSubjects + verbPhrases CRUD for procedural narrativeText
@@ -239,12 +233,12 @@ Current deployed project: `monkar-rpg` (Firebase, Blaze plan — required for Cl
 
 ## Alternatives considered
 
-**Skipping Cloud Functions entirely** (Firestore rules only, Spark/free plan, no billing needed): the daily lock still works reliably via `request.time` in rules. The random rolls (background/trait at creation, tier at each action) would have to be computed client-side and merely shape-validated by rules, which a technically inclined player could fake via devtools. Not implemented, since the project already has Cloud Functions running, but worth remembering as a no-cost fallback if the Blaze plan ever becomes undesirable.
+**Skipping Cloud Functions entirely** (Firestore rules only, Spark/free plan, no billing needed): the daily lock still works reliably via `request.time` in rules. The random rolls (background at creation, tier at each action) would have to be computed client-side and merely shape-validated by rules, which a technically inclined player could fake via devtools. Not implemented, since the project already has Cloud Functions running, but worth remembering as a no-cost fallback if the Blaze plan ever becomes undesirable.
 
 **Cloudflare Workers / Supabase Edge Functions**: would keep fully server-side rolls without needing Firebase's Blaze plan (their free tiers generally don't require a card, though policies change — verify at signup). Not implemented; would mean keeping Firebase Auth + Firestore as-is and only moving `createCharacter`/`performAction`'s logic to HTTP endpoints on that other platform, called from the client instead of `httpsCallable`.
 
 ## Known gaps (as of this writing)
 
-- The creator dashboard has CRUD for regions/backgrounds/traits/actionTypes only (the data the game actually consumes today). Factions, gods, and creatures have no CRUD yet and still have to be created by hand in the Firestore console — deliberately deferred since nothing in the app reads them yet either.
+- The creator dashboard has CRUD for regions/backgrounds/talents/actionTypes only (the data the game actually consumes today). Factions, gods, and creatures have no CRUD yet and still have to be created by hand in the Firestore console — deliberately deferred since nothing in the app reads them yet either.
 - `title`, `legendLevel` progression beyond the raw counter, `blessings`, `curses`, quest journal, world-knowledge lore, and messaging are all stubs — visually present (or, for messaging, not even that) but not wired to real game logic yet, by design (deferred until the underlying systems are designed).
 - Procedural `narrativeText` generation (see "Procedural quest-result text" above) only covers `"victoire"`/`"echec"` outcomes; tiers still need a hand-authored `narrativeText` fallback for when no subject/verb-phrase pair is populated for a given target. No visual theme/styling pass yet.

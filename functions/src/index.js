@@ -58,10 +58,6 @@ exports.createCharacter = onCall(async (request) => {
   if (backgroundsSnap.empty) throw new HttpsError("failed-precondition", "This region has no backgrounds configured.");
   const background = rollWeighted(backgroundsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
 
-  const traitsSnap = await db.collection("worldData").doc("traits").collection("items").get();
-  if (traitsSnap.empty) throw new HttpsError("failed-precondition", "No traits configured.");
-  const trait = rollWeighted(traitsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-
   const characterRef = db.collection("characters").doc();
   await characterRef.set({
     ownerUid: uid,
@@ -69,7 +65,6 @@ exports.createCharacter = onCall(async (request) => {
     age: 18,
     region: { id: regionId, name: region.name },
     background: { id: background.id, name: background.name, profession: background.profession || "" },
-    trait: { id: trait.id, name: trait.name, description: trait.description || "" },
     title: "",
     profession: background.profession || "",
     reputation: background.reputationStart || 0,

@@ -1,6 +1,6 @@
 // One-off admin script: node scripts/seedWorldData.js
 // Uses Application Default Credentials (run `gcloud auth application-default login` first).
-// Populates example regions, region-specific backgrounds, global traits, and one actionType.
+// Populates example regions, region-specific backgrounds, and one actionType.
 const admin = require("firebase-admin");
 
 admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: "monkar-rpg" });
@@ -52,23 +52,6 @@ async function seed() {
     reputationStart: 5,
     startingGold: 20,
     startingItems: [{ name: "Arc court", qty: 1 }],
-    weight: 30,
-  });
-
-  const traitsRef = db.collection("worldData").doc("traits").collection("items");
-  await traitsRef.doc("robuste").set({
-    name: "Robuste",
-    description: "Un corps endurci par les épreuves.",
-    weight: 40,
-  });
-  await traitsRef.doc("vif-esprit").set({
-    name: "Vif d'esprit",
-    description: "Toujours une longueur d'avance.",
-    weight: 30,
-  });
-  await traitsRef.doc("chanceux").set({
-    name: "Chanceux",
-    description: "La fortune lui sourit souvent.",
     weight: 30,
   });
 

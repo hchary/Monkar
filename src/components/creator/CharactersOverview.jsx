@@ -26,7 +26,6 @@ function CharacterDetail({ character, onBack }) {
         <li>Propriétaire (uid) : {character.ownerUid}</li>
         <li>Région : {character.region?.name}</li>
         <li>Background : {character.background?.name}</li>
-        <li>Trait : {character.trait?.name}</li>
         <li>Métier : {character.profession}</li>
         <li>Titre : {character.title || "(aucun)"}</li>
         <li>Réputation : {character.reputation}</li>
