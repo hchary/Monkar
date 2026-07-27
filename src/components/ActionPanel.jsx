@@ -67,7 +67,7 @@ export default function ActionPanel({ character }) {
       )}
 
       {lastAction && (
-        <div className="last-action">
+        <div className={`last-action${lastAction.quest?.difficulty ? ` difficulty-${lastAction.quest.difficulty}` : ""}`}>
           <h2>Action de la veille</h2>
           <p className="action-type-label">{actionTypes.find((a) => a.id === lastAction.actionTypeId)?.label || lastAction.actionTypeId}</p>
 
@@ -76,7 +76,14 @@ export default function ActionPanel({ character }) {
           ) : (
             <>
               <button className="status-toggle" onClick={() => setExpanded((v) => !v)}>
-                {lastAction.success ? "Succès" : "Échec"} {expanded ? "▲" : "▼"}
+                {lastAction.success ? (
+                  <span className={lastAction.quest?.difficulty ? `difficulty-text-${lastAction.quest.difficulty}` : undefined}>
+                    Succès
+                  </span>
+                ) : (
+                  "Échec"
+                )}{" "}
+                {expanded ? "▲" : "▼"}
               </button>
 
               {expanded && (

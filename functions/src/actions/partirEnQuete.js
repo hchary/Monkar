@@ -5,34 +5,34 @@ const { generateResultText } = require("../textGeneration");
 
 const ACTION_TYPE_ID = "partir-en-quete";
 
-const DEFAULT_QUEST_RARITY_WEIGHTS = [
-  { rarity: "commun", weight: 55 },
-  { rarity: "peu_commun", weight: 30 },
-  { rarity: "rare", weight: 10 },
-  { rarity: "tres_rare", weight: 4 },
-  { rarity: "legendaire", weight: 1 },
+const DEFAULT_QUEST_DIFFICULTY_WEIGHTS = [
+  { difficulty: "facile", weight: 55 },
+  { difficulty: "moyen", weight: 30 },
+  { difficulty: "difficile", weight: 10 },
+  { difficulty: "tres_difficile", weight: 4 },
+  { difficulty: "epique", weight: 1 },
 ];
 
-// Safety net in case a region's quests never carry a rarity present in the weight
-// table (e.g. only "mythique"/"divin"/"unique" quests) - without this the draw loop
-// below would spin forever.
-const MAX_RARITY_DRAWS = 50;
+// Safety net in case a region's quests never carry a difficulty present in the weight
+// table (e.g. only "mythique" quests) - without this the draw loop below would spin
+// forever.
+const MAX_DIFFICULTY_DRAWS = 50;
 
 function pickRandom(items) {
   if (items.length === 0) return null;
   return items[Math.floor(Math.random() * items.length)];
 }
 
-// Draws a rarity first, then a random quest of that rarity within the given pool,
-// redrawing the rarity whenever no quest matches - so rarer quests are rarer to draw,
-// not just rarer to exist.
-function drawQuest(regionQuests, rarityWeights) {
-  for (let i = 0; i < MAX_RARITY_DRAWS; i++) {
-    const rarity = rollWeighted(rarityWeights).rarity;
-    const candidates = regionQuests.filter((q) => (q.rarities || []).includes(rarity));
-    if (candidates.length > 0) return { ...pickRandom(candidates), rarity };
+// Draws a difficulty first, then a random quest of that difficulty within the given
+// pool, redrawing the difficulty whenever no quest matches - so harder quests are
+// rarer to draw, not just rarer to exist.
+function drawQuest(regionQuests, difficultyWeights) {
+  for (let i = 0; i < MAX_DIFFICULTY_DRAWS; i++) {
+    const difficulty = rollWeighted(difficultyWeights).difficulty;
+    const candidates = regionQuests.filter((q) => (q.difficulties || []).includes(difficulty));
+    if (candidates.length > 0) return { ...pickRandom(candidates), difficulty };
   }
-  return { ...pickRandom(regionQuests), rarity: null };
+  return { ...pickRandom(regionQuests), difficulty: null };
 }
 
 async function prepare({ db, character, actionType }) {
@@ -50,8 +50,8 @@ async function prepare({ db, character, actionType }) {
     );
   }
 
-  const rarityWeights = actionType.questRarityWeights || DEFAULT_QUEST_RARITY_WEIGHTS;
-  const quest = drawQuest(regionQuests, rarityWeights);
+  const difficultyWeights = actionType.questDifficultyWeights || DEFAULT_QUEST_DIFFICULTY_WEIGHTS;
+  const quest = drawQuest(regionQuests, difficultyWeights);
 
   let locationName = null;
   if (quest.locationId) {
@@ -119,7 +119,7 @@ async function resolve({ tx, db, character, actionType, today, context }) {
   const questSummary = {
     id: quest.id,
     name: quest.name,
-    rarity: quest.rarity,
+    difficulty: quest.difficulty,
     locationId: quest.locationId || null,
     locationName,
   };
