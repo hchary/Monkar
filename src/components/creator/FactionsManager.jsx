@@ -8,6 +8,8 @@ export default function FactionsManager() {
   const [factions, setFactions] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "factions", "items"), (snap) => {
@@ -15,9 +17,15 @@ export default function FactionsManager() {
     });
   }, []);
 
+  const filteredFactions = factions.filter((faction) => {
+    const q = filterText.toLowerCase();
+    return !q || (faction.name || "").toLowerCase().includes(q) || (faction.description || "").toLowerCase().includes(q);
+  });
+
   function startEdit(faction) {
     setEditingId(faction.id);
     setForm({ name: faction.name || "", description: faction.description || "" });
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -39,8 +47,20 @@ export default function FactionsManager() {
     <div className="creator-section">
       <h2>Factions</h2>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input
+          placeholder="Rechercher par nom ou description..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {factions.map((faction) => (
+        {filteredFactions.map((faction) => (
           <li key={faction.id}>
             <strong>{faction.name}</strong> — {faction.description}
             <button type="button" onClick={() => startEdit(faction)}>
@@ -53,23 +73,25 @@ export default function FactionsManager() {
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier la faction" : "Nouvelle faction"}</h3>
-      <form onSubmit={handleSubmit}>
-        <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <input
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer la faction"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier la faction" : "Nouvelle faction"}</summary>
+        <form onSubmit={handleSubmit}>
+          <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <input
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer la faction"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

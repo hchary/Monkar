@@ -244,6 +244,8 @@ export default function RegionsManager() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyRegionForm);
   const [expandedId, setExpandedId] = useState(null);
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const climats = useItems("climats");
   const reliefs = useItems("reliefs");
@@ -256,6 +258,8 @@ export default function RegionsManager() {
       setRegions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  const filteredRegions = regions.filter((region) => matchesRegion(region, filterText));
 
   function startEdit(region) {
     setEditingId(region.id);
@@ -270,6 +274,7 @@ export default function RegionsManager() {
       adventureZoneIds: region.adventureZoneIds || [],
       originIds: region.originIds || [],
     });
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -313,8 +318,20 @@ export default function RegionsManager() {
     <div className="creator-section">
       <h2>Régions</h2>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input
+          placeholder="Rechercher par nom ou description..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {regions.map((region) => (
+        {filteredRegions.map((region) => (
           <li key={region.id}>
             <div>
               <strong>{region.name}</strong> — noms suggérés : {(region.nameSuggestions || []).join(", ") || "aucun"}
@@ -333,8 +350,9 @@ export default function RegionsManager() {
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier la région" : "Nouvelle région"}</h3>
-      <form onSubmit={handleSubmit}>
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier la région" : "Nouvelle région"}</summary>
+        <form onSubmit={handleSubmit}>
         <input placeholder="Nom de la région" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         <input
           placeholder="Suggestions de noms (séparés par des virgules)"
@@ -414,7 +432,8 @@ export default function RegionsManager() {
             </button>
           )}
         </div>
-      </form>
+        </form>
+      </details>
     </div>
   );
 }

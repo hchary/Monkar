@@ -216,6 +216,8 @@ export default function ActionTypesManager() {
   const [editingId, setEditingId] = useState(null);
   const [label, setLabel] = useState("");
   const [tiers, setTiers] = useState([emptyTier()]);
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "actionTypes", "items"), (snap) => {
@@ -229,10 +231,16 @@ export default function ActionTypesManager() {
     });
   }, []);
 
+  const filteredActionTypes = actionTypes.filter((actionType) => {
+    const q = filterText.toLowerCase();
+    return !q || (actionType.label || "").toLowerCase().includes(q);
+  });
+
   function startEdit(actionType) {
     setEditingId(actionType.id);
     setLabel(actionType.label || "");
     setTiers((actionType.tiers || []).map(tierToForm));
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -263,8 +271,16 @@ export default function ActionTypesManager() {
     <div className="creator-section">
       <h2>Types d'action</h2>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input placeholder="Rechercher par libellé..." value={filterText} onChange={(e) => setFilterText(e.target.value)} />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {actionTypes.map((actionType) => (
+        {filteredActionTypes.map((actionType) => (
           <li key={actionType.id}>
             <strong>{actionType.label}</strong> ({(actionType.tiers || []).length} tiers)
             <button type="button" onClick={() => startEdit(actionType)}>
@@ -277,27 +293,29 @@ export default function ActionTypesManager() {
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier le type d'action" : "Nouveau type d'action"}</h3>
-      <form onSubmit={handleSubmit}>
-        <input placeholder="Libellé (ex: Partir en quête)" value={label} onChange={(e) => setLabel(e.target.value)} required />
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier le type d'action" : "Nouveau type d'action"}</summary>
+        <form onSubmit={handleSubmit}>
+          <input placeholder="Libellé (ex: Partir en quête)" value={label} onChange={(e) => setLabel(e.target.value)} required />
 
-        {tiers.map((tier, index) => (
-          <TierEditor key={index} tier={tier} index={index} talents={talents} onChange={updateTier} onRemove={removeTier} />
-        ))}
+          {tiers.map((tier, index) => (
+            <TierEditor key={index} tier={tier} index={index} talents={talents} onChange={updateTier} onRemove={removeTier} />
+          ))}
 
-        <button type="button" onClick={() => setTiers([...tiers, emptyTier()])}>
-          Ajouter un tier
-        </button>
+          <button type="button" onClick={() => setTiers([...tiers, emptyTier()])}>
+            Ajouter un tier
+          </button>
 
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer le type d'action"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer le type d'action"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

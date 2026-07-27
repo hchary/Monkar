@@ -8,6 +8,8 @@ export default function QuestLocationsManager() {
   const [locations, setLocations] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [filterText, setFilterText] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "adventureZones", "items"), (snap) => {
@@ -15,9 +17,15 @@ export default function QuestLocationsManager() {
     });
   }, []);
 
+  const filteredLocations = locations.filter((location) => {
+    const q = filterText.toLowerCase();
+    return !q || (location.name || "").toLowerCase().includes(q) || (location.description || "").toLowerCase().includes(q);
+  });
+
   function startEdit(location) {
     setEditingId(location.id);
     setForm({ name: location.name || "", description: location.description || "" });
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -39,8 +47,20 @@ export default function QuestLocationsManager() {
     <div className="creator-section">
       <h2>Lieux de quête</h2>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <input
+          placeholder="Rechercher par nom ou description..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <button type="button" onClick={() => setFilterText("")}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       <ul className="creator-list">
-        {locations.map((location) => (
+        {filteredLocations.map((location) => (
           <li key={location.id}>
             <strong>{location.name}</strong> — {location.description}
             <button type="button" onClick={() => startEdit(location)}>
@@ -53,23 +73,25 @@ export default function QuestLocationsManager() {
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier le lieu de quête" : "Nouveau lieu de quête"}</h3>
-      <form onSubmit={handleSubmit}>
-        <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <input
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer le lieu de quête"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier le lieu de quête" : "Nouveau lieu de quête"}</summary>
+        <form onSubmit={handleSubmit}>
+          <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <input
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer le lieu de quête"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

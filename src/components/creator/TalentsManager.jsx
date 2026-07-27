@@ -67,10 +67,14 @@ function MultiSelectField({ legend, options, selectedIds, onToggle, createLink }
   );
 }
 
+const emptyFilters = { rarities: [], trainableOnly: false, text: "" };
+
 export default function TalentsManager() {
   const [talents, setTalents] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [filters, setFilters] = useState(emptyFilters);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const quests = useItems("quests");
   const trainerTypes = useItems("trainerTypes");
@@ -80,6 +84,23 @@ export default function TalentsManager() {
       setTalents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  const filteredTalents = talents.filter((talent) => {
+    if (filters.rarities.length > 0 && !filters.rarities.includes(talent.rarity || "commun")) return false;
+    if (filters.trainableOnly && !talent.trainable) return false;
+    const q = filters.text.toLowerCase();
+    if (q && !((talent.name || "").toLowerCase().includes(q) || (talent.effect || "").toLowerCase().includes(q))) {
+      return false;
+    }
+    return true;
+  });
+
+  function toggleRarityFilter(value) {
+    setFilters((prev) => ({
+      ...prev,
+      rarities: prev.rarities.includes(value) ? prev.rarities.filter((r) => r !== value) : [...prev.rarities, value],
+    }));
+  }
 
   function startEdit(talent) {
     setEditingId(talent.id);
@@ -91,6 +112,7 @@ export default function TalentsManager() {
       favoredQuestIds: talent.favoredQuestIds || [],
       trainerTypeId: talent.trainerTypeId || "",
     });
+    setPanelOpen(true);
   }
 
   function resetForm() {
@@ -126,8 +148,34 @@ export default function TalentsManager() {
     <div className="creator-section">
       <h2>Talents</h2>
 
+      <fieldset>
+        <legend>Filtres</legend>
+        <MultiSelectField
+          legend="Raretés"
+          options={RARITIES.map((r) => ({ id: r.value, name: r.label }))}
+          selectedIds={filters.rarities}
+          onToggle={toggleRarityFilter}
+        />
+        <label>
+          <input
+            type="checkbox"
+            checked={filters.trainableOnly}
+            onChange={(e) => setFilters({ ...filters, trainableOnly: e.target.checked })}
+          />
+          Entraînable uniquement
+        </label>
+        <input
+          placeholder="Rechercher par nom ou effet..."
+          value={filters.text}
+          onChange={(e) => setFilters({ ...filters, text: e.target.value })}
+        />
+        <button type="button" onClick={() => setFilters(emptyFilters)}>
+          Réinitialiser les filtres
+        </button>
+      </fieldset>
+
       {RARITIES.map((r) => {
-        const talentsForRarity = talents
+        const talentsForRarity = filteredTalents
           .filter((talent) => (talent.rarity || "commun") === r.value)
           .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
@@ -169,76 +217,78 @@ export default function TalentsManager() {
         );
       })}
 
-      <h3>{editingId ? "Modifier le talent" : "Nouveau talent"}</h3>
-      <form onSubmit={handleSubmit}>
-        <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <textarea
-          placeholder="Effet (affiché dans l'infobulle)"
-          value={form.effect}
-          onChange={(e) => setForm({ ...form, effect: e.target.value })}
-        />
-        <label>
-          Rareté
-          <select value={form.rarity} onChange={(e) => setForm({ ...form, rarity: e.target.value })}>
-            {RARITIES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={form.trainable}
-            onChange={(e) => setForm({ ...form, trainable: e.target.checked })}
+      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+        <summary>{editingId ? "Modifier le talent" : "Nouveau talent"}</summary>
+        <form onSubmit={handleSubmit}>
+          <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <textarea
+            placeholder="Effet (affiché dans l'infobulle)"
+            value={form.effect}
+            onChange={(e) => setForm({ ...form, effect: e.target.value })}
           />
-          Entraînable
-        </label>
+          <label>
+            Rareté
+            <select value={form.rarity} onChange={(e) => setForm({ ...form, rarity: e.target.value })}>
+              {RARITIES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={form.trainable}
+              onChange={(e) => setForm({ ...form, trainable: e.target.checked })}
+            />
+            Entraînable
+          </label>
 
-        <MultiSelectField
-          legend="Quêtes favorisées"
-          options={quests}
-          selectedIds={form.favoredQuestIds}
-          onToggle={toggleQuest}
-          createLink={`/creator?section=${encodeURIComponent("Quêtes")}`}
-        />
+          <MultiSelectField
+            legend="Quêtes favorisées"
+            options={quests}
+            selectedIds={form.favoredQuestIds}
+            onToggle={toggleQuest}
+            createLink={`/creator?section=${encodeURIComponent("Quêtes")}`}
+          />
 
-        {form.trainable && (
-          <fieldset>
-            <legend>
-              Entraîneur requis
-              <Link to={`/creator?section=${encodeURIComponent("Types d'entraîneur")}`} target="_blank" rel="noopener noreferrer">
-                {" "}
-                Créer
-              </Link>
-            </legend>
-            <label>
-              Type d'entraîneur
-              <select
-                value={form.trainerTypeId}
-                onChange={(e) => setForm({ ...form, trainerTypeId: e.target.value })}
-              >
-                <option value="">(aucun)</option>
-                {trainerTypes.map((trainerType) => (
-                  <option key={trainerType.id} value={trainerType.id}>
-                    {trainerType.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </fieldset>
-        )}
-
-        <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer le talent"}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm}>
-              Annuler
-            </button>
+          {form.trainable && (
+            <fieldset>
+              <legend>
+                Entraîneur requis
+                <Link to={`/creator?section=${encodeURIComponent("Types d'entraîneur")}`} target="_blank" rel="noopener noreferrer">
+                  {" "}
+                  Créer
+                </Link>
+              </legend>
+              <label>
+                Type d'entraîneur
+                <select
+                  value={form.trainerTypeId}
+                  onChange={(e) => setForm({ ...form, trainerTypeId: e.target.value })}
+                >
+                  <option value="">(aucun)</option>
+                  {trainerTypes.map((trainerType) => (
+                    <option key={trainerType.id} value={trainerType.id}>
+                      {trainerType.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </fieldset>
           )}
-        </div>
-      </form>
+
+          <div>
+            <button type="submit">{editingId ? "Enregistrer" : "Créer le talent"}</button>
+            {editingId && (
+              <button type="button" onClick={resetForm}>
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
+      </details>
     </div>
   );
 }
