@@ -64,6 +64,9 @@ export default function TagsManager() {
     const referencingLootTables = await getDocs(
       query(collection(db, "worldData", "lootTables", "items"), where("tagIds", "array-contains", selectedTag.id))
     );
+    const referencingTalents = await getDocs(
+      query(collection(db, "worldData", "talents", "items"), where("tagIds", "array-contains", selectedTag.id))
+    );
     await Promise.all([
       ...referencingQuests.docs.map((questDoc) =>
         updateDoc(questDoc.ref, { tagIds: (questDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
@@ -76,6 +79,9 @@ export default function TagsManager() {
       ),
       ...referencingLootTables.docs.map((tableDoc) =>
         updateDoc(tableDoc.ref, { tagIds: (tableDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
+      ),
+      ...referencingTalents.docs.map((talentDoc) =>
+        updateDoc(talentDoc.ref, { tagIds: (talentDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
       ),
     ]);
     await deleteDoc(doc(db, "worldData", "tags", "items", selectedTag.id));

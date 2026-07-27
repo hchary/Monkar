@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { matchesTag } from "./TagsManager";
+import MultiSelectModalField from "./MultiSelectModalField";
 
 export const RARITIES = [
   { value: "commun", label: "Commun" },
@@ -21,6 +23,7 @@ const emptyForm = {
   effect: "",
   favoredQuestIds: [],
   trainerTypeId: "",
+  tagIds: [],
 };
 
 // Matches a talent's name, effect text, or rarity — for use as MultiSelectModalField's matchesFilter.
@@ -78,6 +81,8 @@ export default function TalentsManager() {
 
   const quests = useItems("quests");
   const trainerTypes = useItems("trainerTypes");
+  const tags = useItems("tags");
+  const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "talents", "items"), (snap) => {
@@ -111,6 +116,7 @@ export default function TalentsManager() {
       effect: talent.effect || "",
       favoredQuestIds: talent.favoredQuestIds || [],
       trainerTypeId: talent.trainerTypeId || "",
+      tagIds: talent.tagIds || [],
     });
     setPanelOpen(true);
   }
@@ -129,6 +135,13 @@ export default function TalentsManager() {
     }));
   }
 
+  function toggleTagId(id) {
+    setForm((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
+    }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     const ref = editingId ? doc(db, "worldData", "talents", "items", editingId) : doc(collection(db, "worldData", "talents", "items"));
@@ -140,6 +153,7 @@ export default function TalentsManager() {
       effect: form.effect,
       favoredQuestIds: form.favoredQuestIds,
       trainerTypeId: form.trainable ? form.trainerTypeId : "",
+      tagIds: form.tagIds,
     });
     resetForm();
   }
@@ -204,6 +218,11 @@ export default function TalentsManager() {
                       Entraîneur : {trainerTypes.find((t) => t.id === talent.trainerTypeId)?.name || talent.trainerTypeId}
                     </div>
                   )}
+                  {(talent.tagIds || []).length > 0 && (
+                    <div>
+                      Tags : {talent.tagIds.map((id) => tags.find((t) => t.id === id)?.name || id).join(", ")}
+                    </div>
+                  )}
                   <button type="button" onClick={() => startEdit(talent)}>
                     Modifier
                   </button>
@@ -251,6 +270,17 @@ export default function TalentsManager() {
             selectedIds={form.favoredQuestIds}
             onToggle={toggleQuest}
             createLink={`/creator?section=${encodeURIComponent("Quêtes")}`}
+          />
+
+          <MultiSelectModalField
+            legend="Tags"
+            options={sortedTags}
+            selectedIds={form.tagIds}
+            onToggle={toggleTagId}
+            createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+            matchesFilter={matchesTag}
+            filterPlaceholder="Filtrer par nom..."
+            buttonLabel="Ajouter tags"
           />
 
           {form.trainable && (
