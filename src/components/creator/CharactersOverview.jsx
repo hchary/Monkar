@@ -32,10 +32,6 @@ function CharacterDetail({ character, onBack }) {
         <li>Réputation : {character.reputation}</li>
         <li>Niveau de légende : {character.legendLevel ?? "(aucun)"}</li>
         <li>Or : {character.gold}</li>
-        <li>
-          Stats : force {character.stats?.force}, agilité {character.stats?.agilite}, intelligence {character.stats?.intelligence},
-          charisme {character.stats?.charisme}
-        </li>
       </ul>
 
       <h4>Historique complet</h4>

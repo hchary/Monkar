@@ -45,7 +45,6 @@ characters/{characterId}
   reputation: number                -- starts at background.reputationStart, +N per tier.reputationGain
   legendLevel: number | null        -- null until the first tier.legendary roll, then increments
   alive: boolean                   -- false = permadeath; the player creates a new character
-  stats: { force, agilite, intelligence, charisme }
   gold: number
   inventory: [{ name, qty }]
   talents: [{ id, name, quality, trainable, rarity, effect, lastChangeDate, lastChangeCircumstance }]
@@ -62,7 +61,6 @@ characters/{characterId}
 actionsLog/{logId}                 -- permanent history, independent of lastAction
   characterId, ownerUid, actionTypeId, date
   tierName: string, success: boolean
-  bonusesApplied: { [stat]: number }
   narrativeText: string
   consequence: { type: "wound" | "death", name?, description } | null
   createdAt: server timestamp
@@ -74,7 +72,6 @@ worldData/actionTypes/items/{id}
     cible: "groupe" | "individuel" | undefined,  -- opts this tier into procedural narrativeText
                                                   -- generation (see below); when absent, narrativeText
                                                   -- is used verbatim
-    bonuses: { [stat]: number },          -- applied on any tier (success or failure)
     goldGain, itemGain: { name, qty },    -- success only
     talentGain: { talentId, quality, circumstance },  -- success only; talentId references worldData/talents/items,
                                                        -- circumstance is French narrative text (see Talents below)
@@ -111,7 +108,7 @@ worldData/regions/items/{regionId}/backgrounds/{id}
   name, profession, weight, reputationStart, startingGold, startingItems: [{name, qty}]
 
 worldData/traits/items/{id}
-  name, description, weight, bonuses: { [stat]: number }
+  name, description, weight
 
 worldData/talents/items/{id}
   name: string                     -- French, e.g. "Résistance au feu"
@@ -142,10 +139,9 @@ The creator role itself is a **custom claim** on the Firebase Auth ID token (`re
 Callable, `functions/src/index.js`. Given `{ regionId, name }`:
 1. Rejects if the caller isn't authenticated, or already has a character with `alive == true` (one living character per account).
 2. Loads the chosen region, rolls a background from `worldData/regions/items/{regionId}/backgrounds` (weighted), and a trait from the global `worldData/traits/items` (weighted).
-3. Builds starting `stats` from a fixed base plus the trait's `bonuses`.
-4. Creates the `characters` doc (region/background/trait chosen or rolled as above; `title` empty, `legendLevel` null, `alive: true`, `reputation`/`gold`/`inventory` from the background) and upserts `users/{uid}` with `role: "player"` and the new `characterId`.
+3. Creates the `characters` doc (region/background/trait chosen or rolled as above; `title` empty, `legendLevel` null, `alive: true`, `reputation`/`gold`/`inventory` from the background) and upserts `users/{uid}` with `role: "player"` and the new `characterId`.
 
-Region is a player *choice*; background and trait are *rolled* server-side specifically so a player can't simply pick the best possible starting stats.
+Region is a player *choice*; background and trait are *rolled* server-side specifically so a player can't simply pick the best possible starting character.
 
 ## The `performAction` Cloud Function
 
@@ -154,7 +150,6 @@ Callable. Given an `actionTypeId`:
 2. Loads the `actionType` document and its `tiers`, plus the full `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items` collections (small, shared reference data — read once, outside the transaction).
 3. In a Firestore transaction: re-reads the character, rejects if `lastActionDate` is already today (UTC), otherwise rolls a tier by cumulative weight and:
    - if the rolled tier has a `cible`, calls `generateResultText` (`functions/src/textGeneration.js`) with `resultat` derived from the tier's `success` (`"victoire"` or `"echec"`) and the tier's `cible`, to pick a compatible verb phrase + subject and produce a fresh `narrativeText`; falls back to the tier's own `narrativeText` if the tier has no `cible` or if no compatible verb phrase/subject pair exists (e.g. an empty pool). Subject/verb-phrase matching is done by `cible`/`type` plus tag overlap when a verb phrase restricts to specific subject tags, and the `{sujet}` placeholder is filled in with French elision of the subject's article after "de" (`de le` → `du`, `de les` → `des`, `de la` → `de la`, `de l'` → `de l'`).
-   - applies `bonuses` to `stats` (success or failure alike),
    - on success: increments `gold`/`reputation`, `arrayUnion`s `itemGain` into `inventory`; if `tier.talentGain` is set, reads the referenced `worldData/talents/items/{talentId}` doc, applies the rarity floor-bump for the granted `quality` (see [docs/TODO.md](TODO.md) — quality 3/4/5 floor rarity at rare/très rare/légendaire respectively, never downgrading), and `arrayUnion`s the resulting denormalized talent object into `talents`; increments `legendLevel` if `tier.legendary` is set (Firestore's `increment` on a `null` field just sets it, which is what makes "hidden until first legendary exploit" work),
    - on failure with `consequence.type === "death"`: sets `alive: false` (permadeath — the front-end then shows character creation again),
    - on failure with `consequence.type === "wound"`: `arrayUnion`s a wound into `wounds`,
@@ -182,7 +177,7 @@ There is no in-app UI for this (deliberately — it's a one-time, high-privilege
 No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute requireCreator` and by the same `worldData`/`characters`/`actionsLog` Firestore rules described above (writes to `worldData` require the creator custom claim; there's no Cloud Function in this path since, unlike player-facing rolls, there's no anti-cheat concern — the creator is the trusted party rules already gate). Several sections, switched locally (no sub-routing), including:
 
 - **`RegionsManager.jsx`**: CRUD for `worldData/regions/items`, and per-region CRUD for the nested `backgrounds` subcollection (expand a region to manage its own background pool inline).
-- **`TraitsManager.jsx`**: CRUD for the global `worldData/traits/items`, with a stat-bonus sub-form for the four fixed stats.
+- **`TraitsManager.jsx`**: CRUD for the global `worldData/traits/items`.
 - **`TalentsManager.jsx`**: CRUD for the global `worldData/talents/items` catalog (name, trainable flag, rarity, effect text) — see [docs/TODO.md](TODO.md) for the full talent system design.
 - **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above. The talent grant fields are a select over `worldData/talents/items` (populated live) plus a starting quality and a French circumstance string, mapping to the `tier.talentGain` shape above. A tier's optional `cible` select opts it into the procedural `narrativeText` generation described below instead of using the tier's own fixed text.
 - **`TextGenerationManager.jsx`**: CRUD for `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items` (see "Procedural quest-result text" below) — two sub-forms in one section, following the same pattern as the other managers.
