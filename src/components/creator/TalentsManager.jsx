@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
@@ -18,12 +19,50 @@ const emptyForm = {
   trainable: false,
   rarity: "commun",
   effect: "",
+  favoredQuestSubjectIds: [],
+  trainerTypeId: "",
 };
+
+function useItems(collectionName) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", collectionName, "items"), (snap) => {
+      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, [collectionName]);
+  return items;
+}
+
+function MultiSelectField({ legend, options, selectedIds, onToggle, createLink }) {
+  return (
+    <fieldset>
+      <legend>
+        {legend}
+        {createLink && (
+          <Link to={createLink} target="_blank" rel="noopener noreferrer">
+            {" "}
+            Créer
+          </Link>
+        )}
+      </legend>
+      {options.length === 0 && <p>Aucun élément créé pour l'instant.</p>}
+      {options.map((option) => (
+        <label key={option.id}>
+          <input type="checkbox" checked={selectedIds.includes(option.id)} onChange={() => onToggle(option.id)} />
+          {option.name}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
 
 export default function TalentsManager() {
   const [talents, setTalents] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  const questSubjects = useItems("questSubjects");
+  const trainerTypes = useItems("trainerTypes");
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "talents", "items"), (snap) => {
@@ -38,12 +77,23 @@ export default function TalentsManager() {
       trainable: !!talent.trainable,
       rarity: talent.rarity || "commun",
       effect: talent.effect || "",
+      favoredQuestSubjectIds: talent.favoredQuestSubjectIds || [],
+      trainerTypeId: talent.trainerTypeId || "",
     });
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
+  }
+
+  function toggleQuestSubject(questSubjectId) {
+    setForm((prev) => ({
+      ...prev,
+      favoredQuestSubjectIds: prev.favoredQuestSubjectIds.includes(questSubjectId)
+        ? prev.favoredQuestSubjectIds.filter((id) => id !== questSubjectId)
+        : [...prev.favoredQuestSubjectIds, questSubjectId],
+    }));
   }
 
   async function handleSubmit(e) {
@@ -55,6 +105,8 @@ export default function TalentsManager() {
       trainable: form.trainable,
       rarity: form.rarity,
       effect: form.effect,
+      favoredQuestSubjectIds: form.favoredQuestSubjectIds,
+      trainerTypeId: form.trainable ? form.trainerTypeId : "",
     });
     resetForm();
   }
@@ -63,20 +115,48 @@ export default function TalentsManager() {
     <div className="creator-section">
       <h2>Talents</h2>
 
-      <ul className="creator-list">
-        {talents.map((talent) => (
-          <li key={talent.id}>
-            <strong>{talent.name}</strong>
-            {talent.trainable && "*"} ({RARITIES.find((r) => r.value === talent.rarity)?.label || talent.rarity}) — {talent.effect}
-            <button type="button" onClick={() => startEdit(talent)}>
-              Modifier
-            </button>
-            <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "talents", "items", talent.id))}>
-              Supprimer
-            </button>
-          </li>
-        ))}
-      </ul>
+      {RARITIES.map((r) => {
+        const talentsForRarity = talents
+          .filter((talent) => (talent.rarity || "commun") === r.value)
+          .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+
+        if (talentsForRarity.length === 0) return null;
+
+        return (
+          <details key={r.value} className="rarity-group">
+            <summary>
+              {r.label} ({talentsForRarity.length})
+            </summary>
+            <ul className="creator-list">
+              {talentsForRarity.map((talent) => (
+                <li key={talent.id}>
+                  <strong>{talent.name}</strong>
+                  {talent.trainable && "*"} — {talent.effect}
+                  {(talent.favoredQuestSubjectIds || []).length > 0 && (
+                    <div>
+                      Quêtes favorisées :{" "}
+                      {talent.favoredQuestSubjectIds
+                        .map((id) => questSubjects.find((qs) => qs.id === id)?.name || id)
+                        .join(", ")}
+                    </div>
+                  )}
+                  {talent.trainable && talent.trainerTypeId && (
+                    <div>
+                      Entraîneur : {trainerTypes.find((t) => t.id === talent.trainerTypeId)?.name || talent.trainerTypeId}
+                    </div>
+                  )}
+                  <button type="button" onClick={() => startEdit(talent)}>
+                    Modifier
+                  </button>
+                  <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "talents", "items", talent.id))}>
+                    Supprimer
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })}
 
       <h3>{editingId ? "Modifier le talent" : "Nouveau talent"}</h3>
       <form onSubmit={handleSubmit}>
@@ -104,6 +184,40 @@ export default function TalentsManager() {
           />
           Entraînable
         </label>
+
+        <MultiSelectField
+          legend="Sujets de quête favorisés"
+          options={questSubjects}
+          selectedIds={form.favoredQuestSubjectIds}
+          onToggle={toggleQuestSubject}
+          createLink={`/creator?section=${encodeURIComponent("Sujets de quête")}`}
+        />
+
+        {form.trainable && (
+          <fieldset>
+            <legend>
+              Entraîneur requis
+              <Link to={`/creator?section=${encodeURIComponent("Types d'entraîneur")}`} target="_blank" rel="noopener noreferrer">
+                {" "}
+                Créer
+              </Link>
+            </legend>
+            <label>
+              Type d'entraîneur
+              <select
+                value={form.trainerTypeId}
+                onChange={(e) => setForm({ ...form, trainerTypeId: e.target.value })}
+              >
+                <option value="">(aucun)</option>
+                {trainerTypes.map((trainerType) => (
+                  <option key={trainerType.id} value={trainerType.id}>
+                    {trainerType.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </fieldset>
+        )}
 
         <div>
           <button type="submit">{editingId ? "Enregistrer" : "Créer le talent"}</button>

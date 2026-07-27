@@ -9,6 +9,7 @@ import OriginsManager from "../components/creator/OriginsManager";
 import TraitsManager from "../components/creator/TraitsManager";
 import TalentsManager from "../components/creator/TalentsManager";
 import ActionTypesManager from "../components/creator/ActionTypesManager";
+import TrainerTypesManager from "../components/creator/TrainerTypesManager";
 import TextGenerationManager from "../components/creator/TextGenerationManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 
@@ -25,6 +26,7 @@ const SECTIONS = {
   Traits: TraitsManager,
   Talents: TalentsManager,
   "Types d'action": ActionTypesManager,
+  "Types d'entraîneur": TrainerTypesManager,
   "Génération de texte": TextGenerationManager,
   Personnages: CharactersOverview,
 };
