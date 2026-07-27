@@ -83,7 +83,9 @@ A quest is characterized by:
 - **Failure phrases**: same, filtered to `resultat: "echec"`.
 - **Possible regions**: multi-select of existing regions (`worldData/regions/items` via `RegionsManager.jsx`).
 - **Quest location**: single-select. This reuses what used to be called "Zones d'aventure", now displayed as "Lieu(x) de quête" (`QuestLocationsManager.jsx`, renamed from `AdventureZonesManager.jsx`). The underlying Firestore collection id (`worldData/adventureZones/items`) deliberately kept its original name to avoid a data migration — only the display text and component name changed. This same catalog is also what a region's `adventureZoneIds` multi-select (`RegionsManager.jsx`) draws from.
-- It's already referenced by `TalentsManager.jsx`'s `favoredQuestIds` multi-select (a talent can be tagged as favoring certain quests), but that link is purely informational today — nothing consumes it to influence quest generation, selection, or rewards. How it should eventually affect gameplay (e.g. weighting which quest gets offered, or which quest can trigger that talent's quality-up) is still undecided.
+- It's already referenced by `TalentsManager.jsx`'s `favoredQuestIds` multi-select (a talent can be tagged as favoring certain quests), but that link is purely informational today — nothing consumes it to influence quest selection or rewards. How it should eventually affect gameplay (e.g. weighting which quest gets offered, or which quest can trigger that talent's quality-up) is still undecided.
+
+Quest *drawing* is now wired into the "Partir en quête" action (`functions/src/actions/partirEnQuete.js`) — see [docs/ARCHITECTURE.md](ARCHITECTURE.md) for the full mechanism: a rarity is rolled first (default weights commun 55/peu_commun 30/rare 10/tres_rare 4/legendaire 1, redrawn until a matching quest exists), then a random quest of that rarity is picked from the character's region.
 
 **Quest list page**: quests are shown in a filtered list, filterable by quest objectives, rarity, possible regions, and quest location. A reset button clears all filters. Selected filters are injected as default values into the matching fields of the "New quest" creation form below (resynced live whenever the filters change, as long as no existing quest is being edited).
 
@@ -104,5 +106,5 @@ worldData/quests/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- **Loot**: a quest should eventually single-select a loot table, but that needs a loot table creation page first (and, before that, an item creation page). Not implemented — `worldData/quests/items` has no `lootTableId` field yet.
+- **Loot**: a quest should eventually single-select a loot table, but that needs a loot table creation page first (and, before that, an item creation page). Not implemented — `worldData/quests/items` has no `lootTableId` field yet, and the quest draw in `partirEnQuete.js` deliberately doesn't roll loot yet either.
 - How `favoredQuestIds` on a talent should affect gameplay is still undecided (see above).

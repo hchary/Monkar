@@ -82,6 +82,12 @@ export default function ActionPanel({ character }) {
               {expanded && (
                 <div className="action-detail">
                   <p>{lastAction.narrativeText}</p>
+                  {lastAction.quest && (
+                    <p className="quest-info">
+                      Quête : {lastAction.quest.name}
+                      {lastAction.quest.locationName && ` — ${lastAction.quest.locationName}`}
+                    </p>
+                  )}
                   {!lastAction.success && lastAction.consequence && (
                     <ul>
                       <li>Cause : {lastAction.consequence.description}</li>
