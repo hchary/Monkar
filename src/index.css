@@ -210,10 +210,45 @@ button.selected {
   margin-left: auto;
 }
 
-.creator-dashboard .creator-nav {
+.creator-groups {
   display: flex;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
   margin-bottom: 24px;
+}
+
+.creator-group {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  transition: flex-grow 0.2s ease, opacity 0.2s ease;
+}
+
+.creator-group.collapsed {
+  flex: 0 0 auto;
+  opacity: 0.6;
+}
+
+.creator-group.expanded {
+  flex: 1 1 auto;
+}
+
+.creator-group-header {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-weight: bold;
+}
+
+.creator-group.expanded .creator-group-header {
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.creator-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .creator-section form {
