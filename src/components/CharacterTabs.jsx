@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import InventoryTab from "./InventoryTab";
 
 const TABS = [
   "Inventaire",
@@ -58,22 +59,7 @@ export default function CharacterTabs({ character }) {
       </div>
 
       <div className="tab-content">
-        {activeTab === "Inventaire" && (
-          <>
-            <p>Or : {character.gold}</p>
-            {character.inventory?.length > 0 ? (
-              <ul>
-                {character.inventory.map((item, i) => (
-                  <li key={i}>
-                    {item.name} {item.qty > 1 && `x${item.qty}`}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState text="Ton inventaire est vide." />
-            )}
-          </>
-        )}
+        {activeTab === "Inventaire" && <InventoryTab character={character} />}
 
         {activeTab === "Talents" &&
           (character.talents?.length > 0 ? (
