@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
+import { RARITIES } from "./creator/TalentsManager";
 
 const REVEAL_DELAY_HOURS = 24;
 
@@ -16,6 +17,9 @@ export default function ActionPanel({ character }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState("");
+  const questDialogRef = useRef(null);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "actionTypes", "items"), (snap) => {
@@ -44,6 +48,32 @@ export default function ActionPanel({ character }) {
   async function handleDebugAdvanceTime() {
     await updateDoc(doc(db, "characters", character.id), { lastActionDate: null, lastActionAt: null });
   }
+
+  // Auto-opens once a quest result is revealed and hasn't been closed yet - reappears on
+  // reload if the player left before clicking "Fermer", since that's what grants the loot.
+  const showQuestPopup = !!(revealed && lastAction?.quest && !lastAction?.lootClaimed);
+
+  useEffect(() => {
+    if (showQuestPopup) questDialogRef.current?.showModal();
+    else questDialogRef.current?.close();
+  }, [showQuestPopup]);
+
+  async function handleCloseQuestPopup() {
+    setClaiming(true);
+    setClaimError("");
+    try {
+      const claimQuestLoot = httpsCallable(functions, "claimQuestLoot");
+      await claimQuestLoot();
+    } catch (err) {
+      setClaimError(err.message);
+    } finally {
+      setClaiming(false);
+    }
+  }
+
+  const sortedLoot = [...(lastAction?.loot || [])].sort(
+    (a, b) => RARITIES.findIndex((r) => r.value === b.rarity) - RARITIES.findIndex((r) => r.value === a.rarity)
+  );
 
   return (
     <div className="action-panel">
@@ -111,6 +141,7 @@ export default function ActionPanel({ character }) {
                         </li>
                       )}
                       {lastAction.talentGain && <li>Nouveau talent : {lastAction.talentGain.name} {lastAction.talentGain.quality}</li>}
+                      {lastAction.loot?.length > 0 && <li>Butin : {lastAction.loot.map((item) => item.name).join(", ")}</li>}
                       {lastAction.reputationGain > 0 && <li>Réputation : +{lastAction.reputationGain}</li>}
                       {lastAction.legendary && <li className="legendary">Exploit légendaire !</li>}
                     </ul>
@@ -123,6 +154,40 @@ export default function ActionPanel({ character }) {
       )}
 
       {!canActToday && !lastAction && <p className="empty-state">Aucune action encore.</p>}
+
+      {lastAction?.quest && (
+        <dialog
+          ref={questDialogRef}
+          className="quest-result-dialog"
+          onCancel={(e) => e.preventDefault()}
+        >
+          <div className="quest-result-content">
+            <h3>
+              {lastAction.quest.name} — {lastAction.success ? "Succès" : "Échec"}
+            </h3>
+            <p>{lastAction.narrativeText}</p>
+
+            {lastAction.success && sortedLoot.length > 0 && (
+              <fieldset className="quest-loot-box">
+                <legend>Butin obtenu</legend>
+                <ul className="instance-list">
+                  {sortedLoot.map((item, index) => (
+                    <li key={index} className={`instance-card rarity-${item.rarity}`}>
+                      {item.name}
+                    </li>
+                  ))}
+                </ul>
+              </fieldset>
+            )}
+
+            {claimError && <p className="error">{claimError}</p>}
+
+            <button type="button" onClick={handleCloseQuestPopup} disabled={claiming}>
+              Fermer
+            </button>
+          </div>
+        </dialog>
+      )}
     </div>
   );
 }

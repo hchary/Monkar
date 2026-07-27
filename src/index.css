@@ -700,6 +700,34 @@ fieldset label {
   margin: 0;
 }
 
+.quest-result-dialog {
+  width: min(480px, 90vw);
+  padding: 0;
+  border: 1px solid var(--border);
+  clip-path: var(--pixel-frame);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.quest-result-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.quest-result-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.quest-result-content h3 {
+  margin: 0;
+}
+
+.quest-loot-box .instance-list {
+  max-height: none;
+}
+
 .climate-banner-footer {
   position: fixed;
   left: 50%;

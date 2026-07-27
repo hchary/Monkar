@@ -29,6 +29,11 @@ service cloud.firestore {
       allow write: if false; // only written by Cloud Functions (performAction)
     }
 
+    match /instances/{instanceId} {
+      allow read: if isCreator() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false; // only written by Cloud Functions (claimQuestLoot)
+    }
+
     match /worldData/{document=**} {
       allow read: if isSignedIn();
       allow write: if isCreator();

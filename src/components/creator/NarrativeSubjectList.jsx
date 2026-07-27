@@ -1,3 +1,5 @@
+import { RARITIES } from "./TalentsManager";
+
 export const SUBJECT_TYPES = [
   { value: "groupe", label: "Groupe" },
   { value: "individuel", label: "Individuel" },
@@ -28,6 +30,9 @@ export default function NarrativeSubjectList({ subjects, onEdit, onDelete, tagsC
                   <strong>
                     {capitalizeSubject(subject.nom)} ({capitalizeSubject(subject.article)})
                   </strong>
+                  {subject.rarity && (
+                    <span> — {RARITIES.find((r) => r.value === subject.rarity)?.label || subject.rarity}</span>
+                  )}
                   {tagsCatalog && (subject.tagIds || []).length > 0 && (
                     <span>
                       {" "}

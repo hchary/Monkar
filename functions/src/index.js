@@ -129,3 +129,48 @@ exports.performAction = onCall(async (request) => {
 
   return { ok: true };
 });
+
+// Grants a resolved quest's rolled loot (see partirEnQuete.js) as Instance documents, and
+// marks it claimed so re-clicking "Fermer" (or reloading before it closes) can't duplicate
+// them. Separate from performAction: loot is rolled with the rest of the quest resolution,
+// but only committed to the character's inventory once the player closes the result pop-up.
+exports.claimQuestLoot = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required.");
+
+  const charSnap = await db
+    .collection("characters")
+    .where("ownerUid", "==", uid)
+    .where("alive", "==", true)
+    .limit(1)
+    .get();
+  if (charSnap.empty) throw new HttpsError("failed-precondition", "No living character found for this user.");
+  const characterRef = charSnap.docs[0].ref;
+
+  await db.runTransaction(async (tx) => {
+    const characterDoc = await tx.get(characterRef);
+    const character = characterDoc.data();
+    const lastAction = character.lastAction;
+    if (!lastAction || !lastAction.quest) {
+      throw new HttpsError("failed-precondition", "No quest result to claim.");
+    }
+    if (lastAction.lootClaimed) return;
+
+    const today = todayUTC();
+    for (const item of lastAction.loot || []) {
+      const instanceRef = db.collection("instances").doc();
+      tx.set(instanceRef, {
+        objectId: item.objectId,
+        characterId: characterRef.id,
+        ownerUid: uid,
+        acquisitionDate: today,
+        condition: "neuf",
+        description: item.description,
+      });
+    }
+
+    tx.update(characterRef, { "lastAction.lootClaimed": true });
+  });
+
+  return { ok: true };
+});

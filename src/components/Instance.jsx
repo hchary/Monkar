@@ -30,6 +30,7 @@ export default function InstanceCard({ instance, object, tags }) {
       <strong>{object.name}</strong> — {rarityLabel} — {typeLabel}
       <div>État : {conditionLabel}</div>
       <div>Obtenu le {formatDate(instance.acquisitionDate)}</div>
+      {(instance.description || object.description) && <div>{instance.description || object.description}</div>}
       <div>
         Tags : {(object.tagIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") || "aucun"}
       </div>
