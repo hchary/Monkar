@@ -352,3 +352,99 @@ fieldset label {
   border-color: transparent;
   border-image: linear-gradient(90deg, #ff004c, #ff8a00, #ffe600, #00e676, #00b0ff, #7c4dff) 1;
 }
+
+.modal-select-field {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.modal-select-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modal-select-header > span {
+  font-weight: bold;
+}
+
+.modal-select-header button {
+  padding: 4px 8px;
+}
+
+.modal-select-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.modal-select-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.85em;
+}
+
+.modal-select-dialog {
+  width: min(480px, 90vw);
+  max-height: 80vh;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.modal-select-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-select-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  max-height: 80vh;
+}
+
+.modal-select-content h4 {
+  margin: 0;
+}
+
+.modal-select-content input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-select-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-select-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-select-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.modal-select-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}

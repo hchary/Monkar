@@ -73,18 +73,36 @@ Not implemented yet beyond the name-only stub described above.
 
 ## Quest creation and editing
 
-Currently only a name-only stub exists: `worldData/quests/items` via `QuestsManager.jsx` (the same bare-CRUD pattern as `TrainerTypesManager.jsx`), registered as the "Quêtes" tab in `CreatorDashboard.jsx`.
+Status: **implemented**, except loot (see "Still open" below). `worldData/quests/items` via `QuestsManager.jsx`, registered as the "Quêtes" tab in `CreatorDashboard.jsx`.
 
-- It's already referenced by `TalentsManager.jsx`'s `favoredQuestIds` multi-select (a talent can be tagged as favoring certain quests), but that link is purely informational today — nothing consumes it to influence quest generation, selection, or rewards.
-- A full quest entity needs its remaining fields designed, at minimum: an objective, a région link, rewards, and difficulty/weighting.
-- "Objectifs de quête" (`QuestObjectivesManager.jsx`) are quest-themed `worldData/narrativeSubjects/items` tagged `"objectif de quête"` — not a separate collection (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). Whether/how a quest's objective field should draw from that tagged set is an open question for this entry.
-- How `favoredQuestIds` on a talent should eventually affect gameplay (e.g. weighting which quest gets offered, or which quest can trigger that talent's quality-up) is also undecided.
+A quest is characterized by:
+
+- **Quest objectives**: multi-select of existing "Objectifs de quête" (`QuestObjectivesManager.jsx`) — quest-themed `worldData/narrativeSubjects/items` tagged `"objectif de quête"` (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). A quest can have several.
+- **Possible rarities**: multi-select from the existing rarity tiers — the 8-tier enum shared with talents (see [Expanded talent system](#expanded-talent-system)): commun, peu_commun, rare, tres_rare, legendaire, mythique, divin, unique. Reuses `TalentsManager.jsx`'s exported `RARITIES`.
+- **Success phrases**: multi-select of existing verb phrases (`worldData/verbPhrases/items` via `VerbPhrasesManager.jsx` in `TextGenerationManager.jsx`) whose `resultat` is `"victoire"`, with a link over to the verb phrase creation UI.
+- **Failure phrases**: same, filtered to `resultat: "echec"`.
+- **Possible regions**: multi-select of existing regions (`worldData/regions/items` via `RegionsManager.jsx`).
+- **Quest location**: single-select. This reuses what used to be called "Zones d'aventure", now displayed as "Lieu(x) de quête" (`QuestLocationsManager.jsx`, renamed from `AdventureZonesManager.jsx`). The underlying Firestore collection id (`worldData/adventureZones/items`) deliberately kept its original name to avoid a data migration — only the display text and component name changed. This same catalog is also what a region's `adventureZoneIds` multi-select (`RegionsManager.jsx`) draws from.
+- It's already referenced by `TalentsManager.jsx`'s `favoredQuestIds` multi-select (a talent can be tagged as favoring certain quests), but that link is purely informational today — nothing consumes it to influence quest generation, selection, or rewards. How it should eventually affect gameplay (e.g. weighting which quest gets offered, or which quest can trigger that talent's quality-up) is still undecided.
+
+**Quest list page**: quests are shown in a filtered list, filterable by quest objectives, rarity, possible regions, and quest location. A reset button clears all filters. Selected filters are injected as default values into the matching fields of the "New quest" creation form below (resynced live whenever the filters change, as long as no existing quest is being edited).
+
+**Quest creation**: the creation section is a collapsible panel (`<details>`), closed by default, opened automatically when editing an existing quest. In that form, the potentially large catalogs (objectives, success/failure phrases, regions) are picked via a searchable `<dialog>` popup — `MultiSelectModalField.jsx`, a shared component (not specific to quests) — rather than an inline checkbox list; a text filter narrows the popup's options, and picked items show as chips once closed. Rarities stay an inline checkbox list (`MultiSelectField`, still local to `QuestsManager.jsx`) since that catalog is small and fixed (8 tiers).
+
+`MultiSelectModalField` takes a `matchesFilter(option, query)` prop (defaulting to a plain name match) so each catalog can define what its popup search actually matches against, instead of hardcoding name-only search in the shared component. Each catalog's manager exports its own: `matchesQuestObjective` (name or tag) in `QuestObjectivesManager.jsx`, `matchesVerbPhrase` (template text, cible, or tag) in `TextGenerationManager.jsx`, `matchesRegion` (name or description) in `RegionsManager.jsx`, `matchesQuest` (name) in `QuestsManager.jsx`, and `matchesTalent` (name, effect, or rarity) in `TalentsManager.jsx` — the last two aren't wired into any `MultiSelectModalField` usage yet (e.g. `TalentsManager.jsx`'s `favoredQuestIds` still uses a plain inline checkbox list), but are ready for whenever those fields switch to the modal picker too.
 
 **Data model implications**:
 ```
 worldData/quests/items/{id}
-  name: string              -- French, e.g. "Chasse aux bandits"
-  -- objective, regionId, rewards, difficulty: TBD once the fields above are designed
+  name: string                -- French, e.g. "Chasse aux bandits"
+  objectiveIds: string[]      -- worldData/narrativeSubjects/items ids tagged "objectif de quête"
+  rarities: string[]          -- subset of the shared rarity enum
+  successPhraseIds: string[]  -- worldData/verbPhrases/items ids, resultat: "victoire"
+  failurePhraseIds: string[]  -- worldData/verbPhrases/items ids, resultat: "echec"
+  regionIds: string[]         -- worldData/regions/items ids
+  locationId: string          -- worldData/adventureZones/items id
 ```
 
-Not implemented yet beyond the name-only stub described above.
+**Still open (deliberately deferred)**:
+- **Loot**: a quest should eventually single-select a loot table, but that needs a loot table creation page first (and, before that, an item creation page). Not implemented — `worldData/quests/items` has no `lootTableId` field yet.
+- How `favoredQuestIds` on a talent should affect gameplay is still undecided (see above).

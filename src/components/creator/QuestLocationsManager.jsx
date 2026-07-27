@@ -4,20 +4,20 @@ import { db } from "../../lib/firebase";
 
 const emptyForm = { name: "", description: "" };
 
-export default function AdventureZonesManager() {
-  const [zones, setZones] = useState([]);
+export default function QuestLocationsManager() {
+  const [locations, setLocations] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "adventureZones", "items"), (snap) => {
-      setZones(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLocations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
-  function startEdit(zone) {
-    setEditingId(zone.id);
-    setForm({ name: zone.name || "", description: zone.description || "" });
+  function startEdit(location) {
+    setEditingId(location.id);
+    setForm({ name: location.name || "", description: location.description || "" });
   }
 
   function resetForm() {
@@ -37,23 +37,23 @@ export default function AdventureZonesManager() {
 
   return (
     <div className="creator-section">
-      <h2>Zones d'aventures</h2>
+      <h2>Lieux de quête</h2>
 
       <ul className="creator-list">
-        {zones.map((zone) => (
-          <li key={zone.id}>
-            <strong>{zone.name}</strong> — {zone.description}
-            <button type="button" onClick={() => startEdit(zone)}>
+        {locations.map((location) => (
+          <li key={location.id}>
+            <strong>{location.name}</strong> — {location.description}
+            <button type="button" onClick={() => startEdit(location)}>
               Modifier
             </button>
-            <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "adventureZones", "items", zone.id))}>
+            <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "adventureZones", "items", location.id))}>
               Supprimer
             </button>
           </li>
         ))}
       </ul>
 
-      <h3>{editingId ? "Modifier la zone d'aventure" : "Nouvelle zone d'aventure"}</h3>
+      <h3>{editingId ? "Modifier le lieu de quête" : "Nouveau lieu de quête"}</h3>
       <form onSubmit={handleSubmit}>
         <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         <input
@@ -62,7 +62,7 @@ export default function AdventureZonesManager() {
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
         <div>
-          <button type="submit">{editingId ? "Enregistrer" : "Créer la zone d'aventure"}</button>
+          <button type="submit">{editingId ? "Enregistrer" : "Créer le lieu de quête"}</button>
           {editingId && (
             <button type="button" onClick={resetForm}>
               Annuler

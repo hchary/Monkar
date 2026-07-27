@@ -3,7 +3,7 @@ import RegionsManager from "../components/creator/RegionsManager";
 import ClimatsManager from "../components/creator/ClimatsManager";
 import ReliefsManager from "../components/creator/ReliefsManager";
 import FactionsManager from "../components/creator/FactionsManager";
-import AdventureZonesManager from "../components/creator/AdventureZonesManager";
+import QuestLocationsManager from "../components/creator/QuestLocationsManager";
 import QuestObjectivesManager from "../components/creator/QuestObjectivesManager";
 import OriginsManager from "../components/creator/OriginsManager";
 import TalentsManager from "../components/creator/TalentsManager";
@@ -20,7 +20,7 @@ const SECTIONS = {
   Climat: ClimatsManager,
   Reliefs: ReliefsManager,
   Factions: FactionsManager,
-  "Zones d'aventures": AdventureZonesManager,
+  "Lieux de quête": QuestLocationsManager,
   "Objectifs de quête": QuestObjectivesManager,
   Origines: OriginsManager,
   Talents: TalentsManager,

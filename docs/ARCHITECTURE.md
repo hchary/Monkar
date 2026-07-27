@@ -115,8 +115,21 @@ worldData/talents/items/{id}
   favoredQuestIds: [string]        -- worldData/quests/items ids, purely informational for now
   trainerTypeId: string            -- worldData/trainerTypes/items id, only meaningful when trainable
 
-worldData/quests/items/{id}      -- name-only stub, see docs/TODO.md ("Quest creation and editing")
-  name: string
+worldData/adventureZones/items/{id}   -- displayed as "Lieu(x) de quête" in the UI; the collection id
+  name: string                        -- itself keeps its original name to avoid a data migration
+  description: string                 -- referenced by both worldData/regions/items (adventureZoneIds,
+                                       -- a region's available locations) and worldData/quests/items
+                                       -- (locationId, a single quest's location)
+
+worldData/quests/items/{id}
+  name: string                 -- French, e.g. "Chasse aux bandits"
+  objectiveIds: [string]       -- worldData/narrativeSubjects/items ids tagged "objectif de quête"
+  rarities: [string]           -- subset of the shared rarity enum (see Talents above)
+  successPhraseIds: [string]   -- worldData/verbPhrases/items ids, resultat: "victoire"
+  failurePhraseIds: [string]   -- worldData/verbPhrases/items ids, resultat: "echec"
+  regionIds: [string]          -- worldData/regions/items ids
+  locationId: string           -- worldData/adventureZones/items id
+  -- lootTableId: TBD -- loot table catalog not implemented yet, see docs/TODO.md
 
 worldData/factions/{id}            -- not yet consumed by the app, reserved for
 worldData/gods/{id}                   the creator dashboard (Phase 3)
@@ -183,7 +196,10 @@ No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute
 - **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above. The talent grant fields are a select over `worldData/talents/items` (populated live) plus a starting quality and a French circumstance string, mapping to the `tier.talentGain` shape above. A tier's optional `cible` select opts it into the procedural `narrativeText` generation described below instead of using the tier's own fixed text.
 - **`TextGenerationManager.jsx`**: read/edit/delete for all of `worldData/narrativeSubjects/items` (grouped by `type` into collapsible, alphabetically sorted sections via the shared `NarrativeSubjectList.jsx`) plus full CRUD for `worldData/verbPhrases/items` (see "Procedural quest-result text" below). Creating a *new* narrative subject isn't done here — see `QuestObjectivesManager.jsx` below, currently the only type-specific creation entry point.
 - **`QuestObjectivesManager.jsx`**: also reads/writes `worldData/narrativeSubjects/items` (via `NarrativeSubjectList.jsx`), filtered to those tagged `"objectif de quête"`; its create/edit form always sets that tag on submit. Quest objectives are a *type* of narrative subject, not a separate collection.
-- **`QuestsManager.jsx`** and **`TrainerTypesManager.jsx`**: name-only stubs for `worldData/quests/items` and `worldData/trainerTypes/items` respectively — see [docs/TODO.md](TODO.md) for what each still needs.
+- **`QuestLocationsManager.jsx`**: CRUD for `worldData/adventureZones/items` (name + description), displayed as "Lieux de quête" — a region's `adventureZoneIds` multi-select (`RegionsManager.jsx`) and a quest's `locationId` single-select (`QuestsManager.jsx`) both draw from this same catalog.
+- **`QuestsManager.jsx`**: CRUD for `worldData/quests/items` — see the shape above. The page is a filtered list (filterable by quest objectives, rarities, possible regions, and quest location, with a reset button) plus a collapsible "Nouvelle quête" form (closed by default, opened automatically when editing an existing quest). Whatever is currently selected in the list filters is applied as the default value of the matching creation-form fields, resyncing whenever the filters change (as long as no existing quest is being edited). Loot is deliberately not a field yet — see [docs/TODO.md](TODO.md). Its potentially large catalogs (objectives, phrases, regions) are picked via `MultiSelectModalField.jsx` (see below) instead of an inline checkbox list.
+- **`MultiSelectModalField.jsx`**: a shared, catalog-agnostic multi-select control — a `<dialog>` popup with a text-filtered checkbox list and selected-item chips, used wherever a form needs to pick several items out of a potentially large catalog. Its search behavior isn't hardcoded: a `matchesFilter(option, query)` prop decides what the popup's text filter actually matches against (defaults to a plain name match). Each catalog's own manager exports a matching function shaped for its data — `matchesQuestObjective` (`QuestObjectivesManager.jsx`, matches name or tag), `matchesVerbPhrase` (`TextGenerationManager.jsx`, matches template text/cible/tag), `matchesRegion` (`RegionsManager.jsx`, matches name or description), `matchesQuest` (`QuestsManager.jsx`), `matchesTalent` (`TalentsManager.jsx`) — so any future `MultiSelectModalField` usage against that catalog reuses the same filter instead of redefining it. Currently only `QuestsManager.jsx`'s own form uses the modal picker; `matchesQuest`/`matchesTalent` are exported ahead of any consumer, ready for e.g. `TalentsManager.jsx`'s `favoredQuestIds` field to switch over later.
+- **`TrainerTypesManager.jsx`**: name-only stub for `worldData/trainerTypes/items` — see [docs/TODO.md](TODO.md) for what it still needs.
 - **`CharactersOverview.jsx`**: lists every character (any `alive` state) and, on click, shows the full character sheet plus its complete `actionsLog` history. Reads all of `characters`/`actionsLog` unfiltered, which the rules permit for the creator role — see the `actionsLog` list-query note above for why a *player's own* history tab needs an `ownerUid` filter but the creator's doesn't (the rule's `isCreator()` branch doesn't depend on `resource.data`, so it authorizes any query shape once true).
 
 ## Procedural quest-result text
