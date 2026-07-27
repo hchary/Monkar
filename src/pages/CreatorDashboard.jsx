@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import RegionsManager from "../components/creator/RegionsManager";
 import TraitsManager from "../components/creator/TraitsManager";
 import TalentsManager from "../components/creator/TalentsManager";
 import ActionTypesManager from "../components/creator/ActionTypesManager";
+import QuestTypesManager from "../components/creator/QuestTypesManager";
+import TrainerTypesManager from "../components/creator/TrainerTypesManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 
 const SECTIONS = {
@@ -10,11 +13,15 @@ const SECTIONS = {
   Traits: TraitsManager,
   Talents: TalentsManager,
   "Types d'action": ActionTypesManager,
+  "Types de quête": QuestTypesManager,
+  "Types d'entraîneur": TrainerTypesManager,
   Personnages: CharactersOverview,
 };
 
 export default function CreatorDashboard() {
-  const [section, setSection] = useState("Régions");
+  const [searchParams] = useSearchParams();
+  const requestedSection = searchParams.get("section");
+  const [section, setSection] = useState(SECTIONS[requestedSection] ? requestedSection : "Régions");
   const Section = SECTIONS[section];
 
   return (

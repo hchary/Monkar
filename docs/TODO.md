@@ -61,3 +61,22 @@ Known gap: granting the same talent to a character more than once (e.g. via two 
 ## Trainers
 
 Design note only — nothing implemented. The talent system's "s'entraîner" (train) progression path was deliberately deferred because the trainer concept itself isn't designed yet: who/what a player trains with (an NPC? a location? a standalone action type?), whether training costs anything (gold, a full day's action slot, both), whether it's restricted to talents the character already has, and how it picks *which* trainable talent to bump when a character has several. Once this is designed, revisit "Still open" in [Expanded talent system](#expanded-talent-system) above — the mechanic should reuse the existing weighted-tier roll (a success tier grants +1 quality to a designated talent) rather than introduce a second RNG system, per prior decision.
+
+## Quest type creation page
+
+Talents now reference quest types they favor (`favoredQuestTypeIds`, a multi-select on the talent form in `TalentsManager.jsx`), but the quest type catalog itself is only a bare-bones stub: `QuestTypesManager.jsx` (registered as the "Types de quête" tab in `CreatorDashboard.jsx`) stores nothing beyond a `name` in `worldData/questTypes/items/{id}`. A full creation page is still needed.
+
+- At minimum, a description field explaining what the quest type represents in narrative terms.
+- Likely needs to connect to other quest-shaping concepts already sketched in [brainstormn.md](brainstormn.md) — e.g. "sujets de quête" (defeat bandits, break a curse, deliver equipment, etc.) and adventure zone types — once those are designed, quest types may need to reference or overlap with them rather than be a fully separate catalog.
+- Should probably surface where a quest type is used across the world data (which talents favor it, which regions/action types generate it), once those relationships exist.
+
+Not implemented yet beyond the name-only stub described above.
+
+## Trainer type creation page
+
+Talents that are trainable now reference a required trainer type (`trainerTypeId`, a single-select on the talent form in `TalentsManager.jsx`, shown when "Entraînable" is checked). The trainer type catalog itself is only a bare-bones stub: `TrainerTypesManager.jsx` (registered as the "Types d'entraîneur" tab in `CreatorDashboard.jsx`) stores nothing beyond a `name` in `worldData/trainerTypes/items/{id}`.
+
+- At minimum, a description field for what kind of trainer this represents (e.g. "Maître d'armes", "Sage ermite").
+- This is the catalog side of the still-undesigned [Trainers](#trainers) mechanic above — region/location tied to a trainer, availability, and training cost/cadence are all open questions there and will likely shape what this page needs beyond a name and description.
+
+Not implemented yet beyond the name-only stub described above.
