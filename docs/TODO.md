@@ -155,3 +155,31 @@ worldData/objects/items/{id}
 **Still open (deliberately deferred)**:
 - **Instance**: the components that specialize Objet (weapon, armor, etc.) will be a separate `Instance` component — an object plus a date of acquisition, potentially other particulars, and a link to a character's inventory. Not implemented at all yet — no object is attached to any character.
 - **Item-type tags**: an object's "type" (arme, armure, etc.) is meant to be signaled via a tag, but there's no dedicated item-type tag concept yet — for now it's an ordinary tag from the same shared catalog as everything else, with no mechanical distinction.
+
+## Loot table creation
+
+Status: **implemented**. `worldData/lootTables/items` via `TablesDeTirageManager.jsx`, registered as the "Tables de tirage" tab in `CreatorDashboard.jsx`, under the "Personnages" group.
+
+A table de butin (loot table) is a named, tagged pool of `worldData/objects/items` a quest (or any future consumer) can draw from. It is characterized by:
+
+- **Name**.
+- **Tags**: multi-select against `worldData/tags/items`, same mechanism already used by quests, quest objectives, and objects.
+- **Rarity**: reuses the 8-tier rarity enum shared with talents and objects — a single value per table (not per entry).
+- **Objects**: multi-select against `worldData/objects/items`, via `MultiSelectModalField.jsx`.
+
+**Loot table list page**: filtered list (rarity, tags, free-text search over name, with a reset button) plus a collapsible "Nouvelle table de tirage" form below — same list-then-create layout as [Object creation](#object-creation), except list actions ("Modifier"/"Tirer") only appear on hover instead of always being visible, to keep the row uncluttered; deleting a table is done from the edit form instead of the list.
+
+**Drawing**: clicking "Tirer" on a table in the list rolls `drawLootTableItemId(table)` (`src/lib/lootTables.js`) — a uniform random pick over the table's `itemIds` — and shows the result in a popup. The drawn object's name links to `/creator?section=Objets&objectId={id}`, which `ObjectsManager.jsx` reads to auto-open that object's edit form. The draw function is a standalone, side-effect-free export specifically so other parts of the app (e.g. a future quest resolution flow) can reuse the same mechanic instead of reimplementing it.
+
+**Data model implications**:
+```
+worldData/lootTables/items/{id}
+  name: string
+  rarity: string      -- one of the 8-tier rarity enum shared with talents
+  tagIds: string[]    -- worldData/tags/items ids
+  itemIds: string[]   -- worldData/objects/items ids
+```
+
+**Still open (deliberately deferred)**:
+- **Quest integration**: `worldData/quests/items` has no `lootTableId` field yet, so a quest can't single-select a loot table and no loot is drawn on quest resolution (`partirEnQuete.js`) — see [Quest creation and editing](#quest-creation-and-editing).
+- **Weighted entries**: the draw is uniform across all objects in a table; per-entry weighting (like `RegionsManager.jsx`'s backgrounds) isn't supported.

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { useSearchParams } from "react-router-dom";
+import { collection, doc, deleteDoc, setDoc, onSnapshot, getDocs, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { RARITIES } from "./TalentsManager";
 import { matchesTag } from "./TagsManager";
@@ -51,6 +52,7 @@ export default function ObjectsManager() {
   const [form, setForm] = useState(emptyForm);
   const [filters, setFilters] = useState(emptyFilters);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const tags = useItems("tags");
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
@@ -60,6 +62,24 @@ export default function ObjectsManager() {
       setObjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  // Deep link from other managers (e.g. a loot table draw) straight to an object's edit form.
+  useEffect(() => {
+    const objectId = searchParams.get("objectId");
+    if (!objectId) return;
+    const target = objects.find((o) => o.id === objectId);
+    if (!target) return;
+    startEdit(target);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("objectId");
+        return next;
+      },
+      { replace: true }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objects, searchParams]);
 
   const filteredObjects = objects.filter((object) => {
     if (filters.rarities.length > 0 && !filters.rarities.includes(object.rarity || "commun")) return false;
@@ -103,6 +123,18 @@ export default function ObjectsManager() {
       ...prev,
       tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
     }));
+  }
+
+  async function handleDelete(objectId) {
+    const referencingTables = await getDocs(
+      query(collection(db, "worldData", "lootTables", "items"), where("itemIds", "array-contains", objectId))
+    );
+    await Promise.all(
+      referencingTables.docs.map((tableDoc) =>
+        updateDoc(tableDoc.ref, { itemIds: (tableDoc.data().itemIds || []).filter((id) => id !== objectId) })
+      )
+    );
+    await deleteDoc(doc(db, "worldData", "objects", "items", objectId));
   }
 
   async function handleSubmit(e) {
@@ -156,7 +188,7 @@ export default function ObjectsManager() {
             <button type="button" onClick={() => startEdit(object)}>
               Modifier
             </button>
-            <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "objects", "items", object.id))}>
+            <button type="button" onClick={() => handleDelete(object.id)}>
               Supprimer
             </button>
           </li>
