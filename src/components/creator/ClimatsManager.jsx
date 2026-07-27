@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-const emptyForm = { name: "", description: "" };
+const emptyForm = { name: "", description: "", bannerKey: "" };
+
+const BANNER_KEYS = [
+  { value: "foret", label: "Forêt" },
+  { value: "glace", label: "Glace" },
+  { value: "pleine_mer", label: "Pleine mer" },
+  { value: "bord_mer", label: "Bord de mer" },
+  { value: "desert", label: "Désert" },
+  { value: "volcan", label: "Volcan" },
+  { value: "ville", label: "Ville" },
+  { value: "grotte", label: "Grotte" },
+];
 
 export default function ClimatsManager() {
   const [climats, setClimats] = useState([]);
@@ -24,7 +35,7 @@ export default function ClimatsManager() {
 
   function startEdit(climat) {
     setEditingId(climat.id);
-    setForm({ name: climat.name || "", description: climat.description || "" });
+    setForm({ name: climat.name || "", description: climat.description || "", bannerKey: climat.bannerKey || "" });
     setPanelOpen(true);
   }
 
@@ -39,7 +50,7 @@ export default function ClimatsManager() {
       ? doc(db, "worldData", "climats", "items", editingId)
       : doc(collection(db, "worldData", "climats", "items"));
 
-    await setDoc(ref, { name: form.name, description: form.description });
+    await setDoc(ref, { name: form.name, description: form.description, bannerKey: form.bannerKey });
     resetForm();
   }
 
@@ -63,6 +74,9 @@ export default function ClimatsManager() {
         {filteredClimats.map((climat) => (
           <li key={climat.id}>
             <strong>{climat.name}</strong> — {climat.description}
+            {climat.bannerKey && (
+              <> ({BANNER_KEYS.find((b) => b.value === climat.bannerKey)?.label || climat.bannerKey})</>
+            )}
             <button type="button" onClick={() => startEdit(climat)}>
               Modifier
             </button>
@@ -82,6 +96,14 @@ export default function ClimatsManager() {
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
+          <select value={form.bannerKey} onChange={(e) => setForm({ ...form, bannerKey: e.target.value })}>
+            <option value="">Aucune bannière</option>
+            {BANNER_KEYS.map((b) => (
+              <option key={b.value} value={b.value}>
+                {b.label}
+              </option>
+            ))}
+          </select>
           <div>
             <button type="submit">{editingId ? "Enregistrer" : "Créer le climat"}</button>
             {editingId && (
