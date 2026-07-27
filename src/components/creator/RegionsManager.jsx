@@ -1,8 +1,28 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-const emptyRegionForm = { name: "", nameSuggestions: "" };
+const DIRECTIONS = [
+  { value: "nord", label: "Nord" },
+  { value: "sud", label: "Sud" },
+  { value: "est", label: "Est" },
+  { value: "ouest", label: "Ouest" },
+];
+
+const emptyRegionForm = {
+  name: "",
+  nameSuggestions: "",
+  description: "",
+  neighbors: [],
+  climatId: "",
+  reliefIds: [],
+  factionIds: [],
+  adventureZoneIds: [],
+  questSubjectIds: [],
+  originIds: [],
+};
+
 const emptyBackgroundForm = {
   name: "",
   profession: "",
@@ -11,6 +31,16 @@ const emptyBackgroundForm = {
   startingGold: 0,
   startingItems: "",
 };
+
+function useItems(collectionName) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", collectionName, "items"), (snap) => {
+      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, [collectionName]);
+  return items;
+}
 
 function BackgroundsEditor({ regionId }) {
   const [backgrounds, setBackgrounds] = useState([]);
@@ -116,11 +146,105 @@ function BackgroundsEditor({ regionId }) {
   );
 }
 
+function NeighborsField({ regions, currentId, neighbors, onChange }) {
+  const others = regions.filter((r) => r.id !== currentId);
+
+  function toggle(regionId) {
+    const exists = neighbors.some((n) => n.regionId === regionId);
+    onChange(
+      exists
+        ? neighbors.filter((n) => n.regionId !== regionId)
+        : [...neighbors, { regionId, direction: "nord" }]
+    );
+  }
+
+  function setDirection(regionId, direction) {
+    onChange(neighbors.map((n) => (n.regionId === regionId ? { ...n, direction } : n)));
+  }
+
+  return (
+    <fieldset>
+      <legend>Régions voisines</legend>
+      {others.length === 0 && <p>Aucune autre région créée pour l'instant.</p>}
+      {others.map((region) => {
+        const neighbor = neighbors.find((n) => n.regionId === region.id);
+        return (
+          <label key={region.id}>
+            <input type="checkbox" checked={!!neighbor} onChange={() => toggle(region.id)} />
+            {region.name}
+            {neighbor && (
+              <select value={neighbor.direction} onChange={(e) => setDirection(region.id, e.target.value)}>
+                {DIRECTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+function MultiSelectField({ legend, options, selectedIds, onToggle, createLink, getTooltip }) {
+  return (
+    <fieldset>
+      <legend>
+        {legend}
+        {createLink && (
+          <Link to={createLink} target="_blank" rel="noopener noreferrer">
+            {" "}
+            Créer
+          </Link>
+        )}
+      </legend>
+      {options.length === 0 && <p>Aucun élément créé pour l'instant.</p>}
+      {options.map((option) => (
+        <label key={option.id} title={getTooltip ? getTooltip(option) : undefined}>
+          <input type="checkbox" checked={selectedIds.includes(option.id)} onChange={() => onToggle(option.id)} />
+          {option.name}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+function ReliefQuickCreate() {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  async function handleAdd() {
+    if (!name) return;
+    await setDoc(doc(collection(db, "worldData", "reliefs", "items")), { name, description });
+    setName("");
+    setDescription("");
+  }
+
+  return (
+    <div className="inline-create">
+      <input placeholder="Nouveau relief" value={name} onChange={(e) => setName(e.target.value)} />
+      <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
+      <button type="button" onClick={handleAdd}>
+        Ajouter un relief
+      </button>
+    </div>
+  );
+}
+
 export default function RegionsManager() {
   const [regions, setRegions] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyRegionForm);
   const [expandedId, setExpandedId] = useState(null);
+
+  const climats = useItems("climats");
+  const reliefs = useItems("reliefs");
+  const factions = useItems("factions");
+  const adventureZones = useItems("adventureZones");
+  const questSubjects = useItems("questSubjects");
+  const origins = useItems("origins");
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "regions", "items"), (snap) => {
@@ -130,12 +254,30 @@ export default function RegionsManager() {
 
   function startEdit(region) {
     setEditingId(region.id);
-    setForm({ name: region.name || "", nameSuggestions: (region.nameSuggestions || []).join(", ") });
+    setForm({
+      name: region.name || "",
+      nameSuggestions: (region.nameSuggestions || []).join(", "),
+      description: region.description || "",
+      neighbors: region.neighbors || [],
+      climatId: region.climatId || "",
+      reliefIds: region.reliefIds || [],
+      factionIds: region.factionIds || [],
+      adventureZoneIds: region.adventureZoneIds || [],
+      questSubjectIds: region.questSubjectIds || [],
+      originIds: region.originIds || [],
+    });
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(emptyRegionForm);
+  }
+
+  function toggleIn(field, id) {
+    setForm((prev) => ({
+      ...prev,
+      [field]: prev[field].includes(id) ? prev[field].filter((x) => x !== id) : [...prev[field], id],
+    }));
   }
 
   async function handleSubmit(e) {
@@ -149,7 +291,18 @@ export default function RegionsManager() {
       ? doc(db, "worldData", "regions", "items", editingId)
       : doc(collection(db, "worldData", "regions", "items"));
 
-    await setDoc(ref, { name: form.name, nameSuggestions });
+    await setDoc(ref, {
+      name: form.name,
+      nameSuggestions,
+      description: form.description,
+      neighbors: form.neighbors,
+      climatId: form.climatId,
+      reliefIds: form.reliefIds,
+      factionIds: form.factionIds,
+      adventureZoneIds: form.adventureZoneIds,
+      questSubjectIds: form.questSubjectIds,
+      originIds: form.originIds,
+    });
     resetForm();
   }
 
@@ -169,7 +322,7 @@ export default function RegionsManager() {
                 Supprimer
               </button>
               <button type="button" onClick={() => setExpandedId(expandedId === region.id ? null : region.id)}>
-                {expandedId === region.id ? "Masquer les backgrounds" : "Gérer les backgrounds"}
+                {expandedId === region.id ? "Masquer les origines" : "Editer les origines"}
               </button>
             </div>
             {expandedId === region.id && <BackgroundsEditor regionId={region.id} />}
@@ -185,6 +338,79 @@ export default function RegionsManager() {
           value={form.nameSuggestions}
           onChange={(e) => setForm({ ...form, nameSuggestions: e.target.value })}
         />
+        <textarea
+          placeholder="Description"
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+        />
+
+        <NeighborsField
+          regions={regions}
+          currentId={editingId}
+          neighbors={form.neighbors}
+          onChange={(neighbors) => setForm({ ...form, neighbors })}
+        />
+
+        <fieldset>
+          <legend>
+            Climat
+            <Link to={`/creator?section=${encodeURIComponent("Climat")}`} target="_blank" rel="noopener noreferrer">
+              {" "}
+              Créer
+            </Link>
+          </legend>
+          <select value={form.climatId} onChange={(e) => setForm({ ...form, climatId: e.target.value })}>
+            <option value="">Aucun</option>
+            {climats.map((climat) => (
+              <option key={climat.id} value={climat.id} title={climat.description}>
+                {climat.name}
+              </option>
+            ))}
+          </select>
+        </fieldset>
+
+        <MultiSelectField
+          legend="Reliefs"
+          options={reliefs}
+          selectedIds={form.reliefIds}
+          onToggle={(id) => toggleIn("reliefIds", id)}
+          createLink={`/creator?section=${encodeURIComponent("Reliefs")}`}
+          getTooltip={(relief) => relief.description}
+        />
+        <ReliefQuickCreate />
+
+        <MultiSelectField
+          legend="Factions"
+          options={factions}
+          selectedIds={form.factionIds}
+          onToggle={(id) => toggleIn("factionIds", id)}
+          createLink={`/creator?section=${encodeURIComponent("Factions")}`}
+        />
+
+        <MultiSelectField
+          legend="Zones d'aventures"
+          options={adventureZones}
+          selectedIds={form.adventureZoneIds}
+          onToggle={(id) => toggleIn("adventureZoneIds", id)}
+          createLink={`/creator?section=${encodeURIComponent("Zones d'aventures")}`}
+        />
+
+        <MultiSelectField
+          legend="Sujets de quête"
+          options={questSubjects}
+          selectedIds={form.questSubjectIds}
+          onToggle={(id) => toggleIn("questSubjectIds", id)}
+          createLink={`/creator?section=${encodeURIComponent("Sujets de quête")}`}
+        />
+
+        <MultiSelectField
+          legend="Origines"
+          options={origins}
+          selectedIds={form.originIds}
+          onToggle={(id) => toggleIn("originIds", id)}
+          createLink={`/creator?section=${encodeURIComponent("Origines")}`}
+        />
+
         <div>
           <button type="submit">{editingId ? "Enregistrer" : "Créer la région"}</button>
           {editingId && (
