@@ -71,6 +71,9 @@ worldData/actionTypes/items/{id}
   label: string                    -- e.g. "Partir en quête"
   tiers: [{
     name, weight, success, narrativeText,
+    cible: "groupe" | "individuel" | undefined,  -- opts this tier into procedural narrativeText
+                                                  -- generation (see below); when absent, narrativeText
+                                                  -- is used verbatim
     bonuses: { [stat]: number },          -- applied on any tier (success or failure)
     goldGain, itemGain: { name, qty },    -- success only
     talentGain: { talentId, quality, circumstance },  -- success only; talentId references worldData/talents/items,
@@ -80,6 +83,25 @@ worldData/actionTypes/items/{id}
     consequence: { type: "wound"|"death", name?, description }  -- failure only
   }]
   -- weight is a relative weight; performAction sums all tiers' weights and rolls against that total
+
+worldData/narrativeSubjects/items/{id}   -- procedural narrativeText generation, see below (distinct
+                                          -- from worldData/questSubjects, which is the région-linked
+                                          -- quest theme/category list)
+  type: "groupe" | "individuel"
+  article: "le" | "la" | "les" | "l'"    -- elided with a following "de" (du/de la/des/de l')
+  nom: string                            -- French, e.g. "bandits", "chef des bandits"
+  genre: "m" | "f"
+  nombre: "singulier" | "pluriel"
+  tags: [string]                         -- e.g. ["hostile", "humanoïde"]
+
+worldData/verbPhrases/items/{id}     -- procedural narrativeText generation, see below
+  resultat: "victoire" | "echec" | "partielle"   -- only "victoire"/"echec" are produced today,
+                                                  -- since tiers only have a boolean success
+  cible: "groupe" | "individuel" | "les_deux"
+  template: string                       -- French, contains a {sujet} placeholder,
+                                          -- e.g. "avez triomphé de {sujet}"
+  tags: [string]                         -- optional; when set, only pairs with subjects sharing
+                                          -- at least one tag
 
 worldData/regions/items/{id}
   name: string
@@ -129,8 +151,9 @@ Region is a player *choice*; background and trait are *rolled* server-side speci
 
 Callable. Given an `actionTypeId`:
 1. Rejects if the caller isn't authenticated, or has no character with `alive == true`.
-2. Loads the `actionType` document and its `tiers`.
+2. Loads the `actionType` document and its `tiers`, plus the full `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items` collections (small, shared reference data — read once, outside the transaction).
 3. In a Firestore transaction: re-reads the character, rejects if `lastActionDate` is already today (UTC), otherwise rolls a tier by cumulative weight and:
+   - if the rolled tier has a `cible`, calls `generateResultText` (`functions/src/textGeneration.js`) with `resultat` derived from the tier's `success` (`"victoire"` or `"echec"`) and the tier's `cible`, to pick a compatible verb phrase + subject and produce a fresh `narrativeText`; falls back to the tier's own `narrativeText` if the tier has no `cible` or if no compatible verb phrase/subject pair exists (e.g. an empty pool). Subject/verb-phrase matching is done by `cible`/`type` plus tag overlap when a verb phrase restricts to specific subject tags, and the `{sujet}` placeholder is filled in with French elision of the subject's article after "de" (`de le` → `du`, `de les` → `des`, `de la` → `de la`, `de l'` → `de l'`).
    - applies `bonuses` to `stats` (success or failure alike),
    - on success: increments `gold`/`reputation`, `arrayUnion`s `itemGain` into `inventory`; if `tier.talentGain` is set, reads the referenced `worldData/talents/items/{talentId}` doc, applies the rarity floor-bump for the granted `quality` (see [docs/TODO.md](TODO.md) — quality 3/4/5 floor rarity at rare/très rare/légendaire respectively, never downgrading), and `arrayUnion`s the resulting denormalized talent object into `talents`; increments `legendLevel` if `tier.legendary` is set (Firestore's `increment` on a `null` field just sets it, which is what makes "hidden until first legendary exploit" work),
    - on failure with `consequence.type === "death"`: sets `alive: false` (permadeath — the front-end then shows character creation again),
@@ -156,13 +179,24 @@ There is no in-app UI for this (deliberately — it's a one-time, high-privilege
 
 ## Creator dashboard (`CreatorDashboard.jsx`)
 
-No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute requireCreator` and by the same `worldData`/`characters`/`actionsLog` Firestore rules described above (writes to `worldData` require the creator custom claim; there's no Cloud Function in this path since, unlike player-facing rolls, there's no anti-cheat concern — the creator is the trusted party rules already gate). Five sections, switched locally (no sub-routing):
+No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute requireCreator` and by the same `worldData`/`characters`/`actionsLog` Firestore rules described above (writes to `worldData` require the creator custom claim; there's no Cloud Function in this path since, unlike player-facing rolls, there's no anti-cheat concern — the creator is the trusted party rules already gate). Several sections, switched locally (no sub-routing), including:
 
 - **`RegionsManager.jsx`**: CRUD for `worldData/regions/items`, and per-region CRUD for the nested `backgrounds` subcollection (expand a region to manage its own background pool inline).
 - **`TraitsManager.jsx`**: CRUD for the global `worldData/traits/items`, with a stat-bonus sub-form for the four fixed stats.
 - **`TalentsManager.jsx`**: CRUD for the global `worldData/talents/items` catalog (name, trainable flag, rarity, effect text) — see [docs/TODO.md](TODO.md) for the full talent system design.
-- **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above. The talent grant fields are a select over `worldData/talents/items` (populated live) plus a starting quality and a French circumstance string, mapping to the `tier.talentGain` shape above.
+- **`ActionTypesManager.jsx`**: CRUD for `worldData/actionTypes/items`. The `tiers` array is edited via a structured per-tier form (not raw JSON) that toggles between "success" fields (gold/item/talent/reputation gains, legendary flag) and "failure" fields (wound vs. death consequence) depending on the tier's `success` checkbox — see `formToTier`/`tierToForm` for the mapping between form state and the Firestore shape documented above. The talent grant fields are a select over `worldData/talents/items` (populated live) plus a starting quality and a French circumstance string, mapping to the `tier.talentGain` shape above. A tier's optional `cible` select opts it into the procedural `narrativeText` generation described below instead of using the tier's own fixed text.
+- **`TextGenerationManager.jsx`**: CRUD for `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items` (see "Procedural quest-result text" below) — two sub-forms in one section, following the same pattern as the other managers.
 - **`CharactersOverview.jsx`**: lists every character (any `alive` state) and, on click, shows the full character sheet plus its complete `actionsLog` history. Reads all of `characters`/`actionsLog` unfiltered, which the rules permit for the creator role — see the `actionsLog` list-query note above for why a *player's own* history tab needs an `ownerUid` filter but the creator's doesn't (the rule's `isCreator()` branch doesn't depend on `resource.data`, so it authorizes any query shape once true).
+
+## Procedural quest-result text
+
+A tier can either carry a fixed `narrativeText` (used verbatim, as before) or opt into procedural generation by setting `cible: "groupe" | "individuel"`. When set, `performAction` calls `generateResultText` (`functions/src/textGeneration.js`) with the tier's outcome (`"victoire"` or `"echec"`, from `tier.success`) and `cible`:
+
+1. Filters `worldData/verbPhrases/items` to those matching the outcome and target (`cible: "les_deux"` matches either target), and picks one at random.
+2. Filters `worldData/narrativeSubjects/items` to those of the matching `type`, further narrowed to subjects sharing at least one tag with the verb phrase's `tags` if it declares any, and picks one at random.
+3. Substitutes the picked verb phrase's `{sujet}` placeholder with the subject's `nom`, prefixed by the French elision of its `article` after "de" (`le` → `du`, `les` → `des`, `la` → `de la`, `l'` → `de l'`) — this contraction lives in `contractDe`, a single dedicated function, rather than being duplicated per verb phrase. The past participle in these templates doesn't agree with a complement introduced by "de", so no further grammatical-agreement logic is needed.
+
+If no verb phrase or no subject matches, `generateResultText` returns `null` and the tier's own `narrativeText` is used as a fallback — a tier can therefore opt into procedural generation without needing every outcome/target combination populated up front. The `resultat: "partielle"` value on verb phrases is accepted by the schema but never produced today, since tiers only have a boolean `success`, not a tri-state outcome.
 
 ## Front-end structure
 
@@ -188,12 +222,13 @@ src/
       TraitsManager.jsx      global traits CRUD
       TalentsManager.jsx     global talent catalog CRUD (name/trainable/rarity/effect)
       ActionTypesManager.jsx actionTypes CRUD with a structured tiers sub-form
+      TextGenerationManager.jsx narrativeSubjects + verbPhrases CRUD for procedural narrativeText
       CharactersOverview.jsx list of every character -> full sheet + history on click
   pages/
     Login.jsx, Signup.jsx    auth only; Signup no longer touches Firestore directly
     CharacterProfile.jsx     orchestrator: queries the living character, renders
                              CharacterCreation if none exists, else the banner+tabs+panel
-    CreatorDashboard.jsx     section nav switching between the five creator/ components above
+    CreatorDashboard.jsx     section nav switching between the creator/ components above
 ```
 
 `NavBar.jsx` renders a "Mon personnage" link always, an "Espace créateur" link only when `user.role === "creator"`, and sign-out — it's the only way to reach `/creator` or log out, and only shows once a user is signed in.
@@ -217,4 +252,4 @@ Current deployed project: `monkar-rpg` (Firebase, Blaze plan — required for Cl
 
 - The creator dashboard has CRUD for regions/backgrounds/traits/actionTypes only (the data the game actually consumes today). Factions, gods, and creatures have no CRUD yet and still have to be created by hand in the Firestore console — deliberately deferred since nothing in the app reads them yet either.
 - `title`, `legendLevel` progression beyond the raw counter, `blessings`, `curses`, quest journal, world-knowledge lore, and messaging are all stubs — visually present (or, for messaging, not even that) but not wired to real game logic yet, by design (deferred until the underlying systems are designed).
-- No narrative text variety beyond whatever is authored per tier; no visual theme/styling pass yet.
+- Procedural `narrativeText` generation (see "Procedural quest-result text" above) only covers `"victoire"`/`"echec"` outcomes; tiers still need a hand-authored `narrativeText` fallback for when no subject/verb-phrase pair is populated for a given target. No visual theme/styling pass yet.
