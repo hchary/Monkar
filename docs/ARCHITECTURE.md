@@ -62,6 +62,7 @@ actionsLog/{logId}                 -- permanent history, independent of lastActi
   tierName: string, success: boolean
   narrativeText: string
   consequence: { type: "wound" | "death", name?, description } | null
+  quest: { id, name, rarity, locationId, locationName } | undefined  -- "partir-en-quete" only, see below
   createdAt: server timestamp
 
 worldData/actionTypes/items/{id}
@@ -78,7 +79,10 @@ worldData/actionTypes/items/{id}
     legendary: boolean,                   -- success only, bumps legendLevel
     consequence: { type: "wound"|"death", name?, description }  -- failure only
   }]
-  -- weight is a relative weight; performAction sums all tiers' weights and rolls against that total
+  -- weight is a relative weight; the acting handler sums all tiers' weights and rolls against that total
+  questRarityWeights: [{ rarity, weight }]  -- "partir-en-quete" only, optional; defaults to
+                                             -- commun 55 / peu_commun 30 / rare 10 / tres_rare 4 / legendaire 1
+                                             -- when absent, see "Quest drawing" below
 
 worldData/narrativeSubjects/items/{id}   -- procedural narrativeText generation, see below
   type: "groupe" | "individuel"
@@ -160,18 +164,28 @@ Region is a player *choice*; background is *rolled* server-side specifically so 
 
 ## The `performAction` Cloud Function
 
-Callable. Given an `actionTypeId`:
-1. Rejects if the caller isn't authenticated, or has no character with `alive == true`.
-2. Loads the `actionType` document and its `tiers`, plus the full `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items` collections (small, shared reference data — read once, outside the transaction).
-3. In a Firestore transaction: re-reads the character, rejects if `lastActionDate` is already today (UTC), otherwise rolls a tier by cumulative weight and:
-   - if the rolled tier has a `cible`, calls `generateResultText` (`functions/src/textGeneration.js`) with `resultat` derived from the tier's `success` (`"victoire"` or `"echec"`) and the tier's `cible`, to pick a compatible verb phrase + subject and produce a fresh `narrativeText`; falls back to the tier's own `narrativeText` if the tier has no `cible` or if no compatible verb phrase/subject pair exists (e.g. an empty pool). Subject/verb-phrase matching is done by `cible`/`type` plus tag overlap when a verb phrase restricts to specific subject tags, and the `{sujet}` placeholder is filled in with French elision of the subject's article after "de" (`de le` → `du`, `de les` → `des`, `de la` → `de la`, `de l'` → `de l'`).
-   - on success: increments `gold`/`reputation`, `arrayUnion`s `itemGain` into `inventory`; if `tier.talentGain` is set, reads the referenced `worldData/talents/items/{talentId}` doc, applies the rarity floor-bump for the granted `quality` (see [docs/TODO.md](TODO.md) — quality 3/4/5 floor rarity at rare/très rare/légendaire respectively, never downgrading), and `arrayUnion`s the resulting denormalized talent object into `talents`; increments `legendLevel` if `tier.legendary` is set (Firestore's `increment` on a `null` field just sets it, which is what makes "hidden until first legendary exploit" work),
-   - on failure with `consequence.type === "death"`: sets `alive: false` (permadeath — the front-end then shows character creation again),
-   - on failure with `consequence.type === "wound"`: `arrayUnion`s a wound into `wounds`,
-   - always sets `lastActionDate`, `lastActionAt` (server timestamp), and the full `lastAction` snapshot, and writes a mirrored `actionsLog` entry.
+`performAction` (`functions/src/index.js`) is a thin dispatcher, not a monolithic roller — each `actionTypeId` has its own handler module under `functions/src/actions/` (today: `partirEnQuete.js`; future actions like marchander/s'entraîner/voyager/explorer/travailler get their own module rather than being squeezed into one generic tier-roller, since their mechanics have little in common). A handler exports:
+
+- `prepare({ db, character, actionType })` — async, runs **before** the transaction. Does any read-only setup specific to that action (e.g. drawing a quest, see below) and can `throw HttpsError` for a precondition that should block the action *without* consuming the daily lock (nothing has been written yet at this point).
+- `resolve({ tx, db, character, actionType, today, context })` — runs **inside** the transaction, after the once-per-day lock re-check. Returns `{ updates, logFields }`: `updates` is the full `characters/{id}` patch (`lastActionDate`, `lastActionAt`, `lastAction`, plus whatever gold/inventory/talents/reputation/legendLevel/alive/wounds changes apply), `logFields` is the handler-specific subset merged into the `actionsLog` entry (the dispatcher adds the common `characterId`/`ownerUid`/`actionTypeId`/`date`/`createdAt` fields itself).
+
+Given an `actionTypeId`, `performAction`:
+1. Rejects if the caller isn't authenticated, has no character with `alive == true`, or `actionTypeId` has no registered handler.
+2. Loads the `actionType` document, calls the handler's `prepare(...)`.
+3. In a Firestore transaction: re-reads the character, rejects if `lastActionDate` is already today (UTC), otherwise calls the handler's `resolve(...)` and writes the returned `updates` + a mirrored `actionsLog` entry.
 4. Returns only `{ ok: true }` — deliberately not the roll result, since the outcome must stay hidden for 24h even from the player who just acted (see below).
 
-The transaction is what actually prevents a double-action race (e.g. two tabs clicking at once) — the lock check and the write happen atomically.
+The transaction is what actually prevents a double-action race (e.g. two tabs clicking at once) — the lock check and the write happen atomically. `rollWeighted`/`rarityFloor`/`RARITY_ORDER` (shared by `createCharacter`'s background roll and by quest handlers) live in `functions/src/lib/rolls.js`.
+
+### `partirEnQuete.js`: drawing a quest
+
+`prepare` queries `worldData/quests/items` `where regionIds array-contains character.region.id` to get the region's full quest catalog. If it's empty, it throws `failed-precondition` with *"Aucune quête disponible dans la région, prenez le temps de vous reposer."* — the player isn't locked out for the day and can retry once the creator adds quests for that region.
+
+Otherwise the quest is drawn **rarity-first**: a rarity is rolled against `actionType.questRarityWeights` (defaults to commun 55 / peu_commun 30 / rare 10 / tres_rare 4 / legendaire 1 when the field is absent), then a random quest whose `rarities` includes that rarity is picked from the region's catalog; if none matches, the rarity is redrawn and the process repeats (capped at 50 attempts, after which it falls back to a uniform pick over the region's whole catalog — only reachable if the region's quests carry rarities absent from the weight table). This makes rarer quests rarer to encounter, not merely rarer to have been authored.
+
+Once a quest is drawn, if `quest.locationId` is set its `worldData/adventureZones/items` name is resolved once for display. Then `resolve` still rolls the usual `actionType.tiers` (success/failure, gold, wounds, death, talents — unchanged from before quests existed) but, when the tier has a `cible`, tries `generateResultText` restricted to **the quest's own pools** first — subjects limited to `quest.objectiveIds`, verb phrases limited to `quest.successPhraseIds` (on success) or `quest.failurePhraseIds` (on failure) — falling back to the full global `narrativeSubjects`/`verbPhrases` pools if the quest's own pool has no match for that outcome. The drawn quest (`id`, `name`, `rarity` — the one actually rolled, not the quest's full `rarities` list — `locationId`, `locationName`) is recorded on both `lastAction.quest` and the `actionsLog` entry.
+
+Loot is deliberately not drawn — `worldData/quests/items` has no `lootTableId` yet (see [docs/TODO.md](TODO.md)).
 
 ## The 24-hour reveal delay
 
@@ -204,10 +218,10 @@ No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute
 
 ## Procedural quest-result text
 
-A tier can either carry a fixed `narrativeText` (used verbatim, as before) or opt into procedural generation by setting `cible: "groupe" | "individuel"`. When set, `performAction` calls `generateResultText` (`functions/src/textGeneration.js`) with the tier's outcome (`"victoire"` or `"echec"`, from `tier.success`) and `cible`:
+A tier can either carry a fixed `narrativeText` (used verbatim, as before) or opt into procedural generation by setting `cible: "groupe" | "individuel"`. When set, the action handler (e.g. `partirEnQuete.js`'s `resolve`) calls `generateResultText` (`functions/src/textGeneration.js`) with the tier's outcome (`"victoire"` or `"echec"`, from `tier.success`), `cible`, and whichever subject/verb-phrase pools it chooses to pass (see "Quest drawing" above for how `partirEnQuete.js` narrows these to the drawn quest's own pools first):
 
-1. Filters `worldData/verbPhrases/items` to those matching the outcome and target (`cible: "les_deux"` matches either target), and picks one at random.
-2. Filters `worldData/narrativeSubjects/items` to those of the matching `type`, further narrowed to subjects sharing at least one tag with the verb phrase's `tags` if it declares any, and picks one at random.
+1. Filters the given verb phrases to those matching the outcome and target (`cible: "les_deux"` matches either target), and picks one at random.
+2. Filters the given subjects to those of the matching `type`, further narrowed to subjects sharing at least one tag with the verb phrase's `tags` if it declares any, and picks one at random.
 3. Substitutes the picked verb phrase's `{sujet}` placeholder with the subject's `nom`, prefixed by the French elision of its `article` after "de" (`le` → `du`, `les` → `des`, `la` → `de la`, `l'` → `de l'`) — this contraction lives in `contractDe`, a single dedicated function, rather than being duplicated per verb phrase. The past participle in these templates doesn't agree with a complement introduced by "de", so no further grammatical-agreement logic is needed.
 
 If no verb phrase or no subject matches, `generateResultText` returns `null` and the tier's own `narrativeText` is used as a fallback — a tier can therefore opt into procedural generation without needing every outcome/target combination populated up front. The `resultat: "partielle"` value on verb phrases is accepted by the schema but never produced today, since tiers only have a boolean `success`, not a tri-state outcome.
