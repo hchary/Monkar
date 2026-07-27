@@ -4,11 +4,12 @@ import ClimatsManager from "../components/creator/ClimatsManager";
 import ReliefsManager from "../components/creator/ReliefsManager";
 import FactionsManager from "../components/creator/FactionsManager";
 import AdventureZonesManager from "../components/creator/AdventureZonesManager";
-import QuestSubjectsManager from "../components/creator/QuestSubjectsManager";
+import QuestObjectivesManager from "../components/creator/QuestObjectivesManager";
 import OriginsManager from "../components/creator/OriginsManager";
 import TalentsManager from "../components/creator/TalentsManager";
 import ActionTypesManager from "../components/creator/ActionTypesManager";
 import TrainerTypesManager from "../components/creator/TrainerTypesManager";
+import QuestsManager from "../components/creator/QuestsManager";
 import TextGenerationManager from "../components/creator/TextGenerationManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 
@@ -20,11 +21,12 @@ const SECTIONS = {
   Reliefs: ReliefsManager,
   Factions: FactionsManager,
   "Zones d'aventures": AdventureZonesManager,
-  "Sujets de quête": QuestSubjectsManager,
+  "Objectifs de quête": QuestObjectivesManager,
   Origines: OriginsManager,
   Talents: TalentsManager,
   "Types d'action": ActionTypesManager,
   "Types d'entraîneur": TrainerTypesManager,
+  Quêtes: QuestsManager,
   "Génération de texte": TextGenerationManager,
   Personnages: CharactersOverview,
 };

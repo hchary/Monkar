@@ -244,11 +244,11 @@ button.selected {
   padding: 4px 8px;
 }
 
-.rarity-group {
+.collapsible-group {
   margin-bottom: 12px;
 }
 
-.rarity-group summary {
+.collapsible-group summary {
   cursor: pointer;
   font-weight: bold;
   padding: 8px 12px;
@@ -256,7 +256,7 @@ button.selected {
   border-radius: 4px;
 }
 
-.rarity-group .creator-list {
+.collapsible-group .creator-list {
   margin-top: 8px;
 }
 

@@ -19,7 +19,6 @@ const emptyRegionForm = {
   reliefIds: [],
   factionIds: [],
   adventureZoneIds: [],
-  questSubjectIds: [],
   originIds: [],
 };
 
@@ -243,7 +242,6 @@ export default function RegionsManager() {
   const reliefs = useItems("reliefs");
   const factions = useItems("factions");
   const adventureZones = useItems("adventureZones");
-  const questSubjects = useItems("questSubjects");
   const origins = useItems("origins");
 
   useEffect(() => {
@@ -263,7 +261,6 @@ export default function RegionsManager() {
       reliefIds: region.reliefIds || [],
       factionIds: region.factionIds || [],
       adventureZoneIds: region.adventureZoneIds || [],
-      questSubjectIds: region.questSubjectIds || [],
       originIds: region.originIds || [],
     });
   }
@@ -300,7 +297,6 @@ export default function RegionsManager() {
       reliefIds: form.reliefIds,
       factionIds: form.factionIds,
       adventureZoneIds: form.adventureZoneIds,
-      questSubjectIds: form.questSubjectIds,
       originIds: form.originIds,
     });
     resetForm();
@@ -393,14 +389,6 @@ export default function RegionsManager() {
           selectedIds={form.adventureZoneIds}
           onToggle={(id) => toggleIn("adventureZoneIds", id)}
           createLink={`/creator?section=${encodeURIComponent("Zones d'aventures")}`}
-        />
-
-        <MultiSelectField
-          legend="Sujets de quête"
-          options={questSubjects}
-          selectedIds={form.questSubjectIds}
-          onToggle={(id) => toggleIn("questSubjectIds", id)}
-          createLink={`/creator?section=${encodeURIComponent("Sujets de quête")}`}
         />
 
         <MultiSelectField

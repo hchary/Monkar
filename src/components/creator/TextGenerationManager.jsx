@@ -2,14 +2,23 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-const emptySubjectForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tags: "" };
+const emptySubjectForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel" };
 const emptyVerbPhraseForm = { resultat: "victoire", cible: "groupe", template: "", tags: "" };
+
+const SUBJECT_TYPES = [
+  { value: "groupe", label: "Groupe" },
+  { value: "individuel", label: "Individuel" },
+];
 
 function parseTags(tags) {
   return tags
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
+}
+
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
 function SubjectsManager() {
@@ -31,7 +40,6 @@ function SubjectsManager() {
       nom: subject.nom || "",
       genre: subject.genre || "m",
       nombre: subject.nombre || "pluriel",
-      tags: (subject.tags || []).join(", "),
     });
   }
 
@@ -52,7 +60,6 @@ function SubjectsManager() {
       nom: form.nom,
       genre: form.genre,
       nombre: form.nombre,
-      tags: parseTags(form.tags),
     });
     resetForm();
   }
@@ -61,22 +68,36 @@ function SubjectsManager() {
     <div className="creator-section">
       <h3>Sujets narratifs (cibles de résultat)</h3>
 
-      <ul className="creator-list">
-        {subjects.map((subject) => (
-          <li key={subject.id}>
-            <strong>
-              {subject.article} {subject.nom}
-            </strong>{" "}
-            ({subject.type}, {subject.genre}/{subject.nombre}) — tags : {(subject.tags || []).join(", ") || "aucun"}
-            <button type="button" onClick={() => startEdit(subject)}>
-              Modifier
-            </button>
-            <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}>
-              Supprimer
-            </button>
-          </li>
-        ))}
-      </ul>
+      {SUBJECT_TYPES.map((subjectType) => {
+        const subjectsForType = subjects
+          .filter((subject) => (subject.type || "groupe") === subjectType.value)
+          .sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr"));
+
+        if (subjectsForType.length === 0) return null;
+
+        return (
+          <details key={subjectType.value} className="collapsible-group">
+            <summary>
+              {subjectType.label} ({subjectsForType.length})
+            </summary>
+            <ul className="creator-list">
+              {subjectsForType.map((subject) => (
+                <li key={subject.id}>
+                  <strong>
+                    {capitalize(subject.nom)} ({capitalize(subject.article)})
+                  </strong>
+                  <button type="button" onClick={() => startEdit(subject)}>
+                    Modifier
+                  </button>
+                  <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}>
+                    Supprimer
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })}
 
       <h4>{editingId ? "Modifier le sujet" : "Nouveau sujet"}</h4>
       <form onSubmit={handleSubmit}>
@@ -116,11 +137,6 @@ function SubjectsManager() {
             <option value="pluriel">pluriel</option>
           </select>
         </label>
-        <input
-          placeholder="Tags (séparés par des virgules, ex: hostile, humanoïde)"
-          value={form.tags}
-          onChange={(e) => setForm({ ...form, tags: e.target.value })}
-        />
         <div>
           <button type="submit">{editingId ? "Enregistrer" : "Créer le sujet"}</button>
           {editingId && (
