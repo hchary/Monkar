@@ -13,6 +13,7 @@ import TextGenerationManager from "../components/creator/TextGenerationManager";
 import TagsManager from "../components/creator/TagsManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 import ObjectsManager from "../components/creator/ObjectsManager";
+import TablesDeTirageManager from "../components/creator/TablesDeTirageManager";
 
 const DEFAULT_SECTION = "Régions";
 
@@ -54,6 +55,7 @@ const GROUPS = [
       Origines: OriginsManager,
       Talents: TalentsManager,
       Objets: ObjectsManager,
+      "Tables de tirage": TablesDeTirageManager,
     },
   },
 ];

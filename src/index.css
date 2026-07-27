@@ -631,6 +631,50 @@ fieldset label {
   gap: 8px;
 }
 
+.loot-table-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.loot-table-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.creator-list > li:hover .loot-table-actions,
+.creator-list > li:focus-within .loot-table-actions {
+  opacity: 1;
+}
+
+.loot-draw-dialog {
+  width: min(360px, 90vw);
+  padding: 0;
+  border: 1px solid var(--border);
+  clip-path: var(--pixel-frame);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.loot-draw-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.loot-draw-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.loot-draw-content h4 {
+  margin: 0;
+}
+
 .climate-banner-footer {
   position: fixed;
   left: 50%;
