@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import NarrativeSubjectList from "./NarrativeSubjectList";
+import MultiSelectModalField from "./MultiSelectModalField";
+import { matchesTag } from "./TagsManager";
 
 export const OBJECTIVE_TAG = "objectif de quête";
 
-const emptyForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel" };
+const emptyForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tagIds: [] };
 
 // Matches a quest objective's display name or tags — for use as MultiSelectModalField's matchesFilter.
 export function matchesQuestObjective(option, query) {
@@ -23,12 +25,21 @@ export default function QuestObjectivesManager() {
   const [otherTags, setOtherTags] = useState([]);
   const [filterText, setFilterText] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
+  const [tags, setTags] = useState([]);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "narrativeSubjects", "items"), (snap) => {
       setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", "tags", "items"), (snap) => {
+      setTags(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   const objectives = subjects.filter((subject) => (subject.tags || []).includes(OBJECTIVE_TAG));
   const filteredObjectives = objectives.filter((subject) =>
@@ -43,6 +54,7 @@ export default function QuestObjectivesManager() {
       nom: subject.nom || "",
       genre: subject.genre || "m",
       nombre: subject.nombre || "pluriel",
+      tagIds: subject.tagIds || [],
     });
     setOtherTags((subject.tags || []).filter((t) => t !== OBJECTIVE_TAG));
     setPanelOpen(true);
@@ -67,8 +79,16 @@ export default function QuestObjectivesManager() {
       genre: form.genre,
       nombre: form.nombre,
       tags: [...otherTags, OBJECTIVE_TAG],
+      tagIds: form.tagIds,
     });
     resetForm();
+  }
+
+  function toggleTagId(id) {
+    setForm((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
+    }));
   }
 
   return (
@@ -94,6 +114,7 @@ export default function QuestObjectivesManager() {
         subjects={filteredObjectives}
         onEdit={startEdit}
         onDelete={(subject) => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}
+        tagsCatalog={tags}
       />
 
       <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
@@ -135,6 +156,18 @@ export default function QuestObjectivesManager() {
               <option value="pluriel">pluriel</option>
             </select>
           </label>
+
+          <MultiSelectModalField
+            legend="Tags"
+            options={sortedTags}
+            selectedIds={form.tagIds}
+            onToggle={toggleTagId}
+            createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+            matchesFilter={matchesTag}
+            filterPlaceholder="Filtrer par nom..."
+            buttonLabel="Ajouter tags"
+          />
+
           <div>
             <button type="submit">{editingId ? "Enregistrer" : "Créer l'objectif de quête"}</button>
             {editingId && (
