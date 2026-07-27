@@ -6,7 +6,6 @@ import FactionsManager from "../components/creator/FactionsManager";
 import AdventureZonesManager from "../components/creator/AdventureZonesManager";
 import QuestSubjectsManager from "../components/creator/QuestSubjectsManager";
 import OriginsManager from "../components/creator/OriginsManager";
-import TraitsManager from "../components/creator/TraitsManager";
 import TalentsManager from "../components/creator/TalentsManager";
 import ActionTypesManager from "../components/creator/ActionTypesManager";
 import TrainerTypesManager from "../components/creator/TrainerTypesManager";
@@ -23,7 +22,6 @@ const SECTIONS = {
   "Zones d'aventures": AdventureZonesManager,
   "Sujets de quête": QuestSubjectsManager,
   Origines: OriginsManager,
-  Traits: TraitsManager,
   Talents: TalentsManager,
   "Types d'action": ActionTypesManager,
   "Types d'entraîneur": TrainerTypesManager,
