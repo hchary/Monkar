@@ -19,7 +19,7 @@ const emptyForm = {
   trainable: false,
   rarity: "commun",
   effect: "",
-  favoredQuestSubjectIds: [],
+  favoredQuestIds: [],
   trainerTypeId: "",
 };
 
@@ -61,7 +61,7 @@ export default function TalentsManager() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
-  const questSubjects = useItems("questSubjects");
+  const quests = useItems("quests");
   const trainerTypes = useItems("trainerTypes");
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function TalentsManager() {
       trainable: !!talent.trainable,
       rarity: talent.rarity || "commun",
       effect: talent.effect || "",
-      favoredQuestSubjectIds: talent.favoredQuestSubjectIds || [],
+      favoredQuestIds: talent.favoredQuestIds || [],
       trainerTypeId: talent.trainerTypeId || "",
     });
   }
@@ -87,12 +87,12 @@ export default function TalentsManager() {
     setForm(emptyForm);
   }
 
-  function toggleQuestSubject(questSubjectId) {
+  function toggleQuest(questId) {
     setForm((prev) => ({
       ...prev,
-      favoredQuestSubjectIds: prev.favoredQuestSubjectIds.includes(questSubjectId)
-        ? prev.favoredQuestSubjectIds.filter((id) => id !== questSubjectId)
-        : [...prev.favoredQuestSubjectIds, questSubjectId],
+      favoredQuestIds: prev.favoredQuestIds.includes(questId)
+        ? prev.favoredQuestIds.filter((id) => id !== questId)
+        : [...prev.favoredQuestIds, questId],
     }));
   }
 
@@ -105,7 +105,7 @@ export default function TalentsManager() {
       trainable: form.trainable,
       rarity: form.rarity,
       effect: form.effect,
-      favoredQuestSubjectIds: form.favoredQuestSubjectIds,
+      favoredQuestIds: form.favoredQuestIds,
       trainerTypeId: form.trainable ? form.trainerTypeId : "",
     });
     resetForm();
@@ -123,7 +123,7 @@ export default function TalentsManager() {
         if (talentsForRarity.length === 0) return null;
 
         return (
-          <details key={r.value} className="rarity-group">
+          <details key={r.value} className="collapsible-group">
             <summary>
               {r.label} ({talentsForRarity.length})
             </summary>
@@ -132,11 +132,11 @@ export default function TalentsManager() {
                 <li key={talent.id}>
                   <strong>{talent.name}</strong>
                   {talent.trainable && "*"} — {talent.effect}
-                  {(talent.favoredQuestSubjectIds || []).length > 0 && (
+                  {(talent.favoredQuestIds || []).length > 0 && (
                     <div>
                       Quêtes favorisées :{" "}
-                      {talent.favoredQuestSubjectIds
-                        .map((id) => questSubjects.find((qs) => qs.id === id)?.name || id)
+                      {talent.favoredQuestIds
+                        .map((id) => quests.find((q) => q.id === id)?.name || id)
                         .join(", ")}
                     </div>
                   )}
@@ -186,11 +186,11 @@ export default function TalentsManager() {
         </label>
 
         <MultiSelectField
-          legend="Sujets de quête favorisés"
-          options={questSubjects}
-          selectedIds={form.favoredQuestSubjectIds}
-          onToggle={toggleQuestSubject}
-          createLink={`/creator?section=${encodeURIComponent("Sujets de quête")}`}
+          legend="Quêtes favorisées"
+          options={quests}
+          selectedIds={form.favoredQuestIds}
+          onToggle={toggleQuest}
+          createLink={`/creator?section=${encodeURIComponent("Quêtes")}`}
         />
 
         {form.trainable && (
