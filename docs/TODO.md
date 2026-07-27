@@ -127,3 +127,31 @@ A quest's difficulty is drawn from its own 6-tier enum, exported as `DIFFICULTIE
 **Quest drawing**: `partirEnQuete.js` rolls a difficulty first against `actionType.questDifficultyWeights` (defaults to facile 55/moyen 30/difficile 10/tres_difficile 4/epique 1), then picks a random quest carrying that difficulty from the region's catalog — see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
 
 No Firestore migration was needed for this rename — there was no real quest data yet, so the old `rarities` field/values were replaced outright rather than converted.
+
+## Object creation
+
+Status: **implemented**, except the `Instance` component and item-type tags (see "Still open" below). `worldData/objects/items` via `ObjectsManager.jsx`, registered as the "Objets" tab in `CreatorDashboard.jsx`, under the "Personnages" group.
+
+An object is characterized by:
+
+- **Name**.
+- **Tags**: multi-select against `worldData/tags/items`, same mechanism already used by quests and quest objectives.
+- **Rarity**: reuses the 8-tier rarity enum shared with talents (see [Expanded talent system](#expanded-talent-system)), rather than introducing a separate scale like quest difficulty did.
+- **Description**: a plain string.
+
+Objet is deliberately a general, catalog-level component — weapon, armor, component, grimoire, magic item, currency, property deed, etc. are all expected to eventually be represented as objects, distinguished only by tag (e.g. a future "arme" tag), not by separate fields or subtypes.
+
+**Object list page**: filtered list (rarity, tags, free-text search over name/description, with a reset button) plus a collapsible "Nouvel objet" creation form below — same list-then-create layout as [Quest creation and editing](#quest-creation-and-editing).
+
+**Data model implications**:
+```
+worldData/objects/items/{id}
+  name: string
+  description: string
+  rarity: string        -- one of the 8-tier rarity enum shared with talents
+  tagIds: string[]       -- worldData/tags/items ids
+```
+
+**Still open (deliberately deferred)**:
+- **Instance**: the components that specialize Objet (weapon, armor, etc.) will be a separate `Instance` component — an object plus a date of acquisition, potentially other particulars, and a link to a character's inventory. Not implemented at all yet — no object is attached to any character.
+- **Item-type tags**: an object's "type" (arme, armure, etc.) is meant to be signaled via a tag, but there's no dedicated item-type tag concept yet — for now it's an ordinary tag from the same shared catalog as everything else, with no mechanical distinction.

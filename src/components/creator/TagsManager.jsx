@@ -58,12 +58,18 @@ export default function TagsManager() {
     const referencingSubjects = await getDocs(
       query(collection(db, "worldData", "narrativeSubjects", "items"), where("tagIds", "array-contains", selectedTag.id))
     );
+    const referencingObjects = await getDocs(
+      query(collection(db, "worldData", "objects", "items"), where("tagIds", "array-contains", selectedTag.id))
+    );
     await Promise.all([
       ...referencingQuests.docs.map((questDoc) =>
         updateDoc(questDoc.ref, { tagIds: (questDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
       ),
       ...referencingSubjects.docs.map((subjectDoc) =>
         updateDoc(subjectDoc.ref, { tagIds: (subjectDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
+      ),
+      ...referencingObjects.docs.map((objectDoc) =>
+        updateDoc(objectDoc.ref, { tagIds: (objectDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
       ),
     ]);
     await deleteDoc(doc(db, "worldData", "tags", "items", selectedTag.id));
