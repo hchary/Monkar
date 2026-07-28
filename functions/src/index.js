@@ -4,6 +4,8 @@ const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestor
 const { rollWeighted } = require("./lib/rolls");
 const { stampLifecycle } = require("./lib/actionEffects");
 const { isActionRunning, isActionAcknowledged } = require("./lib/actionLifecycle");
+const { normalizeActionType, evaluateAvailability } = require("./lib/actionCatalog");
+const { buildConditionContext } = require("./lib/actionContext");
 const partirEnQuete = require("./actions/partirEnQuete");
 
 initializeApp();
@@ -98,7 +100,23 @@ exports.performAction = onCall(async (request) => {
 
   const actionTypeSnap = await db.collection("worldData").doc("actionTypes").collection("items").doc(actionTypeId).get();
   if (!actionTypeSnap.exists) throw new HttpsError("not-found", "Unknown action type.");
-  const actionType = actionTypeSnap.data();
+  const actionType = normalizeActionType(actionTypeSnap.data());
+
+  if (!actionType.enabled) {
+    throw new HttpsError("failed-precondition", "Cette action n'est pas disponible.");
+  }
+
+  // Availability is enforced here, not only in the UI: the client evaluates the same conditions
+  // through the mirrored evaluator to decide what to display, but that answer is UX - this one
+  // is authority. Both fail closed on a condition type they don't recognize.
+  const conditionContext = await buildConditionContext({
+    db,
+    character,
+    characterId: characterRef.id,
+    conditions: actionType.availability.conditions,
+  });
+  const availability = evaluateAvailability(actionType, conditionContext);
+  if (!availability.ok) throw new HttpsError("failed-precondition", availability.reason);
 
   const today = todayUTC();
 

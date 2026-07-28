@@ -135,6 +135,10 @@ async function resolve({ tx, db, character, actionType, today, context }) {
         trainable: !!talent.trainable,
         rarity: rarityFloor(talent.rarity, quality),
         effect: talent.effect || "",
+        // Copied at grant time like every other talent field, so a hasTalentTag condition can be
+        // evaluated straight off the character document with no catalog lookup. Talents granted
+        // before this was added carry no tagIds and simply never match such a condition.
+        tagIds: talent.tagIds || [],
         lastChangeDate: today,
         lastChangeCircumstance: tier.talentGain.circumstance || "",
       };

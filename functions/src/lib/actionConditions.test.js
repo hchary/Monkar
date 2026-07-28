@@ -1,0 +1,211 @@
+const { test, describe } = require("node:test");
+const assert = require("node:assert/strict");
+const {
+  CONDITION_TYPES,
+  UNKNOWN_CONDITION_REASON,
+  evaluateConditions,
+  conditionsNeedInstances,
+} = require("./actionConditions");
+
+const CHARACTER = {
+  profession: "Pêcheur",
+  reputation: 40,
+  legendLevel: 2,
+  region: { id: "cote-des-brumes", name: "Côte des Brumes" },
+  wounds: [],
+  talents: [
+    { id: "resistance-au-feu", quality: 3, tagIds: ["feu", "protection"] },
+    { id: "peche", quality: 1, tagIds: [] },
+  ],
+};
+
+const ctx = (overrides = {}) => ({ character: CHARACTER, instanceTagIds: new Set(), ...overrides });
+
+// Asserts a single condition in isolation, which is how the creator authors them one row at a time.
+function check(condition, context = ctx()) {
+  return evaluateConditions([condition], context).ok;
+}
+
+describe("evaluateConditions - no conditions", () => {
+  test("an action with no conditions is available", () => {
+    assert.deepStrictEqual(evaluateConditions(undefined, ctx()), { ok: true, reason: null });
+    assert.deepStrictEqual(evaluateConditions(null, ctx()), { ok: true, reason: null });
+    assert.deepStrictEqual(evaluateConditions([], ctx()), { ok: true, reason: null });
+  });
+
+  test("a conditions field that isn't a list fails closed", () => {
+    assert.deepStrictEqual(evaluateConditions("aucune", ctx()), {
+      ok: false,
+      reason: UNKNOWN_CONDITION_REASON,
+    });
+  });
+});
+
+describe("evaluateConditions - hasTalent", () => {
+  test("matches a talent the character owns", () => {
+    assert.equal(check({ type: "hasTalent", talentId: "peche" }), true);
+    assert.equal(check({ type: "hasTalent", talentId: "alchimie" }), false);
+  });
+
+  test("minQuality gates on the talent's quality, and defaults to 1", () => {
+    assert.equal(check({ type: "hasTalent", talentId: "resistance-au-feu", minQuality: 3 }), true);
+    assert.equal(check({ type: "hasTalent", talentId: "resistance-au-feu", minQuality: 4 }), false);
+    assert.equal(check({ type: "hasTalent", talentId: "peche", minQuality: 2 }), false);
+    assert.equal(check({ type: "hasTalent", talentId: "peche" }), true);
+  });
+
+  test("a missing or malformed talentId fails closed", () => {
+    assert.equal(check({ type: "hasTalent" }), false);
+    assert.equal(check({ type: "hasTalent", talentId: "" }), false);
+    assert.equal(check({ type: "hasTalent", talentId: "peche", minQuality: "beaucoup" }), false);
+  });
+});
+
+describe("evaluateConditions - hasTalentTag", () => {
+  test("matches any owned talent carrying the tag", () => {
+    assert.equal(check({ type: "hasTalentTag", tagId: "feu" }), true);
+    assert.equal(check({ type: "hasTalentTag", tagId: "glace" }), false);
+  });
+
+  test("respects minQuality on the tagged talent", () => {
+    assert.equal(check({ type: "hasTalentTag", tagId: "feu", minQuality: 3 }), true);
+    assert.equal(check({ type: "hasTalentTag", tagId: "feu", minQuality: 5 }), false);
+  });
+
+  test("a talent granted before tagIds were copied never matches", () => {
+    const legacy = { ...CHARACTER, talents: [{ id: "resistance-au-feu", quality: 5 }] };
+    assert.equal(check({ type: "hasTalentTag", tagId: "feu" }, ctx({ character: legacy })), false);
+  });
+});
+
+describe("evaluateConditions - numeric thresholds", () => {
+  test("minReputation compares against the character's reputation", () => {
+    assert.equal(check({ type: "minReputation", value: 40 }), true);
+    assert.equal(check({ type: "minReputation", value: 41 }), false);
+  });
+
+  test("minLegendLevel treats a never-set level as zero", () => {
+    assert.equal(check({ type: "minLegendLevel", value: 2 }), true);
+    assert.equal(check({ type: "minLegendLevel", value: 3 }), false);
+
+    const novice = { ...CHARACTER, legendLevel: null };
+    assert.equal(check({ type: "minLegendLevel", value: 1 }, ctx({ character: novice })), false);
+    assert.equal(check({ type: "minLegendLevel", value: 0 }, ctx({ character: novice })), true);
+  });
+
+  test("a missing or malformed threshold fails closed", () => {
+    assert.equal(check({ type: "minReputation" }), false);
+    assert.equal(check({ type: "minReputation", value: null }), false);
+    assert.equal(check({ type: "minReputation", value: "beaucoup" }), false);
+  });
+});
+
+describe("evaluateConditions - profession and region", () => {
+  test("profession matches the character's denormalized profession string", () => {
+    assert.equal(check({ type: "profession", values: ["Pêcheur", "Forgeron"] }), true);
+    assert.equal(check({ type: "profession", values: ["Forgeron"] }), false);
+  });
+
+  test("region matches the character's region id", () => {
+    assert.equal(check({ type: "region", regionIds: ["cote-des-brumes"] }), true);
+    assert.equal(check({ type: "region", regionIds: ["montagnes"] }), false);
+  });
+
+  test("an empty allowlist allows nobody", () => {
+    assert.equal(check({ type: "profession", values: [] }), false);
+    assert.equal(check({ type: "region", regionIds: [] }), false);
+  });
+});
+
+describe("evaluateConditions - hasInstanceTag", () => {
+  test("matches a tag on an owned instance", () => {
+    const context = ctx({ instanceTagIds: new Set(["outil-de-peche"]) });
+    assert.equal(check({ type: "hasInstanceTag", tagId: "outil-de-peche" }, context), true);
+    assert.equal(check({ type: "hasInstanceTag", tagId: "arme" }, context), false);
+  });
+
+  // A caller that skipped the extra reads cannot prove ownership, so it must not assume it.
+  test("fails closed when the instance tag set was never loaded", () => {
+    assert.equal(check({ type: "hasInstanceTag", tagId: "arme" }, { character: CHARACTER }), false);
+  });
+});
+
+describe("evaluateConditions - notWounded", () => {
+  test("passes only while the character carries no wound", () => {
+    assert.equal(check({ type: "notWounded" }), true);
+
+    const wounded = { ...CHARACTER, wounds: [{ name: "Côte fêlée" }] };
+    assert.equal(check({ type: "notWounded" }, ctx({ character: wounded })), false);
+  });
+});
+
+describe("evaluateConditions - composition", () => {
+  test("every condition must hold", () => {
+    const conditions = [
+      { type: "minReputation", value: 10 },
+      { type: "hasTalent", talentId: "peche" },
+      { type: "notWounded" },
+    ];
+    assert.equal(evaluateConditions(conditions, ctx()).ok, true);
+
+    conditions.push({ type: "minLegendLevel", value: 99 });
+    assert.equal(evaluateConditions(conditions, ctx()).ok, false);
+  });
+
+  test("the first failing condition decides the message", () => {
+    const result = evaluateConditions(
+      [
+        { type: "minReputation", value: 999 },
+        { type: "hasTalent", talentId: "alchimie" },
+      ],
+      ctx()
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "Votre réputation est insuffisante.");
+  });
+
+  test("every reason is French player-facing text, never an id", () => {
+    for (const { value } of CONDITION_TYPES) {
+      const result = evaluateConditions([{ type: value }], ctx({ character: { wounds: [{}] } }));
+      assert.equal(result.ok, false, `${value} should fail with an empty condition`);
+      assert.match(result.reason, /^[A-ZÀ-Ü].*\.$/, `${value} reason should read as a sentence`);
+    }
+  });
+});
+
+describe("evaluateConditions - unknown types fail closed", () => {
+  // A catalog authored against a newer schema than the deployed code must hide the action, never
+  // grant it - and the client copy must fail the same way, or a stale client would offer an
+  // action the server refuses.
+  test("an unrecognized condition type blocks the action", () => {
+    const result = evaluateConditions([{ type: "aLaBelleEtoile" }], ctx());
+    assert.deepStrictEqual(result, { ok: false, reason: UNKNOWN_CONDITION_REASON });
+  });
+
+  test("a condition with no type at all blocks the action", () => {
+    assert.equal(evaluateConditions([{}], ctx()).ok, false);
+    assert.equal(evaluateConditions([null], ctx()).ok, false);
+  });
+
+  test("an unknown type blocks even when every other condition passes", () => {
+    const conditions = [{ type: "minReputation", value: 1 }, { type: "aLaBelleEtoile" }];
+    assert.equal(evaluateConditions(conditions, ctx()).ok, false);
+  });
+});
+
+describe("conditionsNeedInstances", () => {
+  test("is true only when a condition actually reads owned instances", () => {
+    assert.equal(conditionsNeedInstances([{ type: "hasInstanceTag", tagId: "arme" }]), true);
+    assert.equal(
+      conditionsNeedInstances([{ type: "minReputation", value: 1 }, { type: "hasInstanceTag", tagId: "arme" }]),
+      true
+    );
+  });
+
+  test("is false for condition sets that never touch instances", () => {
+    assert.equal(conditionsNeedInstances([{ type: "minReputation", value: 1 }]), false);
+    assert.equal(conditionsNeedInstances([{ type: "hasTalent", talentId: "peche" }]), false);
+    assert.equal(conditionsNeedInstances([]), false);
+    assert.equal(conditionsNeedInstances(undefined), false);
+  });
+});

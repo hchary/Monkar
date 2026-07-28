@@ -596,9 +596,9 @@ before `completesAt` is rejected. **Deploy functions before merging** (§3.6).
 *As shipped:* the lifecycle *readers* live in the mirrored pair `functions/src/lib/actionLifecycle.js`
 ⇄ `src/lib/actionLifecycle.js` (`actionCompletesAtMillis`, `isActionRunning`,
 `isActionAcknowledged`, `actionState`), so the server's lock and the client's rendering answer the
-same question from byte-identical bodies. The *writer* (`stampLifecycle`, `resolveDurationHours`)
-stays server-only in `actionEffects.js`, which keeps the mirrored pair identical apart from its
-export syntax. `canActToday` is gated on `!isActionRunning` only, **not** on `acknowledged`:
+same question from byte-identical bodies. The *writer* (`stampLifecycle`) stays server-only in
+`actionEffects.js`, which keeps the mirrored pair identical apart from its export syntax.
+`canActToday` is gated on `!isActionRunning` only, **not** on `acknowledged`:
 until Phase 4 ships the generic result dialog, an action with no quest has nothing that would flip
 `acknowledged`, and gating on it would lock the player out permanently. Tighten it in Phase 4.
 `lootClaimed` is no longer written; it survives only as a read-time fallback in
@@ -612,7 +612,7 @@ framework and fixing it means touching the permadeath flow (which character the 
 loads, and for how long), so it is out of scope here — but R3 is not truly satisfied for fatal
 outcomes until it is addressed. Worth its own TODO entry.
 
-### Phase 2 — Catalog and conditions
+### Phase 2 — Catalog and conditions — **done**
 
 1. `src/lib/actionCategories.js` with `ACTION_CATEGORIES`.
 2. `src/lib/actionConditions.js` and `functions/src/lib/actionConditions.js` (mirrored pair per
@@ -629,6 +629,26 @@ outcomes until it is addressed. Worth its own TODO entry.
 
 **Acceptance:** an action with `{ type: "minReputation", value: 999 }` is refused by the callable
 even when invoked directly, with the authored French message.
+
+*As shipped:* three mirrored pairs now exist — `actionLifecycle`, `actionConditions` (the
+evaluator, `CONDITION_TYPES`, `conditionsNeedInstances`), and `actionCatalog`
+(`normalizeActionType`, `evaluateAvailability`, and `resolveDurationHours`, moved out of
+`actionEffects.js` so the read-time default has exactly one definition). The ESM copies are
+**generated** from the CommonJS ones by a transform rather than hand-written, and a checked
+normalization diff proves the three pairs' bodies are identical — hand-mirroring three files was
+the obvious place for drift to start. `ACTION_CATEGORIES` stays client-only: the functions treat
+`categoryId` as an opaque string and never need the labels. Server-side, `buildConditionContext`
+(`functions/src/lib/actionContext.js`) loads the owned-instance tag set only when a condition
+asks for it, resolving tags through one `objects` collection read instead of one lookup per owned
+item.
+
+Malformed conditions fail closed alongside unknown ones: a half-filled row from the creator form
+(`{ type: "hasTalent" }` with no `talentId`, a non-numeric threshold, an empty allowlist) blocks
+the action rather than being skipped, so a bad save can never widen access. The
+acceptance criterion was verified at the unit level (`evaluateAvailability` returning the
+authored message) and by executing the generated client copies in the browser, not against the
+deployed callable — the wiring in `performAction` itself is four lines and unverified until
+deploy.
 
 ### Phase 3 — Generic resolution
 

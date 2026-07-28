@@ -1,7 +1,7 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { applyTierEffects, isSuccess, resolveDurationHours, stampLifecycle } = require("./actionEffects");
+const { applyTierEffects, isSuccess, stampLifecycle } = require("./actionEffects");
 const { HOUR_MS } = require("./actionLifecycle");
 
 // FieldValue sentinels (increment/arrayUnion/serverTimestamp) are plain transform objects
@@ -150,25 +150,6 @@ describe("applyTierEffects", () => {
     assert.deepStrictEqual(updates.lastAction.loot, []);
     assert.equal(updates.lastAction.tierName, "Succès");
     assert.equal(updates.lastAction.date, TODAY);
-  });
-});
-
-describe("resolveDurationHours", () => {
-  test("defaults to 24h", () => {
-    assert.equal(resolveDurationHours({}), 24);
-    assert.equal(resolveDurationHours(undefined), 24);
-  });
-
-  test("honours a positive duration", () => {
-    assert.equal(resolveDurationHours({ durationHours: 8 }), 8);
-    assert.equal(resolveDurationHours({ durationHours: "12" }), 12);
-  });
-
-  test("falls back to the default rather than producing an action that never completes", () => {
-    assert.equal(resolveDurationHours({ durationHours: 0 }), 24);
-    assert.equal(resolveDurationHours({ durationHours: -5 }), 24);
-    assert.equal(resolveDurationHours({ durationHours: "bientôt" }), 24);
-    assert.equal(resolveDurationHours({ durationHours: null }), 24);
   });
 });
 

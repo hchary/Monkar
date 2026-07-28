@@ -1,5 +1,6 @@
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { DEFAULT_DURATION_HOURS, HOUR_MS } = require("./actionLifecycle");
+const { HOUR_MS } = require("./actionLifecycle");
+const { resolveDurationHours } = require("./actionCatalog");
 
 // A tier is a success unless it explicitly says otherwise - the same rule every action
 // applies, kept in one place so the generic path and per-action handlers can't drift apart.
@@ -61,14 +62,6 @@ function applyTierEffects({
   return updates;
 }
 
-// Every action runs for 24h unless its catalog entry says otherwise. Nonsense values (absent,
-// zero, negative, non-numeric) fall back to the default rather than producing an action that
-// completes in the past or never - the field is authored by hand today (no creator UI yet).
-function resolveDurationHours(actionType) {
-  const hours = Number(actionType?.durationHours);
-  return Number.isFinite(hours) && hours > 0 ? hours : DEFAULT_DURATION_HOURS;
-}
-
 // Stamps onto a handler's character patch the lifecycle fields every action shares: when it
 // started, when it completes, how the frame should be colored, and whether the player has seen
 // the result yet. The dispatcher owns this rather than the handlers, so an action with no
@@ -98,4 +91,4 @@ function stampLifecycle(updates, { actionType, now = Timestamp.now(), durationHo
   };
 }
 
-module.exports = { applyTierEffects, isSuccess, resolveDurationHours, stampLifecycle };
+module.exports = { applyTierEffects, isSuccess, stampLifecycle };
