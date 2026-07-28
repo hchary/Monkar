@@ -1,25 +1,27 @@
-import { useEffect, useRef, useState } from "react";
-import { collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { Timestamp, collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
-import { RARITIES } from "./creator/TalentsManager";
+import { normalizeActionType } from "../lib/actionCatalog";
+import { HOUR_MS, actionCompletesAtMillis, actionState, toMillis } from "../lib/actionLifecycle";
+import ActionBrowser from "./actions/ActionBrowser";
+import ActionCountdown from "./actions/ActionCountdown";
+import ActionResultDialog from "./actions/ActionResultDialog";
+import ActionOutcome from "./actions/ActionOutcome";
 
-const REVEAL_DELAY_HOURS = 24;
-
-function hoursSince(timestamp) {
-  if (!timestamp) return Infinity;
-  const actedAt = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return (Date.now() - actedAt.getTime()) / (1000 * 60 * 60);
-}
-
+// The state machine of docs/ISSUE-02-ACTION-FRAMEWORK.md §3.6, driven by one `now` that ticks
+// every second: idle -> ActionBrowser, running -> ActionCountdown (replaces the panel's contents,
+// R10), completed -> ActionResultDialog (modal, R3). The tick is what makes "completed" arrive
+// live for a connected player instead of only after a reload (fixes F6) - actionState() derives
+// the same three states the Cloud Function's lock uses, from the same completesAt instant.
 export default function ActionPanel({ character }) {
   const [actionTypes, setActionTypes] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
-  const [claiming, setClaiming] = useState(false);
-  const [claimError, setClaimError] = useState("");
-  const questDialogRef = useRef(null);
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [ackError, setAckError] = useState("");
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "actionTypes", "items"), (snap) => {
@@ -27,12 +29,15 @@ export default function ActionPanel({ character }) {
     });
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const canActToday = character.lastActionDate !== today;
-  const lastAction = character.lastAction;
-  const revealed = lastAction && hoursSince(character.lastActionAt) >= REVEAL_DELAY_HOURS;
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-  async function handleAction(actionTypeId) {
+  const lastAction = character.lastAction;
+  const state = actionState(character, now);
+
+  async function handleStart(actionTypeId) {
     setSubmitting(true);
     setError("");
     try {
@@ -45,35 +50,39 @@ export default function ActionPanel({ character }) {
     }
   }
 
-  async function handleDebugAdvanceTime() {
-    await updateDoc(doc(db, "characters", character.id), { lastActionDate: null, lastActionAt: null });
-  }
-
-  // Auto-opens once a quest result is revealed and hasn't been closed yet - reappears on
-  // reload if the player left before clicking "Fermer", since that's what grants the loot.
-  const showQuestPopup = !!(revealed && lastAction?.quest && !lastAction?.lootClaimed);
-
-  useEffect(() => {
-    if (showQuestPopup) questDialogRef.current?.showModal();
-    else questDialogRef.current?.close();
-  }, [showQuestPopup]);
-
-  async function handleCloseQuestPopup() {
-    setClaiming(true);
-    setClaimError("");
+  async function handleAcknowledge() {
+    setAcknowledging(true);
+    setAckError("");
     try {
-      const claimQuestLoot = httpsCallable(functions, "claimQuestLoot");
-      await claimQuestLoot();
+      const acknowledgeAction = httpsCallable(functions, "acknowledgeAction");
+      await acknowledgeAction();
     } catch (err) {
-      setClaimError(err.message);
+      setAckError(err.message);
     } finally {
-      setClaiming(false);
+      setAcknowledging(false);
     }
   }
 
-  const sortedLoot = [...(lastAction?.loot || [])].sort(
-    (a, b) => RARITIES.findIndex((r) => r.value === b.rarity) - RARITIES.findIndex((r) => r.value === a.rarity)
-  );
+  // Backdates the running action by 24h so it completes immediately, rather than clearing the
+  // lock outright - the countdown and the dialog both read completesAt now, so wiping it would
+  // leave the panel with nothing to show.
+  async function handleDebugAdvanceTime() {
+    const completesAt = actionCompletesAtMillis(character);
+    if (completesAt == null) return;
+
+    const shift = 24 * HOUR_MS;
+    const startedAt = toMillis(lastAction?.startedAt ?? character.lastActionAt);
+    const patch = { "lastAction.completesAt": Timestamp.fromMillis(completesAt - shift) };
+    if (startedAt != null) patch["lastAction.startedAt"] = Timestamp.fromMillis(startedAt - shift);
+
+    await updateDoc(doc(db, "characters", character.id), patch);
+  }
+
+  const actionType = actionTypes.find((a) => a.id === lastAction?.actionTypeId);
+  const showLoot = !!actionType && normalizeActionType(actionType).result.showLoot;
+
+  const accent = lastAction?.accent;
+  const frameClass = accent ? `${accent.kind}-frame ${accent.kind}-${accent.value}` : "";
 
   return (
     <div className="action-panel">
@@ -82,111 +91,42 @@ export default function ActionPanel({ character }) {
         [TEST] Avancer le temps d'un jour
       </button>
 
-      {canActToday && (
+      {state === "running" && <ActionCountdown character={character} now={now} />}
+
+      {state === "idle" && (
         <>
           <h2>Action du jour</h2>
-          <div className="action-list">
-            {actionTypes.map((action) => (
-              <button key={action.id} disabled={submitting} onClick={() => handleAction(action.id)}>
-                {action.label}
-              </button>
-            ))}
-          </div>
-          {error && <p className="error">{error}</p>}
+          <ActionBrowser
+            character={character}
+            actionTypes={actionTypes}
+            onStart={handleStart}
+            submitting={submitting}
+            error={error}
+          />
         </>
       )}
 
-      {lastAction && (
-        <div className={`last-action${lastAction.quest?.difficulty ? ` difficulty-${lastAction.quest.difficulty}` : ""}`}>
+      {state === "idle" && lastAction && (
+        <div className={`last-action ${frameClass}`.trim()}>
           <h2>Action de la veille</h2>
-          <p className="action-type-label">{actionTypes.find((a) => a.id === lastAction.actionTypeId)?.label || lastAction.actionTypeId}</p>
+          <p className="action-type-label">{lastAction.label}</p>
 
-          {!revealed ? (
-            <p className="status pending">En cours...</p>
-          ) : (
-            <>
-              <button className="status-toggle" onClick={() => setExpanded((v) => !v)}>
-                {lastAction.success ? (
-                  <span className={lastAction.quest?.difficulty ? `difficulty-text-${lastAction.quest.difficulty}` : undefined}>
-                    Succès
-                  </span>
-                ) : (
-                  "Échec"
-                )}{" "}
-                {expanded ? "▲" : "▼"}
-              </button>
+          <button type="button" className="status-toggle" onClick={() => setExpanded((v) => !v)}>
+            {lastAction.success ? "Succès" : "Échec"} {expanded ? "▲" : "▼"}
+          </button>
 
-              {expanded && (
-                <div className="action-detail">
-                  <p>{lastAction.narrativeText}</p>
-                  {lastAction.quest && (
-                    <p className="quest-info">
-                      Quête : {lastAction.quest.name}
-                      {lastAction.quest.locationName && ` — ${lastAction.quest.locationName}`}
-                    </p>
-                  )}
-                  {!lastAction.success && lastAction.consequence && (
-                    <ul>
-                      <li>Cause : {lastAction.consequence.description}</li>
-                      {lastAction.consequence.type === "death" && <li className="fatal">Ton personnage est mort.</li>}
-                      {lastAction.consequence.type === "wound" && <li>Blessure : {lastAction.consequence.name}</li>}
-                    </ul>
-                  )}
-                  {lastAction.success && (
-                    <ul>
-                      {(lastAction.goldGain > 0 || lastAction.itemGain) && (
-                        <li>
-                          Gain : {lastAction.goldGain > 0 && `${lastAction.goldGain} or`}
-                          {lastAction.itemGain && ` ${lastAction.itemGain.name}`}
-                        </li>
-                      )}
-                      {lastAction.talentGain && <li>Nouveau talent : {lastAction.talentGain.name} {lastAction.talentGain.quality}</li>}
-                      {lastAction.loot?.length > 0 && <li>Butin : {lastAction.loot.map((item) => item.name).join(", ")}</li>}
-                      {lastAction.reputationGain > 0 && <li>Réputation : +{lastAction.reputationGain}</li>}
-                      {lastAction.legendary && <li className="legendary">Exploit légendaire !</li>}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+          {expanded && <ActionOutcome lastAction={lastAction} showLoot={showLoot} />}
         </div>
       )}
 
-      {!canActToday && !lastAction && <p className="empty-state">Aucune action encore.</p>}
-
-      {lastAction?.quest && (
-        <dialog
-          ref={questDialogRef}
-          className="quest-result-dialog"
-          onCancel={(e) => e.preventDefault()}
-        >
-          <div className="quest-result-content">
-            <h3>
-              {lastAction.quest.name} — {lastAction.success ? "Succès" : "Échec"}
-            </h3>
-            <p>{lastAction.narrativeText}</p>
-
-            {lastAction.success && sortedLoot.length > 0 && (
-              <fieldset className="quest-loot-box">
-                <legend>Butin obtenu</legend>
-                <ul className="instance-list">
-                  {sortedLoot.map((item, index) => (
-                    <li key={index} className={`instance-card rarity-${item.rarity}`}>
-                      {item.name}
-                    </li>
-                  ))}
-                </ul>
-              </fieldset>
-            )}
-
-            {claimError && <p className="error">{claimError}</p>}
-
-            <button type="button" onClick={handleCloseQuestPopup} disabled={claiming}>
-              Fermer
-            </button>
-          </div>
-        </dialog>
+      {state === "completed" && (
+        <ActionResultDialog
+          lastAction={lastAction}
+          showLoot={showLoot}
+          onClose={handleAcknowledge}
+          closing={acknowledging}
+          error={ackError}
+        />
       )}
     </div>
   );

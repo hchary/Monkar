@@ -2,6 +2,8 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { rollWeighted } = require("./lib/rolls");
+const { runActionPipeline } = require("./lib/actionPipeline");
+const { isActionRunning, isActionAcknowledged } = require("./lib/actionLifecycle");
 const partirEnQuete = require("./actions/partirEnQuete");
 
 initializeApp();
@@ -11,12 +13,13 @@ function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Each action type owns its full resolution logic (see functions/src/actions/) since
-// different actions (quêtes, marchander, s'entraîner, voyager...) have little in common
-// beyond "roll something and update the character" - performAction below is just the
-// shared plumbing (auth, character lookup, once-per-day lock, transaction, logging).
+// A handler is the escape hatch for an action whose mechanics don't fit the generic tier
+// roller (see functions/src/lib/actionPipeline.js) - drawing a quest, picking a trainer, and
+// so on. Keyed by handlerId (worldData/actionTypes/items/{id}.handlerId), not by the action
+// type's own document id, so an action can be renamed or duplicated without a code change
+// (docs/ISSUE-02-ACTION-FRAMEWORK.md D13).
 const ACTION_HANDLERS = {
-  "partir-en-quete": partirEnQuete,
+  partirEnQuete,
 };
 
 exports.createCharacter = onCall(async (request) => {
@@ -81,60 +84,21 @@ exports.performAction = onCall(async (request) => {
   const { actionTypeId } = request.data;
   if (!actionTypeId) throw new HttpsError("invalid-argument", "actionTypeId is required.");
 
-  const handler = ACTION_HANDLERS[actionTypeId];
-  if (!handler) throw new HttpsError("invalid-argument", "Unknown or unsupported action type.");
-
-  const charSnap = await db
-    .collection("characters")
-    .where("ownerUid", "==", uid)
-    .where("alive", "==", true)
-    .limit(1)
-    .get();
-  if (charSnap.empty) throw new HttpsError("failed-precondition", "No living character found for this user.");
-  const characterRef = charSnap.docs[0].ref;
-  const character = charSnap.docs[0].data();
-
-  const actionTypeSnap = await db.collection("worldData").doc("actionTypes").collection("items").doc(actionTypeId).get();
-  if (!actionTypeSnap.exists) throw new HttpsError("not-found", "Unknown action type.");
-  const actionType = actionTypeSnap.data();
-
-  const today = todayUTC();
-
-  // Pre-transaction prep (e.g. drawing a quest) can throw a friendly precondition
-  // error - deliberately outside the transaction so it never consumes the day's lock.
-  const context = await handler.prepare({ db, character, actionType });
-
-  await db.runTransaction(async (tx) => {
-    const characterDoc = await tx.get(characterRef);
-    const freshCharacter = characterDoc.data();
-
-    if (freshCharacter.lastActionDate === today) {
-      throw new HttpsError("already-exists", "Action already performed today.");
-    }
-
-    const { updates, logFields } = await handler.resolve({ tx, db, character: freshCharacter, actionType, today, context });
-
-    tx.update(characterRef, updates);
-
-    const logRef = db.collection("actionsLog").doc();
-    tx.set(logRef, {
-      characterId: characterRef.id,
-      ownerUid: uid,
-      actionTypeId,
-      date: today,
-      createdAt: FieldValue.serverTimestamp(),
-      ...logFields,
-    });
-  });
+  await runActionPipeline({ db, uid, actionTypeId, actionHandlers: ACTION_HANDLERS, today: todayUTC() });
 
   return { ok: true };
 });
 
-// Grants a resolved quest's rolled loot (see partirEnQuete.js) as Instance documents, and
-// marks it claimed so re-clicking "Fermer" (or reloading before it closes) can't duplicate
-// them. Separate from performAction: loot is rolled with the rest of the quest resolution,
-// but only committed to the character's inventory once the player closes the result pop-up.
-exports.claimQuestLoot = onCall(async (request) => {
+// Closes the loop on a finished action: runs whatever the action deferred until the player
+// actually saw the result (a quest's rolled loot becomes Instance documents, see
+// partirEnQuete.commit), then marks it acknowledged so the result pop-up doesn't reopen and
+// re-clicking "Fermer" can't duplicate anything.
+//
+// Deferring the commit is deliberate: the outcome is fixed the moment the action resolves, but
+// nothing lands in the character's inventory until they have been shown what they got. Replaces
+// the quest-specific claimQuestLoot - every action gets the same acknowledgement mechanism, and
+// the per-action side effect is the handler's commit() hook.
+exports.acknowledgeAction = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Login required.");
 
@@ -151,25 +115,24 @@ exports.claimQuestLoot = onCall(async (request) => {
     const characterDoc = await tx.get(characterRef);
     const character = characterDoc.data();
     const lastAction = character.lastAction;
-    if (!lastAction || !lastAction.quest) {
-      throw new HttpsError("failed-precondition", "No quest result to claim.");
-    }
-    if (lastAction.lootClaimed) return;
+    if (!lastAction) throw new HttpsError("failed-precondition", "No action result to acknowledge.");
 
-    const today = todayUTC();
-    for (const item of lastAction.loot || []) {
-      const instanceRef = db.collection("instances").doc();
-      tx.set(instanceRef, {
-        objectId: item.objectId,
-        characterId: characterRef.id,
-        ownerUid: uid,
-        acquisitionDate: today,
-        condition: "neuf",
-        description: item.description,
-      });
+    // Idempotent: the pop-up can be closed twice (two tabs, a retried call) without committing
+    // the same loot twice.
+    if (isActionAcknowledged(character)) return;
+
+    // The result is only revealed once the action has run its course; acknowledging it before
+    // then would materialize the loot early.
+    if (isActionRunning(character, Date.now())) {
+      throw new HttpsError("failed-precondition", "This action has not finished yet.");
     }
 
-    tx.update(characterRef, { "lastAction.lootClaimed": true });
+    const handler = ACTION_HANDLERS[lastAction.handlerId];
+    if (handler?.commit) {
+      await handler.commit({ tx, db, characterRef, character, lastAction, uid, today: todayUTC() });
+    }
+
+    tx.update(characterRef, { "lastAction.acknowledged": true });
   });
 
   return { ok: true };

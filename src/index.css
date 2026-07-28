@@ -29,7 +29,6 @@ body {
 }
 
 .auth-page form,
-.action-list,
 .region-list,
 .name-suggestions {
   display: flex;
@@ -129,18 +128,24 @@ button.selected {
   }
 }
 
-.character-tabs .tab-list {
+.character-tabs .tab-list,
+.action-browser .tab-list {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 16px;
 }
 
-.character-tabs .tab-content {
+.character-tabs .tab-content,
+.action-browser .tab-content {
   border: 1px solid var(--border);
   clip-path: var(--pixel-frame);
   padding: 16px;
   min-height: 160px;
+}
+
+.action-browser .action-tab-list {
+  margin-bottom: 12px;
 }
 
 .character-tabs ul {
@@ -165,8 +170,6 @@ button.selected {
 
 .action-panel .last-action {
   margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
 }
 
 .action-panel .action-type-label {
@@ -174,14 +177,23 @@ button.selected {
   margin-bottom: 8px;
 }
 
-.status.pending {
-  opacity: 0.7;
-  font-style: italic;
-}
-
 .status-toggle {
   font-weight: 600;
   width: 100%;
+}
+
+.action-countdown-label {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.action-countdown-timer {
+  font-size: 1.8em;
+  letter-spacing: 0.05em;
+}
+
+.outcome {
+  font-weight: 600;
 }
 
 .action-detail {
@@ -329,6 +341,20 @@ fieldset label {
   gap: 2px;
 }
 
+.condition-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 8px 0;
+  width: 100%;
+}
+
+.condition-row legend {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .tier-editor {
   border: 1px solid var(--border);
   clip-path: var(--pixel-frame);
@@ -431,37 +457,40 @@ fieldset label {
   clip-path: var(--pixel-frame);
 }
 
-/* Quest difficulty — colors the "Action de la veille" panel and the "Succès" text when
-   the drawn quest carries one. Its own 6-tier scale, separate from talent rarity above. */
-.last-action[class*="difficulty-"] {
+/* Action accent frame — colors whatever is showing the action's accent (the countdown while it
+   runs, the recap and result dialog once it's done): either the drawn quest's difficulty, or the
+   action's category as a fallback (D9). Selector-independent (F13) so both ActionCountdown and
+   the "Action de la veille" recap can compose it without duplicating the rules. */
+.difficulty-frame,
+.category-frame {
   border: 2px solid;
   clip-path: var(--pixel-frame);
   padding: 12px;
 }
 
-.last-action.difficulty-facile {
+.difficulty-frame.difficulty-facile {
   border-color: #2ecc71;
 }
 
-.last-action.difficulty-moyen {
+.difficulty-frame.difficulty-moyen {
   border-color: #f1c40f;
 }
 
-.last-action.difficulty-difficile {
+.difficulty-frame.difficulty-difficile {
   border-color: #e67e22;
 }
 
-.last-action.difficulty-tres_difficile {
+.difficulty-frame.difficulty-tres_difficile {
   border-color: #ff6b6b;
 }
 
-.last-action.difficulty-epique {
+.difficulty-frame.difficulty-epique {
   border-color: #d4af37;
   position: relative;
   overflow: hidden;
 }
 
-.last-action.difficulty-epique::after {
+.difficulty-frame.difficulty-epique::after {
   content: "";
   position: absolute;
   top: -50%;
@@ -482,9 +511,27 @@ fieldset label {
   }
 }
 
-.last-action.difficulty-mythique {
+.difficulty-frame.difficulty-mythique {
   border-color: transparent;
   border-image: linear-gradient(135deg, #d4af37, #c0c0c0, #d4af37) 1;
+}
+
+/* The four action categories (src/lib/actionCategories.js), used when an action carries no
+   quest difficulty of its own. */
+.category-frame.category-aventure {
+  border-color: #c0392b;
+}
+
+.category-frame.category-intermede {
+  border-color: #3498db;
+}
+
+.category-frame.category-metier {
+  border-color: #8e44ad;
+}
+
+.category-frame.category-social {
+  border-color: #16a085;
 }
 
 .difficulty-text-facile {
@@ -700,7 +747,7 @@ fieldset label {
   margin: 0;
 }
 
-.quest-result-dialog {
+.action-result-dialog {
   width: min(480px, 90vw);
   padding: 0;
   border: 1px solid var(--border);
@@ -709,22 +756,22 @@ fieldset label {
   background: var(--bg);
 }
 
-.quest-result-dialog::backdrop {
+.action-result-dialog::backdrop {
   background: rgba(0, 0, 0, 0.6);
 }
 
-.quest-result-content {
+.action-result-content {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 16px;
 }
 
-.quest-result-content h3 {
+.action-result-content h3 {
   margin: 0;
 }
 
-.quest-loot-box .instance-list {
+.action-loot-box .instance-list {
   max-height: none;
 }
 

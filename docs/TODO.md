@@ -233,6 +233,58 @@ firestore.rules gained an `instances/{id}` rule (read: creator or the owning pla
 
 **Still open**: no creator UI surfaces which loot tables/objectives are actually reachable together (e.g. a rarity/tag combination with zero matching tables) — a content author has to cross-reference `QuestObjectivesManager.jsx` and `TablesDeTirageManager.jsx` by hand to avoid dead combinations.
 
+## Modular action framework
+
+Status: **analysed, not implemented** — the analysis, architecture proposal, and phased
+implementation plan asked for by this entry are done and live in
+[docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md). No production code written yet.
+
+"Partir en quête" is currently the only action, and it is hardcoded end to end: a handler module
+keyed by its own id in `performAction`, a flat unconditional button list in `ActionPanel.jsx`, and
+a quest-specific result pop-up wired to a quest-specific `claimQuestLoot` callable. The goal is a
+framework where adding an action is mostly content authoring: display conditions per character,
+effects, a place in the UI, an end-of-action pop-up, and the ability for other game elements
+(talents, instances) to modify it.
+
+Target rules the framework has to satisfy:
+
+- One action per day, per character; an action completes 24 h after it starts.
+- Completion opens a result pop-up — immediately if the player is connected, otherwise at their
+  next connection.
+- Availability is decided per action by its own conditions (talent owned, profession, reputation
+  level, …).
+- Actions are grouped into four categories: Aventure, Intermède, Métier, Social. The example
+  actions named for each (Repos, Marchander, Forger, Pêcher, …) are illustrations only —
+  implementing them is explicitly out of scope.
+- UI: the right-hand frame shows category tabs first, then that category's actions; an action's
+  tab has a "Commencer" button; pressing it replaces the frame with a 24 h countdown colored by
+  the quest's difficulty color, framed in the same style as the rest of the UI.
+
+The analysis found one blocking prerequisite: the once-per-day lock (UTC calendar date,
+`lastActionDate`) and the 24 h reveal (`lastActionAt + 24 h`, computed client-side) are two
+different clocks today, so an action started at 23:00 UTC unlocks an hour later while its own
+countdown still has 23 h to run. Both rules unify onto a single `lastAction.completesAt` instant
+before the countdown UI can be built — see the linked document for the full finding list.
+
+**Data model implications**: see [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md)
+§3.2 and §3.6 for the full shapes. Summary — all additive, every field read-time-defaulted, no
+migration or backfill required:
+```
+worldData/actionTypes/items/{id}
+  categoryId, description, order, enabled, handlerId, durationHours,   -- NEW
+  availability: { conditions, unmetBehaviour, unmetMessage },           -- NEW
+  result: { accentSource, showLoot }                                    -- NEW
+  -- label, tiers, questDifficultyWeights unchanged
+
+worldData/talents/items/{id}.actionModifiers: [ ... ]   -- NEW
+worldData/objects/items/{id}.actionModifiers: [ ... ]   -- NEW
+
+characters/{id}.lastAction
+  label, categoryId, startedAt, completesAt, accent,    -- NEW
+  acknowledged: boolean                                  -- NEW, replaces lootClaimed
+  -- lastActionDate kept but demoted to a logging/display field, no longer the lock
+```
+
 ## Procedural narrative generation
 
 Status: **analysed, not implemented** — the feasibility study asked for by this entry is done
