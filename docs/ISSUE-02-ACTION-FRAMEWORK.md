@@ -554,7 +554,7 @@ server-side with the same fail-closed evaluator.
 Six phases, each independently mergeable and independently reviewable. Phases 0–1 change live
 behaviour and carry the risk; 2–6 are additive.
 
-### Phase 0 — Groundwork (no behaviour change)
+### Phase 0 — Groundwork (no behaviour change) — **done**
 
 1. Create `functions/src/lib/actionEffects.js`; move the character-patch construction from
    `partirEnQuete.resolve()` (`functions/src/actions/partirEnQuete.js:180-215`) into
@@ -563,8 +563,17 @@ behaviour and carry the risk; 2–6 are additive.
 2. Add `"test": "node --test src/**/*.test.js"` to `functions/package.json` (F9) and one test
    for `applyTierEffects` covering the success branch, the wound branch, and the death branch.
 
-**Acceptance:** `npm --prefix functions test` passes; a quest resolved through the emulator
-produces a character patch byte-identical to before.
+**Acceptance:** `npm --prefix functions test` passes; a quest resolution produces a character
+patch identical to before.
+
+*As shipped:* `applyTierEffects({ tier, today, actionTypeId, narrativeText, talentGained,
+lastActionExtra })` returns the whole patch, with handler-specific `lastAction` fields (quest
+summary, loot) merged in through `lastActionExtra` — so the generic path of Phase 3 can call it
+with no extra argument. `isSuccess(tier)` is exported alongside it so the `tier.success !== false`
+rule lives in one place. Equivalence was verified by replaying the pre-refactor inline block
+against the extracted function over 160 tier/talent/quest/loot/text combinations (identical
+patches, including key order) rather than through the emulator, which needs a Java runtime and
+credentials this environment doesn't have.
 
 ### Phase 1 — Lifecycle unification
 

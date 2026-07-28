@@ -1,6 +1,6 @@
 const { HttpsError } = require("firebase-functions/v2/https");
-const { FieldValue } = require("firebase-admin/firestore");
 const { rollWeighted, rarityFloor } = require("../lib/rolls");
+const { applyTierEffects, isSuccess } = require("../lib/actionEffects");
 const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 const { generateResultText } = require("../textGeneration");
 
@@ -119,7 +119,7 @@ async function resolve({ tx, db, character, actionType, today, context }) {
   const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects } = context;
 
   const tier = rollWeighted(actionType.tiers);
-  const success = tier.success !== false;
+  const success = isSuccess(tier);
 
   let talentGained = null;
   if (success && tier.talentGain?.talentId) {
@@ -177,42 +177,14 @@ async function resolve({ tx, db, character, actionType, today, context }) {
     locationName,
   };
 
-  const updates = {
-    lastActionDate: today,
-    lastActionAt: FieldValue.serverTimestamp(),
-    lastAction: {
-      actionTypeId: ACTION_TYPE_ID,
-      date: today,
-      tierName: tier.name,
-      success,
-      narrativeText,
-      goldGain: tier.goldGain || 0,
-      itemGain: tier.itemGain || null,
-      talentGain: talentGained,
-      reputationGain: tier.reputationGain || 0,
-      legendary: !!tier.legendary,
-      consequence: tier.consequence || null,
-      quest: questSummary,
-      loot,
-      lootClaimed: false,
-    },
-  };
-
-  if (success) {
-    if (tier.goldGain) updates.gold = FieldValue.increment(tier.goldGain);
-    if (tier.itemGain) updates.inventory = FieldValue.arrayUnion(tier.itemGain);
-    if (talentGained) updates.talents = FieldValue.arrayUnion(talentGained);
-    if (tier.reputationGain) updates.reputation = FieldValue.increment(tier.reputationGain);
-    if (tier.legendary) updates.legendLevel = FieldValue.increment(1);
-  } else if (tier.consequence?.type === "death") {
-    updates.alive = false;
-  } else if (tier.consequence?.type === "wound") {
-    updates.wounds = FieldValue.arrayUnion({
-      name: tier.consequence.name || tier.name,
-      description: tier.consequence.description || "",
-      date: today,
-    });
-  }
+  const updates = applyTierEffects({
+    tier,
+    today,
+    actionTypeId: ACTION_TYPE_ID,
+    narrativeText,
+    talentGained,
+    lastActionExtra: { quest: questSummary, loot, lootClaimed: false },
+  });
 
   const logFields = {
     tierName: tier.name,
