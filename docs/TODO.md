@@ -232,3 +232,154 @@ character.lastAction.lootClaimed: boolean   -- flips to true once claimQuestLoot
 firestore.rules gained an `instances/{id}` rule (read: creator or the owning player via a denormalized `ownerUid`; write: false, Cloud Functions only) — it was missing entirely before this feature, so the "Inventaire" tab's `instances` query had no rule to authorize it.
 
 **Still open**: no creator UI surfaces which loot tables/objectives are actually reachable together (e.g. a rarity/tag combination with zero matching tables) — a content author has to cross-reference `QuestObjectivesManager.jsx` and `TablesDeTirageManager.jsx` by hand to avoid dead combinations.
+
+## Procedural narrative generation
+
+Status: **analysed, not implemented** — the feasibility study asked for by this entry is done
+(`narrative-poc/report.md`, runnable proof-of-concept in `narrative-poc/`), and the resulting
+implementation plan is spun out into
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md). No production code written yet.
+
+Today most player-facing text is hand-authored: quest objectives, verb phrases, and per-tier
+`narrativeText`. The goal is to generate coherent narration from the tags, names and
+descriptions already attached to locations, quests, objectives, characters, talents, powers and
+objects — e.g. a character with a fire spell, fighting an undead army during a village-protection
+quest that ranks up their Pyromancie talent, getting a success message that mentions all three.
+
+The analysis answered the three questions it posed:
+
+- **Is it possible?** Yes for *selecting and assembling* the right pre-authored sentence
+  fragments per context, including correct French agreement — this is what
+  `functions/src/textGeneration.js` already does today for one sentence, generalized to a
+  multi-sentence paragraph. No for *inventing* prose as vivid as the motivating example for tag
+  combinations nobody wrote content for; template output degrades to correct-but-plainer text
+  there, and coverage cost grows multiplicatively with the number of tag dimensions.
+- **Without an LLM?** Yes, and that's the recommended default: a multi-slot, tag-scored template
+  grammar (opening / climax / talent-growth slots, each with its own tagged pool), with the
+  coverage gap above accepted as a designed-in limitation. Zero added infrastructure, no
+  latency, no data leaving Firebase. The other non-LLM avenue tried in the POC — a statistical
+  n-gram/Markov model trained on the game's own sentences — does not fit: the corpus will never
+  be large enough, and it has no way to condition on tags at all.
+- **If not, what's close?** A hosted LLM call from the Cloud Function is the only option that
+  covers arbitrary tag combinations at the example's quality bar, at the cost of latency, an
+  external dependency and non-determinism; small self-hosted models trade a small predictable
+  cost for a large unpredictable one and are weaker at French prose. Recommended shape if the
+  gap ever matters in practice: hybrid — template grammar for ordinary outcomes, LLM reserved
+  for rare high-stakes tiers (epic/legendary, talent rank-ups), never as the default path.
+
+Two pieces of pre-existing data-model debt surfaced while analysing this and are tracked
+separately below, neither blocking: [Location tags](#location-tags) (locations have no tags to
+match against at all) and
+[Tag system unification (tagIds vs free-text tags)](#tag-system-unification-tagids-vs-free-text-tags)
+(the generator matches free-text `tags`, while talents/quests store `tagIds`).
+
+**Data model implications**: none from the analysis itself — see
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) for the concrete changes the
+recommended implementation needs (a `slot` field on `worldData/verbPhrases/items`, plus new read
+paths for talent/quest `tagIds`; no migration or backfill required).
+
+## Location tags
+
+`worldData/adventureZones/items` (displayed as "Lieux de quête" in the creator UI,
+`QuestLocationsManager.jsx`) currently has no tags at all — just `name` and `description`. This
+is one of the two things explicitly deferred as a non-goal in
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) (the multi-slot narrative grammar
+engine spec), which wants a way to select an "opening"/stakes-setting narrative fragment
+flavored by where the quest takes place (e.g. a forest, a coastal village, ruins) — the same way
+it already plans to flavor fragments by the character's talent tags and the quest's own tags.
+
+- **Tags field**: add `tagIds: string[]` to `worldData/adventureZones/items/{id}`, referencing
+  `worldData/tags/items` — the same shared tag catalog and the same `MultiSelectModalField.jsx`
+  picker mechanism already used by quests, objects, loot tables, and talents (see
+  [docs/ARCHITECTURE.md](ARCHITECTURE.md)).
+- **Creator UI**: add the `tagIds` multi-select field to `QuestLocationsManager.jsx`'s
+  create/edit form, alphabetically sorted like the other `tagIds` pickers.
+- **Consumption**: these `tagIds` would be resolved to tag names via the same "tag vocabulary
+  bridge" pattern specified in [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)
+  (resolving `tagIds` → `worldData/tags/items/{id}.name` at generation time, feeding into the
+  grammar engine's context tag set alongside talent tags and quest tags), so the "opening" slot
+  can be authored/matched by location flavor too, not just quest/talent flavor.
+- This is a natural follow-up to the grammar engine issue, not a prerequisite for it — that
+  engine's "opening" slot works fine without location tags (falls back to quest-tag-only or
+  generic matching); this feature just adds a third tag source once the core engine is live.
+
+**Data model implications**:
+```
+worldData/adventureZones/items/{id}
+  tagIds: string[]   -- worldData/tags/items ids, same mechanism as quests/objects/loot
+                      --   tables/talents; NEW field, rest of the shape unchanged
+```
+
+Not implemented yet. Depends conceptually on
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)'s tag-vocabulary-bridge pattern
+landing first for the `tagIds` → context-tags resolution to have a consumer, though the field
+itself could be added to `QuestLocationsManager.jsx` independently of that.
+
+## Tag system unification (tagIds vs free-text tags)
+
+There is currently a dual, unrelated "tags" concept, documented in
+[docs/ARCHITECTURE.md](ARCHITECTURE.md)'s data model section. `worldData/narrativeSubjects/items`
+and `worldData/verbPhrases/items` each carry a `tags: string[]` field of free-text strings (e.g.
+`["hostile", "humanoïde"]`) that **is** functionally read by the procedural text generator
+(`generateResultText`/`generateNarrative` in `functions/src/textGeneration.js`) to match subjects
+to verb phrases. Separately, `narrativeSubjects` (like quests, objects, loot tables, and talents)
+also carries a `tagIds: string[]` field referencing the shared `worldData/tags/items` catalog
+(CRUD'd via `TagsManager.jsx`) — but on `narrativeSubjects` that `tagIds` field is creator-only
+metadata, never read by any player-facing or Cloud Function code, and `verbPhrases` doesn't have
+a `tagIds` field at all.
+
+This split was called out as unresolved debt in
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) (the multi-slot narrative grammar
+engine spec), which sidesteps it for now via a "tag vocabulary bridge" — resolving talents' and
+quests' `tagIds` to tag *names* at generation time, then matching those names against
+`narrativeSubjects`'/`verbPhrases`' free-text `tags`. That bridge works but has a real
+content-authoring fragility: a tag like "feu" must be spelled *identically* in a
+`worldData/tags/items` catalog entry's `name` and in every free-text `tags` array that wants to
+reference it — no fuzzy matching, no referential integrity, easy to typo into a silent content
+gap (a fragment that never matches because "feu" and "Feu" or "feu " don't compare equal). This
+entry tracks the actual fix, as a separate, independently-decidable piece of work rather than a
+prerequisite for the grammar engine.
+
+- **Migration**: move `narrativeSubjects.tags` and `verbPhrases.tags` from free-text string
+  arrays to `tagIds: string[]` referencing `worldData/tags/items`, matching every other tagged
+  collection (objects, loot tables, quests, talents) and making the shared catalog the single
+  source of truth for tag vocabulary everywhere, not just on some collections.
+- **Cascade-delete cleanup**: `TagsManager.jsx`'s existing delete handler already strips a
+  deleted tag's id from quests/objects/loot tables/talents (and `narrativeSubjects.tagIds`, the
+  currently-unused field) before deleting the tag doc. Once migrated, this same cleanup needs to
+  cover `verbPhrases.tagIds` and the newly-migrated, now-functional `narrativeSubjects.tagIds` —
+  today's cleanup runs against the wrong (unused) field on `narrativeSubjects` and doesn't touch
+  `verbPhrases` at all.
+- **Data migration for existing content**: for each free-text tag string currently used in
+  `narrativeSubjects.tags`/`verbPhrases.tags`, find-or-create a matching `worldData/tags/items`
+  doc by name, then replace the free-text array with the resolved `tagIds` array. Expected to be
+  a lightweight one-off script — there's no seeded example content in either collection beyond
+  UI placeholder text, so the live dataset is small.
+- **Open question**: `narrativeSubjects.tags` also carries the reserved sentinel value
+  `"objectif de quête"` (which makes a subject show up as a selectable quest objective in
+  `QuestObjectivesManager.jsx` — there's no separate collection for quest objectives). Migrating
+  to `tagIds` means deciding whether that sentinel becomes a real `worldData/tags/items` entry
+  referenced by id like any other tag, or stays a special-cased string check independent of the
+  `tagIds` migration. Leaning toward a real tag entry for consistency, but this needs a decision
+  before implementation, not an assumption baked into the migration script.
+- Once migrated, the "tag vocabulary bridge" in
+  [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) becomes unnecessary (`tagIds`
+  sets can be compared/unioned directly, no name-resolution step needed) and could be simplified
+  or removed as a follow-up.
+
+**Data model implications**:
+```
+worldData/narrativeSubjects/items/{id}
+  tagIds: string[]   -- worldData/tags/items ids; REPURPOSED to become the functional tag field,
+                      --   replacing the free-text `tags` array below
+  -- tags: string[]  -- REMOVED once migrated (was free-text, functionally used for matching)
+
+worldData/verbPhrases/items/{id}
+  tagIds: string[]   -- worldData/tags/items ids; NEW field, replaces the free-text `tags` array
+  -- tags: string[]  -- REMOVED once migrated (was free-text, functionally used for matching)
+```
+
+Not implemented yet, deliberately deferred as independent from and not a prerequisite for
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)'s grammar engine (see that doc's
+Non-goals section) — the tag vocabulary bridge meets the grammar engine's immediate need without
+this migration.
