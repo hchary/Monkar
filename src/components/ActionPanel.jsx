@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { Timestamp, collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
 import { RARITIES } from "./creator/TalentsManager";
-
-const REVEAL_DELAY_HOURS = 24;
-
-function hoursSince(timestamp) {
-  if (!timestamp) return Infinity;
-  const actedAt = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return (Date.now() - actedAt.getTime()) / (1000 * 60 * 60);
-}
+import {
+  HOUR_MS,
+  actionCompletesAtMillis,
+  isActionAcknowledged,
+  isActionRunning,
+  toMillis,
+} from "../lib/actionLifecycle";
 
 export default function ActionPanel({ character }) {
   const [actionTypes, setActionTypes] = useState([]);
@@ -27,10 +26,13 @@ export default function ActionPanel({ character }) {
     });
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const canActToday = character.lastActionDate !== today;
+  // An action occupies its character until it completes: the same rule the Cloud Function
+  // enforces, read through the same module (src/lib/actionLifecycle.js). It gates both what the
+  // player can start and what they are allowed to see, which used to be two separate clocks.
   const lastAction = character.lastAction;
-  const revealed = lastAction && hoursSince(character.lastActionAt) >= REVEAL_DELAY_HOURS;
+  const running = isActionRunning(character);
+  const canActToday = !running;
+  const revealed = !!lastAction && !running;
 
   async function handleAction(actionTypeId) {
     setSubmitting(true);
@@ -45,13 +47,24 @@ export default function ActionPanel({ character }) {
     }
   }
 
+  // Backdates the running action by 24h so it completes immediately, rather than clearing the
+  // lock outright - the countdown and the reveal both read completesAt now, so wiping it would
+  // leave the panel with nothing to show.
   async function handleDebugAdvanceTime() {
-    await updateDoc(doc(db, "characters", character.id), { lastActionDate: null, lastActionAt: null });
+    const completesAt = actionCompletesAtMillis(character);
+    if (completesAt == null) return;
+
+    const shift = 24 * HOUR_MS;
+    const startedAt = toMillis(lastAction?.startedAt ?? character.lastActionAt);
+    const patch = { "lastAction.completesAt": Timestamp.fromMillis(completesAt - shift) };
+    if (startedAt != null) patch["lastAction.startedAt"] = Timestamp.fromMillis(startedAt - shift);
+
+    await updateDoc(doc(db, "characters", character.id), patch);
   }
 
-  // Auto-opens once a quest result is revealed and hasn't been closed yet - reappears on
+  // Auto-opens once a quest result is revealed and hasn't been acknowledged yet - reappears on
   // reload if the player left before clicking "Fermer", since that's what grants the loot.
-  const showQuestPopup = !!(revealed && lastAction?.quest && !lastAction?.lootClaimed);
+  const showQuestPopup = !!(revealed && lastAction?.quest && !isActionAcknowledged(character));
 
   useEffect(() => {
     if (showQuestPopup) questDialogRef.current?.showModal();
@@ -62,8 +75,8 @@ export default function ActionPanel({ character }) {
     setClaiming(true);
     setClaimError("");
     try {
-      const claimQuestLoot = httpsCallable(functions, "claimQuestLoot");
-      await claimQuestLoot();
+      const acknowledgeAction = httpsCallable(functions, "acknowledgeAction");
+      await acknowledgeAction();
     } catch (err) {
       setClaimError(err.message);
     } finally {

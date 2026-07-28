@@ -398,14 +398,15 @@ Under today's rule an action started at 23:00 UTC unlocks one hour later; under 
 unlocks a full 24 h later. That is what R1 + R2 describe, and it is the only way the countdown in
 R10 can be the panel's sole content while an action runs.
 
-**Client state machine** (`ActionPanel.jsx`), derived from one `now` that ticks every second:
+**Client state machine** (`ActionPanel.jsx`), derived from one `now` that ticks every second —
+`actionState(character, nowMillis)` in the mirrored `actionLifecycle.js` pair:
 
 | Condition | State | Renders |
 |---|---|---|
-| `!lastAction` | `browse` | `ActionBrowser` |
+| `!lastAction` | `idle` | `ActionBrowser` |
 | `now < completesAt` | `running` | `ActionCountdown` (replaces the frame's contents, R10) |
 | `now >= completesAt && !acknowledged` | `completed` | `ActionResultDialog` (modal, R3) |
-| `now >= completesAt && acknowledged` | `browse` | `ActionBrowser` + the existing recap below |
+| `now >= completesAt && acknowledged` | `idle` | `ActionBrowser` + the existing recap below |
 
 R3's "or at their next connection" falls out for free: `acknowledged` is persisted, so the
 `completed` state is re-entered on load until the player closes the dialog. R3's "at completion
@@ -575,7 +576,7 @@ against the extracted function over 160 tier/talent/quest/loot/text combinations
 patches, including key order) rather than through the emulator, which needs a Java runtime and
 credentials this environment doesn't have.
 
-### Phase 1 — Lifecycle unification
+### Phase 1 — Lifecycle unification — **done**
 
 1. `performAction` writes `lastAction.startedAt` / `completesAt` / `acknowledged: false` /
    `label` / `categoryId` / `accent`, using `Timestamp.now()` per §3.6. Keep writing
@@ -591,6 +592,25 @@ credentials this environment doesn't have.
 **Acceptance:** starting an action at 23:00 UTC still blocks a second action at 00:30 UTC.
 Closing the result dialog still grants loot instances exactly once. Calling `acknowledgeAction`
 before `completesAt` is rejected. **Deploy functions before merging** (§3.6).
+
+*As shipped:* the lifecycle *readers* live in the mirrored pair `functions/src/lib/actionLifecycle.js`
+⇄ `src/lib/actionLifecycle.js` (`actionCompletesAtMillis`, `isActionRunning`,
+`isActionAcknowledged`, `actionState`), so the server's lock and the client's rendering answer the
+same question from byte-identical bodies. The *writer* (`stampLifecycle`, `resolveDurationHours`)
+stays server-only in `actionEffects.js`, which keeps the mirrored pair identical apart from its
+export syntax. `canActToday` is gated on `!isActionRunning` only, **not** on `acknowledged`:
+until Phase 4 ships the generic result dialog, an action with no quest has nothing that would flip
+`acknowledged`, and gating on it would lock the player out permanently. Tighten it in Phase 4.
+`lootClaimed` is no longer written; it survives only as a read-time fallback in
+`isActionAcknowledged`.
+
+**Known gap found while implementing, deliberately left alone:** `acknowledgeAction` (like
+`claimQuestLoot` before it) queries the character with `alive == true`, and `CharacterProfile.jsx`
+does the same — so a *death* tier makes the character vanish into `CharacterCreation` and its
+result pop-up is never shown. The player is never told what killed them. This predates the
+framework and fixing it means touching the permadeath flow (which character the profile page
+loads, and for how long), so it is out of scope here — but R3 is not truly satisfied for fatal
+outcomes until it is addressed. Worth its own TODO entry.
 
 ### Phase 2 — Catalog and conditions
 

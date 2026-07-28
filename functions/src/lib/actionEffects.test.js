@@ -1,7 +1,8 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { FieldValue } = require("firebase-admin/firestore");
-const { applyTierEffects, isSuccess } = require("./actionEffects");
+const { FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { applyTierEffects, isSuccess, resolveDurationHours, stampLifecycle } = require("./actionEffects");
+const { HOUR_MS } = require("./actionLifecycle");
 
 // FieldValue sentinels (increment/arrayUnion/serverTimestamp) are plain transform objects
 // that compare correctly under deepStrictEqual, so the patch can be asserted as a whole
@@ -147,8 +148,105 @@ describe("applyTierEffects", () => {
 
     assert.deepStrictEqual(updates.lastAction.quest, quest);
     assert.deepStrictEqual(updates.lastAction.loot, []);
-    assert.equal(updates.lastAction.lootClaimed, false);
     assert.equal(updates.lastAction.tierName, "Succès");
     assert.equal(updates.lastAction.date, TODAY);
+  });
+});
+
+describe("resolveDurationHours", () => {
+  test("defaults to 24h", () => {
+    assert.equal(resolveDurationHours({}), 24);
+    assert.equal(resolveDurationHours(undefined), 24);
+  });
+
+  test("honours a positive duration", () => {
+    assert.equal(resolveDurationHours({ durationHours: 8 }), 8);
+    assert.equal(resolveDurationHours({ durationHours: "12" }), 12);
+  });
+
+  test("falls back to the default rather than producing an action that never completes", () => {
+    assert.equal(resolveDurationHours({ durationHours: 0 }), 24);
+    assert.equal(resolveDurationHours({ durationHours: -5 }), 24);
+    assert.equal(resolveDurationHours({ durationHours: "bientôt" }), 24);
+    assert.equal(resolveDurationHours({ durationHours: null }), 24);
+  });
+});
+
+describe("stampLifecycle", () => {
+  const NOW = Timestamp.fromMillis(Date.parse("2026-07-28T12:00:00Z"));
+  const ACTION_TYPE = { label: "Partir en quête", categoryId: "aventure" };
+
+  function stamp(updates, options) {
+    return stampLifecycle(updates, { actionType: ACTION_TYPE, now: NOW, ...options });
+  }
+
+  test("completesAt is startedAt plus the action's duration", () => {
+    const { lastAction } = stamp({ lastAction: {} });
+
+    assert.deepStrictEqual(lastAction.startedAt, NOW);
+    assert.deepStrictEqual(lastAction.completesAt, Timestamp.fromMillis(NOW.toMillis() + 24 * HOUR_MS));
+  });
+
+  test("honours a per-action duration, and an explicit override on top of it", () => {
+    const fromCatalog = stampLifecycle(
+      { lastAction: {} },
+      { actionType: { ...ACTION_TYPE, durationHours: 6 }, now: NOW }
+    );
+    assert.deepStrictEqual(
+      fromCatalog.lastAction.completesAt,
+      Timestamp.fromMillis(NOW.toMillis() + 6 * HOUR_MS)
+    );
+
+    const overridden = stampLifecycle(
+      { lastAction: {} },
+      { actionType: { ...ACTION_TYPE, durationHours: 6 }, now: NOW, durationHours: 2 }
+    );
+    assert.deepStrictEqual(
+      overridden.lastAction.completesAt,
+      Timestamp.fromMillis(NOW.toMillis() + 2 * HOUR_MS)
+    );
+  });
+
+  test("denormalizes the label and category, and starts unacknowledged", () => {
+    const { lastAction } = stamp({ lastAction: {} });
+
+    assert.equal(lastAction.label, "Partir en quête");
+    assert.equal(lastAction.categoryId, "aventure");
+    assert.equal(lastAction.acknowledged, false);
+  });
+
+  test("keeps a handler's own accent, and falls back to the category otherwise", () => {
+    const questAccent = { kind: "difficulty", value: "epique" };
+    assert.deepStrictEqual(stamp({ lastAction: { accent: questAccent } }).lastAction.accent, questAccent);
+
+    assert.deepStrictEqual(stamp({ lastAction: {} }).lastAction.accent, {
+      kind: "category",
+      value: "aventure",
+    });
+    assert.deepStrictEqual(stamp({ lastAction: { accent: null } }).lastAction.accent, {
+      kind: "category",
+      value: "aventure",
+    });
+  });
+
+  test("leaves the handler's own fields untouched, inside lastAction and beside it", () => {
+    const stamped = stamp({
+      lastActionDate: TODAY,
+      gold: FieldValue.increment(10),
+      lastAction: { actionTypeId: "partir-en-quete", tierName: "Succès", quest: { id: "q1" } },
+    });
+
+    assert.equal(stamped.lastActionDate, TODAY);
+    assert.deepStrictEqual(stamped.gold, FieldValue.increment(10));
+    assert.equal(stamped.lastAction.actionTypeId, "partir-en-quete");
+    assert.equal(stamped.lastAction.tierName, "Succès");
+    assert.deepStrictEqual(stamped.lastAction.quest, { id: "q1" });
+  });
+
+  test("does not mutate the patch it was given", () => {
+    const updates = { lastAction: { tierName: "Succès" } };
+    stamp(updates);
+
+    assert.deepStrictEqual(updates, { lastAction: { tierName: "Succès" } });
   });
 });

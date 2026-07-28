@@ -183,7 +183,13 @@ async function resolve({ tx, db, character, actionType, today, context }) {
     actionTypeId: ACTION_TYPE_ID,
     narrativeText,
     talentGained,
-    lastActionExtra: { quest: questSummary, loot, lootClaimed: false },
+    lastActionExtra: {
+      quest: questSummary,
+      loot,
+      // A quest colors its own frame and countdown by the difficulty that was actually rolled,
+      // rather than falling back to the action's category color.
+      accent: quest.difficulty ? { kind: "difficulty", value: quest.difficulty } : null,
+    },
   });
 
   const logFields = {
@@ -197,4 +203,21 @@ async function resolve({ tx, db, character, actionType, today, context }) {
   return { updates, logFields };
 }
 
-module.exports = { prepare, resolve };
+// Runs when the player closes the quest result pop-up (see acknowledgeAction). The loot was
+// already rolled and frozen onto lastAction.loot during resolve(); this is what turns it into
+// Instance documents the character actually owns.
+async function commit({ tx, db, characterRef, lastAction, uid, today }) {
+  for (const item of lastAction.loot || []) {
+    const instanceRef = db.collection("instances").doc();
+    tx.set(instanceRef, {
+      objectId: item.objectId,
+      characterId: characterRef.id,
+      ownerUid: uid,
+      acquisitionDate: today,
+      condition: "neuf",
+      description: item.description,
+    });
+  }
+}
+
+module.exports = { prepare, resolve, commit };
