@@ -14,6 +14,7 @@ import TagsManager from "../components/creator/TagsManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 import ObjectsManager from "../components/creator/ObjectsManager";
 import TablesDeTirageManager from "../components/creator/TablesDeTirageManager";
+import ActionsManager from "../components/creator/ActionsManager";
 
 const DEFAULT_SECTION = "Régions";
 
@@ -32,6 +33,12 @@ const GROUPS = [
       Quêtes: QuestsManager,
       "Objectifs de quête": QuestObjectivesManager,
       "Lieux de quête": QuestLocationsManager,
+    },
+  },
+  {
+    name: "Actions",
+    tabs: {
+      Actions: ActionsManager,
     },
   },
   {

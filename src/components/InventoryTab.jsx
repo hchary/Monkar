@@ -39,11 +39,19 @@ export default function InventoryTab({ character }) {
   const tags = useItems("tags");
 
   useEffect(() => {
-    const q = query(collection(db, "instances"), where("characterId", "==", character.id));
+    // firestore.rules authorizes instances reads on ownerUid, not characterId - a query filtered
+    // on characterId alone can't prove to Firestore that every possible match satisfies that
+    // rule, so the whole query is denied regardless of what the data actually contains. Both
+    // filters are required.
+    const q = query(
+      collection(db, "instances"),
+      where("ownerUid", "==", character.ownerUid),
+      where("characterId", "==", character.id)
+    );
     return onSnapshot(q, (snap) => {
       setInstances(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-  }, [character.id]);
+  }, [character.id, character.ownerUid]);
 
   function toggleFilterRarity(value) {
     setFilters((prev) => ({

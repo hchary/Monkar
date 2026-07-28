@@ -1,4 +1,5 @@
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { rollWeighted } = require("./rolls");
 const { HOUR_MS } = require("./actionLifecycle");
 const { resolveDurationHours } = require("./actionCatalog");
 
@@ -62,6 +63,28 @@ function applyTierEffects({
   return updates;
 }
 
+// The default resolution path for an action type with no handler (or one naming a handler that
+// isn't registered): roll a weighted tier and apply exactly the gains it declares, its own
+// narrativeText used verbatim. This is what makes "add an action" mostly a content-authoring
+// task (docs/ISSUE-02-ACTION-FRAMEWORK.md Phase 3) - a handler exists only for mechanics this
+// can't express, such as drawing a quest or generating narrative text from a pool.
+function genericResolve({ actionType, actionTypeId, today }) {
+  const tier = rollWeighted(actionType.tiers);
+  const narrativeText = tier.narrativeText || "";
+
+  const updates = applyTierEffects({ tier, today, actionTypeId, narrativeText });
+
+  return {
+    updates,
+    logFields: {
+      tierName: tier.name,
+      success: isSuccess(tier),
+      narrativeText,
+      consequence: tier.consequence || null,
+    },
+  };
+}
+
 // Stamps onto a handler's character patch the lifecycle fields every action shares: when it
 // started, when it completes, how the frame should be colored, and whether the player has seen
 // the result yet. The dispatcher owns this rather than the handlers, so an action with no
@@ -81,6 +104,9 @@ function stampLifecycle(updates, { actionType, now = Timestamp.now(), durationHo
       ...updates.lastAction,
       label: actionType?.label || "",
       categoryId,
+      // Denormalized so acknowledgeAction can find the right handler's commit() by the same
+      // key ACTION_HANDLERS is registered under, without a second actionType read - see D13.
+      handlerId: actionType?.handlerId || null,
       startedAt: now,
       completesAt: Timestamp.fromMillis(now.toMillis() + hours * HOUR_MS),
       // A handler that knows better (a quest exposes its difficulty) sets its own accent;
@@ -91,4 +117,4 @@ function stampLifecycle(updates, { actionType, now = Timestamp.now(), durationHo
   };
 }
 
-module.exports = { applyTierEffects, isSuccess, stampLifecycle };
+module.exports = { applyTierEffects, isSuccess, genericResolve, stampLifecycle };

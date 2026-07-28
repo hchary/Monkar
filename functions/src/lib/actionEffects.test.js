@@ -1,7 +1,7 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { applyTierEffects, isSuccess, stampLifecycle } = require("./actionEffects");
+const { applyTierEffects, isSuccess, genericResolve, stampLifecycle } = require("./actionEffects");
 const { HOUR_MS } = require("./actionLifecycle");
 
 // FieldValue sentinels (increment/arrayUnion/serverTimestamp) are plain transform objects
@@ -153,9 +153,53 @@ describe("applyTierEffects", () => {
   });
 });
 
+describe("genericResolve", () => {
+  test("resolves a single-tier action type with zero handler-specific code", () => {
+    const actionType = { tiers: [{ name: "Repos", weight: 1, goldGain: 5 }] };
+
+    const { updates, logFields } = genericResolve({ actionType, actionTypeId: "se-reposer", today: TODAY });
+
+    assert.equal(updates.lastAction.actionTypeId, "se-reposer");
+    assert.equal(updates.lastAction.tierName, "Repos");
+    assert.deepStrictEqual(updates.gold, FieldValue.increment(5));
+    assert.deepStrictEqual(logFields, {
+      tierName: "Repos",
+      success: true,
+      narrativeText: "",
+      consequence: null,
+    });
+  });
+
+  test("uses the tier's own narrativeText verbatim - no narrative generation", () => {
+    const actionType = {
+      tiers: [{ name: "Repos", weight: 1, narrativeText: "Vous vous reposez tranquillement." }],
+    };
+
+    const { updates, logFields } = genericResolve({ actionType, actionTypeId: "se-reposer", today: TODAY });
+
+    assert.equal(updates.lastAction.narrativeText, "Vous vous reposez tranquillement.");
+    assert.equal(logFields.narrativeText, "Vous vous reposez tranquillement.");
+  });
+
+  test("a failure tier applies its consequence exactly like a handler-resolved action", () => {
+    const actionType = {
+      tiers: [{ name: "Échec", weight: 1, success: false, consequence: { type: "wound", name: "Foulure" } }],
+    };
+
+    const { updates, logFields } = genericResolve({ actionType, actionTypeId: "se-reposer", today: TODAY });
+
+    assert.deepStrictEqual(
+      updates.wounds,
+      FieldValue.arrayUnion({ name: "Foulure", description: "", date: TODAY })
+    );
+    assert.equal(logFields.success, false);
+    assert.deepStrictEqual(logFields.consequence, { type: "wound", name: "Foulure" });
+  });
+});
+
 describe("stampLifecycle", () => {
   const NOW = Timestamp.fromMillis(Date.parse("2026-07-28T12:00:00Z"));
-  const ACTION_TYPE = { label: "Partir en quête", categoryId: "aventure" };
+  const ACTION_TYPE = { label: "Partir en quête", categoryId: "aventure", handlerId: "partirEnQuete" };
 
   function stamp(updates, options) {
     return stampLifecycle(updates, { actionType: ACTION_TYPE, now: NOW, ...options });
@@ -193,6 +237,7 @@ describe("stampLifecycle", () => {
 
     assert.equal(lastAction.label, "Partir en quête");
     assert.equal(lastAction.categoryId, "aventure");
+    assert.equal(lastAction.handlerId, "partirEnQuete");
     assert.equal(lastAction.acknowledged, false);
   });
 

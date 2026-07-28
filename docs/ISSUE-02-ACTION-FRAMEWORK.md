@@ -650,7 +650,7 @@ authored message) and by executing the generated client copies in the browser, n
 deployed callable — the wiring in `performAction` itself is four lines and unverified until
 deploy.
 
-### Phase 3 — Generic resolution
+### Phase 3 — Generic resolution — **done**
 
 1. `functions/src/lib/actionPipeline.js` implementing §3.5's ten steps.
 2. Re-key `ACTION_HANDLERS` by `handlerId` (`{ partirEnQuete }`), with `null`/unknown falling
@@ -665,7 +665,31 @@ deploy.
 that makes the framework's central claim true, so verify it explicitly rather than by
 inspection.
 
-### Phase 4 — Player UI
+*As shipped:* `performAction` is now four lines that delegate to `runActionPipeline({ db, uid,
+actionTypeId, actionHandlers, today })`; the old inline handler lookup, availability check, and
+transaction all moved there unchanged apart from the handler resolution itself. Modifiers (step 4
+of §3.5) are not implemented yet — that is Phase 6 — so the pipeline currently runs steps
+1/2/3/5/6/7(no weights)/9/10 and simply skips the two modifier-only steps.
+
+Re-keying `ACTION_HANDLERS` by `handlerId` meant `acknowledgeAction` could no longer find a
+handler's `commit()` through `lastAction.actionTypeId` (that key space didn't change; the
+registry's did). `stampLifecycle` now also denormalizes `lastAction.handlerId`, so
+`acknowledgeAction` looks the handler up the same way `performAction` does.
+
+**Manual step required before deploying this phase:** `worldData/actionTypes/items/partir-en-quete`
+must carry `handlerId: "partirEnQuete"` (Firestore console, same as the `categoryId` backfill
+Phase 2 already required) — otherwise `partir-en-quete` silently falls through to
+`genericResolve` on deploy and stops drawing quests. Phase 5 turns this into a UI-driven edit;
+until then it is a hand edit, not a code change.
+
+Verified with three new `actionEffects.test.js` cases exercising `genericResolve` directly
+(gain application, verbatim `narrativeText`, and a failure-tier consequence), each pinned to a
+single-tier `tiers` array so the weighted roll is deterministic. `actionPipeline.js` itself has no
+test file, consistent with Phase 2's note: it is Firestore orchestration with no emulator
+available in this environment, so its four lines of new wiring (the handler resolution branch) are
+unverified until deploy — same caveat as the pipeline wiring added in Phase 2.
+
+### Phase 4 — Player UI — **done**
 
 1. CSS refactor per F13: `.difficulty-frame.difficulty-{value}` + `.category-frame.category-{value}`,
    with `.last-action` composing the former.
@@ -680,7 +704,52 @@ the `[TEST]` button → the dialog opens without a reload; reload mid-countdown 
 resumes at the right remaining time; reload after completion without closing the dialog → the
 dialog reopens. Check the 720 px breakpoint (F12).
 
-### Phase 5 — Creator UI
+*As shipped:* `ActionCountdown` does not own an `onComplete` callback or its own interval, unlike
+§3.7's description - `ActionPanel` already ticks `now` once a second to drive `actionState()`, and
+that same tick flowing into `actionCompletesAtMillis` is what flips the state from `running` to
+`completed` and swaps `ActionCountdown` for `ActionResultDialog`. A second independent timer would
+have been redundant. `ActionPanel` now gates on `state === "idle"` rather than `!isActionRunning`,
+tightening the `canActToday` gap Phase 1 deliberately left open (F1's note there: "Tighten it in
+Phase 4").
+
+The gains/consequence/loot recap (`ActionOutcome.jsx`) intentionally drops the old quest dialog's
+inline "Butin : …" line from the gains list - `actionType.result.showLoot` now gates a single
+fieldset, used identically by the dialog and the idle-state recap, rather than two different loot
+renderings.
+
+`ActionBrowser` needed a client-side `instanceTagIds` set for `hasInstanceTag` conditions, unlike
+the mirrored pure evaluators elsewhere - per `functions/src/lib/actionContext.js`'s own comment,
+this is component state built from live snapshots, not a mirrored module.
+
+**Verified live against the deployed `monkar-rpg` Firestore/security rules** (build + `node --test`
+alone don't catch rule mismatches), via a throwaway Playwright-driven test account, cleaned up
+(auth users deleted) afterward:
+- The category/action tab browser renders correctly with no console errors.
+- `ActionCountdown` live-ticks a correctly-classed (`category-frame category-aventure`, etc.)
+  `HH:MM:SS` and hides the browser while running.
+- `ActionResultDialog` + `ActionOutcome` render the right title, outcome, narrative text, and
+  gains from real character data.
+- The dialog's error path (`ackError`) renders and the dialog stays open on failure, rather than
+  disappearing silently.
+
+**Found and fixed along the way — a real, pre-existing bug, not a Phase 4 regression:**
+`InventoryTab.jsx` (and initially my own `ActionBrowser`) queried `instances` filtered only by
+`characterId`, but `firestore.rules` authorizes `instances` reads on `resource.data.ownerUid`.
+Firestore denies a `list` query outright whenever its filters can't *prove* every possible match
+satisfies the rule, regardless of what the actual data contains - so this query has apparently
+always thrown `permission-denied` for every player, silently (no error handler), rendering
+"Ton inventaire est vide" even when the character owns instances. Fixed in both places by adding
+`where("ownerUid", "==", character.ownerUid)` alongside the existing `characterId` filter.
+
+**Not verified — requires a functions deploy, which this session didn't perform:** the
+`completed → idle` transition via `acknowledgeAction`. The live project doesn't have this
+codebase's Cloud Functions deployed yet (`acknowledgeAction` doesn't exist there under that name -
+calling it fails as an unrouted CORS/network error, not an application error), consistent with
+§3.6's "deploy functions before merging" note. The dialog, browser, and countdown are verified;
+the acknowledge round-trip and the resulting idle-state recap are not, until functions are
+deployed.
+
+### Phase 5 — Creator UI — **done**
 
 1. `ActionsManager.jsx` per §3.8, registered as a new "Actions" group in `CreatorDashboard.jsx`.
 2. Backfill the existing `partir-en-quete` document from that UI: `categoryId: "aventure"`,
@@ -689,6 +758,48 @@ dialog reopens. Check the 720 px breakpoint (F12).
 
 **Acceptance:** a new Intermède action can be created, made conditional on a talent, and started
 in the player UI without touching the Firestore console.
+
+*As shipped:* the form matches §3.8 field for field: label, `categoryId` select, description,
+`order`, `enabled`, a `handlerId` select sourced from a `KNOWN_HANDLER_IDS` constant (kept in step
+with `ACTION_HANDLERS` by hand, with an inline warning when a saved `handlerId` isn't in that
+list), `durationHours`, the condition editor (one row per `CONDITION_TYPES` entry, swapping in
+that type's own inputs via the existing `MultiSelectModalField`/`matchesTalent`/`matchesTag`/
+`matchesRegion` helpers), and `result.accentSource` / `result.showLoot`. The `tiers` editor is
+absent exactly as scoped (D14) — tiers stay a manual Firestore edit.
+
+Before this phase, `functions/`'s Phases 1–3 had never been deployed to the live `monkar-rpg`
+project (it was still serving the pre-framework `claimQuestLoot`/`performAction`), so shipping
+this phase's live verification required deploying functions first: `claimQuestLoot` was deleted
+(superseded by `acknowledgeAction`, a rename not an addition) and `createCharacter`/`performAction`
+updated, then `acknowledgeAction` created fresh.
+
+**Verified against the live `monkar-rpg` project** (build + `node --test` don't exercise the
+Firestore-backed catalog or a real deploy), via a throwaway test account, cleaned up afterward
+(auth user, `users/{uid}`, and all Firestore documents created for the test — not just the auth
+user, which is all the Phase 4 session's cleanup removed, leaving orphaned character documents
+behind that this session found and left alone rather than delete data it didn't create):
+- Backfilled `partir-en-quete` through the new UI; confirmed the write landed with exactly the
+  fields §3.8 specifies and that the player UI immediately showed it under "Aventure" with a
+  working "Commencer".
+- Created a throwaway Intermède action gated on `{ type: "hasTalent", talentId: "endurance-de-base" }`
+  with `unmetBehaviour: "disable"`: confirmed it rendered disabled with the authored
+  `unmetMessage` for a character without the talent, then confirmed it became clickable the moment
+  the talent was granted, with no other change.
+- Started it: the panel swapped to `ActionCountdown` with `category-frame category-intermede`
+  (no quest, so the category accent fallback applies, per D9). Backdating via `[TEST] Avancer le
+  temps d'un jour` opened `ActionResultDialog` with the right title/outcome/narrative text;
+  "Fermer" called the newly-deployed `acknowledgeAction` and returned the panel to `idle` with the
+  action in the recap — the round-trip Phase 4 couldn't verify because `acknowledgeAction` didn't
+  exist live yet.
+- Along the way, a first attempt at starting the throwaway action threw an unhandled
+  `TypeError: Cannot read properties of undefined (reading 'narrativeText')` from `genericResolve`
+  (`functions/src/lib/actionEffects.js:73`) surfaced to the client as an opaque `INTERNAL` error.
+  Root cause: the action had no `tiers` (expected, since D14 keeps that editor out of the creator
+  UI) and `rollWeighted(undefined)` returns `undefined`. Not a regression — the design has always
+  required tiers to be hand-authored in Firestore for now — but worth a note for whoever picks up
+  the deferred tier editor: `genericResolve` should probably reject with a friendly
+  `failed-precondition` ("cette action n'a pas de paliers configurés") instead of throwing, so a
+  content author's mistake doesn't read as a server bug.
 
 ### Phase 6 — Modifiers
 
