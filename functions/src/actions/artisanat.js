@@ -2,11 +2,13 @@
 // registered once under the shared "artisanat" handlerId - same convention as recolte.js, since a
 // game can have several Artisanat actions (forge, alchimie...) all sharing this mechanic.
 //
-// Unlike récolte/quête there is no rolled tier: crafting always succeeds once its ingredients are
-// confirmed present, which is why prepare() throws a friendly precondition error instead - the
-// player picks the recette client-side (CraftingTab.jsx only ever offers recettes the character
-// knows and whose categoryIds overlaps the action's own recipeCategoryIds), but this is re-checked
-// here as the authority, never trusted from the client.
+// Crafting always succeeds once its ingredients are confirmed present - this was the first handler
+// to skip the weighted-paliers system entirely, before récolte/quête were rebuilt the same way (see
+// "Abandoning the paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md) - so a missing/invalid
+// recette throws a friendly precondition error instead of ever reaching a fail-tier. The player
+// picks the recette client-side (CraftingTab.jsx only ever offers recettes the character knows and
+// whose categoryIds overlaps the action's own recipeCategoryIds), but this is re-checked here as
+// the authority, never trusted from the client.
 //
 // Ingredients are consumed immediately in resolve() - the same transaction that starts the action,
 // so they leave the character's inventory the moment "Commencer" is clicked - while the produced
@@ -45,7 +47,7 @@ async function prepare({ db, character, actionType, payload }) {
   return { recette, objects };
 }
 
-async function resolve({ tx, db, characterRef, today, context }) {
+async function resolve({ tx, db, characterRef, actionTypeId, today, context }) {
   const { recette, objects } = context;
   const ingredients = recette.ingredients || [];
 
@@ -88,6 +90,8 @@ async function resolve({ tx, db, characterRef, today, context }) {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
       lastAction: {
+        actionTypeId,
+        date: today,
         success: true,
         narrativeText: "",
         recetteId: recette.id,

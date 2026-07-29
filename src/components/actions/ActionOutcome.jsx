@@ -23,16 +23,6 @@ export default function ActionOutcome({ lastAction, showLoot }) {
         </p>
       )}
 
-      {!lastAction.success && lastAction.consequence && (
-        <ul>
-          <li>Cause : {lastAction.consequence.description}</li>
-          {lastAction.consequence.type === "wound" && <li>Blessure : {lastAction.consequence.name}</li>}
-          {(lastAction.consequence.type === "death" || lastAction.consequence.fatal) && (
-            <li className="fatal">Ton personnage est mort.</li>
-          )}
-        </ul>
-      )}
-
       {lastAction.success && (
         <ul>
           {(lastAction.goldGain > 0 || lastAction.itemGain) && (

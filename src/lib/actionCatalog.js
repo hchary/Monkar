@@ -78,7 +78,9 @@ export function normalizeActionType(actionType) {
     order: Number.isFinite(Number(actionType?.order)) ? Number(actionType.order) : 0,
     // Absent means enabled: an action authored before this field existed must keep working.
     enabled: actionType?.enabled !== false,
-    // No handler means the generic tier roller resolves it (Phase 3).
+    // No fallback here any more: an action with no handlerId (or one naming an unregistered
+    // handler) is refused at runtime by functions/src/lib/actionPipeline.js - see "Abandoning the
+    // paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md.
     handlerId: actionType?.handlerId || null,
     durationHours: resolveDurationHours(actionType),
     availability: {
@@ -90,7 +92,6 @@ export function normalizeActionType(actionType) {
       accentSource: result.accentSource === "difficulty" ? "difficulty" : "category",
       showLoot: result.showLoot === true,
     },
-    tiers: Array.isArray(actionType?.tiers) ? actionType.tiers : [],
   };
 }
 

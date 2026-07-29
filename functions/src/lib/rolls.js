@@ -1,6 +1,10 @@
 // Nothing to draw from yields null rather than the `items[-1]` undefined the fallback used to
 // produce: callers then decide what an empty pool means, instead of dereferencing a value that
-// only looks like an item until they touch it (see actionEffects.js's rollTier).
+// only looks like an item until they touch it. Each handler that calls this with its own weight
+// table (e.g. partirEnQuete.js's quest-difficulty draw) is expected to hand it a table it knows is
+// non-empty - there is no shared "empty pool" handling above this any more since the framework-wide
+// tiers mechanism that used to need one was retired (see "Abandoning the paliers system" in
+// docs/ISSUE-02-ACTION-FRAMEWORK.md).
 function rollWeighted(items) {
   if (!Array.isArray(items) || items.length === 0) return null;
 

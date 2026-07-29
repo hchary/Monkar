@@ -806,12 +806,10 @@ behind that this session found and left alone rather than delete data it didn't 
   required tiers to be hand-authored in Firestore for now.
 
   *Fixed since:* the same crash was reported again from a creator-authored "Couper du bois"
-  Récolte action. `rollWeighted` now returns `null` for an empty pool, and every resolution path
-  rolls through `actionEffects.js`'s `rollTier`, which rejects with `failed-precondition`
-  ("Cette action n'a pas de paliers de résultat configurés.") — thrown inside the pipeline's
-  transaction, so a misconfigured action costs the player no day. A content author's mistake now
-  reads as a content message rather than a server bug. The deferred tier editor (§3.8, D14) is
-  still what actually removes the mistake.
+  Récolte action. A first pass gave `genericResolve` a friendly `failed-precondition` instead of
+  a `TypeError` for an empty `tiers` array — a real improvement, but still a patch on a mechanism
+  that made the mistake possible in the first place. See "6. Abandoning the paliers system" below
+  for what replaced it.
 
 ### Phase 6 — Modifiers
 
@@ -846,7 +844,7 @@ Recorded so the implementer does not re-open them; each was a real fork.
 | # | Decision | Why |
 |---|---|---|
 | D1 | The daily lock becomes `completesAt`-based, replacing the UTC-date lock | R1 + R2 describe one mechanism; the countdown UI is unrepresentable otherwise (F5) |
-| D2 | Generic tier roller as the default, code handler as the escape hatch | Otherwise "modular" still means "one module per action" (F1) |
+| D2 | Generic tier roller as the default, code handler as the escape hatch | Otherwise "modular" still means "one module per action" (F1) — **superseded, see §7**: there is no generic path any more, every action requires a handler |
 | D3 | Conditions are a closed set of typed predicates, not an expression language | Authorable in a form, serialisable, testable; an expression engine is unbounded |
 | D4 | Both evaluators fail closed on unknown condition types | A stale client must never offer an action the server refuses |
 | D5 | The condition evaluator is a deliberately duplicated module pair | The repo's established answer to F8, already used by `loot.js` |
@@ -858,7 +856,7 @@ Recorded so the implementer does not re-open them; each was a real fork.
 | D11 | `lastAction` is extended, not replaced by a new `currentAction` field | Keeps `CharactersOverview`, the recap, and `actionsLog` working with no migration |
 | D12 | `lastActionDate` is kept but demoted to a logging/display field | Still feeds `actionsLog.date` and the history tab; removing it is unnecessary churn |
 | D13 | `ACTION_HANDLERS` is keyed by `handlerId`, not by document id | Lets actions share a handler and be renamed without a code change |
-| D14 | The `tiers` editor stays out of the creator UI for now | A large form of its own; tiers keep working as authored today |
+| D14 | The `tiers` editor stays out of the creator UI for now | A large form of its own; tiers keep working as authored today — **superseded, see §7**: `tiers` was retired rather than ever getting an editor |
 
 ## 6. Open questions
 
@@ -895,8 +893,75 @@ None blocking — each has a working default, listed for the record:
 - **Multiple or queued actions per day**, action costs (energy/gold to start), and cancelling a
   running action. R1 is one action per day, full stop.
 - **Actions lasting other than 24 h.** The schema supports it; no content uses it.
-- **Re-adding the `tiers` editor** to the creator dashboard (§3.8, D14).
+- **Re-adding a `tiers` editor** to the creator dashboard. Moot since §7: `tiers` isn't a deferred
+  feature any more, it's a retired mechanism.
 - **Narrative generation changes.** [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)
   is orthogonal: it changes how an outcome's text is produced, this issue changes how actions are
   declared, selected, and timed. They touch `partirEnQuete.js` in different places and can land in
   either order.
+
+---
+
+## 7. Abandoning the paliers system
+
+**Status: implemented.** Everything above this section describes the framework as originally
+designed and built (Phases 0-5), including its central mechanism: a per-action `tiers[]` array in
+Firestore, weighted-rolled by `rollWeighted`, deciding success/failure and every gain or
+consequence that followed. That mechanism has since been removed entirely, not just patched — this
+section records why and what replaced it. Read the sections above as history; this one is current.
+
+**What went wrong twice.** The Phase 5 verification note above already caught one instance:
+starting an action with an empty `tiers` array threw an unhandled `TypeError` from `genericResolve`
+(`rollWeighted` returning `undefined` for an empty pool, then dereferenced), surfaced to the player
+as an opaque `INTERNAL` error. The same crash was reported again independently from a
+creator-authored "Couper du bois" Récolte action — same root cause, different action. A first pass
+turned the `TypeError` into a friendly `failed-precondition`, but that only made the mistake safer
+to make, not impossible to make: `tiers` had no creator-UI editor (D14) and no schema-level
+guarantee of non-emptiness, so any newly-created action was broken until someone hand-edited
+Firestore to add tiers - the exact same content trap the first incident already demonstrated.
+
+**The actual decision, from the user directly:** *"Une action se déroule forcément jusqu'au bout.
+Le tirage aléatoire propre à chaque action est définie dans son handler. Une action execute le
+handler en lui passant les bons inputs. C'est tout."* (An action always runs to completion. The
+random draw specific to each action is defined in its handler. An action executes the handler,
+passing it the right inputs. That's all.) Two changes follow from this, confirmed explicitly
+rather than assumed:
+
+1. **No generic resolution path.** `functions/src/lib/actionPipeline.js` no longer falls back to
+   `genericResolve` when `handlerId` is empty or unregistered — it refuses the action outright with
+   `failed-precondition` before the transaction even opens (same treatment as an unmet condition).
+   Every action type, including any future trivial one with no interesting mechanic, now requires a
+   dedicated handler module. This reverses D2: "modular" no longer means "mostly content, code as
+   the escape hatch" — it means "always code, framework-shared only for timing/labeling."
+   `ActionsManager.jsx`'s "Gestionnaire" field is a required `<select>` with no "Aucun (générique)"
+   option any more, so the creator UI can't produce a handler-less action either.
+2. **No shared outcome/weight scaffolding.** `functions/src/lib/actionEffects.js` no longer exports
+   `isSuccess`/`rollTier`/`applyTierEffects`/`genericResolve` - only `stampLifecycle` (the
+   timing/labeling envelope every handler's result still gets wrapped in) survives. Each handler
+   decides its own outcome and writes its own `updates`/`lastAction` shape directly:
+   - **`partirEnQuete.js`** — a quest always concludes successfully now: no more per-tier chance of
+     death, wound, gold, or reputation loss/gain. What still varies is the narration (tries a
+     randomly-ordered pair of target shapes against the quest's own phrase pools, then the global
+     ones, falling back to a fixed sentence) and the loot/talent-evolution draws, which fire
+     unconditionally instead of being gated on a rolled success flag.
+   - **`recolte.js`** — same treatment: the harvest always runs, no more roll deciding whether it
+     fails outright. It can still yield nothing (no matching loot table, or no mastery in any
+     associated profession), but that was already true independent of any tier.
+   - **`artisanat.js`** — unchanged in behaviour; it never used `tiers` to begin with (crafting
+     always succeeded once ingredients were confirmed present), so it was already the shape the
+     other two handlers were rewritten to match.
+
+**Consequence the user was told and accepted before this landed:** `partirEnQuete.js` was the only
+caller of `functions/src/lib/wounds.js`'s `applyWound` (via the now-deleted `applyTierEffects`). No
+handler calls it any more, so the wound/death mechanic (severity counters, the "Santé" tab, the
+`notWounded` condition) is unreachable through action resolution until some future handler chooses
+to call `applyWound` itself - the pure function, its tests, the character fields, and the display
+UI are all left in place, unused rather than deleted, since nothing else in the game currently
+exercises them.
+
+**Left inert on purpose, not migrated:** any `tiers`/pre-migration content still sitting on old
+`worldData/actionTypes/items` documents (e.g. `partir-en-quete`'s original four tiers) is simply
+never read any more - normalizeActionType no longer recognizes the field, and no handler consults
+it. Safe to delete by hand from the Firestore console or leave as clutter; nothing depends on it
+either way. `functions/scripts/seedWorldData.js` was updated to stop authoring it, since re-running
+that one-off bootstrap script would otherwise reintroduce dead data.

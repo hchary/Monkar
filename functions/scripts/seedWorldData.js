@@ -55,48 +55,14 @@ async function seed() {
     weight: 30,
   });
 
+  // Predates the action framework's handlerId/kindId fields entirely, and is not kept in step
+  // with them - live actionTypes/items/partir-en-quete is edited through ActionsManager instead.
+  // The tiers array this used to seed (a per-tier weighted death/wound/gold/reputation roll) is
+  // gone: partirEnQuete.js's own handler decides the quest's outcome now - see "Abandoning the
+  // paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md.
   const actionTypesRef = db.collection("worldData").doc("actionTypes").collection("items");
   await actionTypesRef.doc("partir-en-quete").set({
     label: "Partir en quête",
-    tiers: [
-      {
-        name: "Catastrophe",
-        weight: 5,
-        success: false,
-        narrativeText: "Une embuscade te laisse pour mort au bord du chemin.",
-        consequence: { type: "death", description: "Tombé lors d'une embuscade." },
-      },
-      {
-        name: "Échec",
-        weight: 20,
-        success: false,
-        narrativeText: "La quête tourne court, tu rentres blessé.",
-        consequence: {
-          type: "wound",
-          severity: "light",
-          name: "Jambe foulée",
-          description: "Une chute t'a laissé une entorse.",
-        },
-      },
-      {
-        name: "Réussite",
-        weight: 55,
-        success: true,
-        narrativeText: "Votre réputation et vos compétences grandissent, vous avez bien mérité de vous reposer",
-        goldGain: 5,
-        reputationGain: 1,
-      },
-      {
-        name: "Exploit légendaire",
-        weight: 20,
-        success: true,
-        narrativeText: "Un exploit dont on parlera dans toutes les tavernes de la région !",
-        goldGain: 15,
-        itemGain: { name: "Trophée de chasse", qty: 1 },
-        reputationGain: 5,
-        legendary: true,
-      },
-    ],
   });
 
   console.log("World data seeded successfully.");

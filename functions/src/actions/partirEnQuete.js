@@ -1,6 +1,6 @@
 const { HttpsError } = require("firebase-functions/v2/https");
-const { rollWeighted, rarityFloor } = require("../lib/rolls");
-const { applyTierEffects, isSuccess, rollTier } = require("../lib/actionEffects");
+const { FieldValue } = require("firebase-admin/firestore");
+const { rollWeighted } = require("../lib/rolls");
 const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 const { rollTalentEvolutions } = require("../lib/talentEvolution");
 const { generateResultText } = require("../textGeneration");
@@ -118,79 +118,62 @@ function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects
   return loot;
 }
 
-async function resolve({ tx, db, character, actionType, today, context }) {
+// A quest always concludes successfully once drawn - there is no more weighted roll deciding
+// death, injury, gold, or reputation the way the retired paliers system used to (see "Abandoning
+// the paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md). What still varies between two
+// resolutions of the same quest is its narration, its loot, and any talent progress - each its
+// own draw, made here rather than read off a per-tier Firestore field.
+const NARRATION_CIBLES = ["individuel", "groupe"];
+const DEFAULT_NARRATIVE_TEXT = "Vous revenez de votre quête.";
+
+// Tries a randomly-ordered target shape (a lone foe vs a group) against the quest's own
+// objective/phrase pools first, then the global pools, before trying the other shape - the same
+// two-level fallback the old per-tier `cible` used to drive, just no longer needing a tier to pick
+// a target from. Falls back to a fixed sentence only if nothing in the catalog matches either
+// shape (a content gap, not an error).
+function narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPhrases }) {
+  const cibles = Math.random() < 0.5 ? NARRATION_CIBLES : [...NARRATION_CIBLES].reverse();
+  const questVerbPhrases = verbPhrases.filter((v) => (quest.successPhraseIds || []).includes(v.id));
+
+  for (const cible of cibles) {
+    const fromQuest = generateResultText({ resultat: "victoire", cible, subjects: questObjectives, verbPhrases: questVerbPhrases });
+    if (fromQuest) return fromQuest;
+
+    const fromGlobal = generateResultText({ resultat: "victoire", cible, subjects: narrativeSubjects, verbPhrases });
+    if (fromGlobal) return fromGlobal;
+  }
+
+  return DEFAULT_NARRATIVE_TEXT;
+}
+
+async function resolve({ character, today, context }) {
   const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
 
-  const tier = rollTier(actionType);
-  const success = isSuccess(tier);
-
-  let talentGained = null;
-  if (success && tier.talentGain?.talentId) {
-    const talentRef = db.collection("worldData").doc("talents").collection("items").doc(tier.talentGain.talentId);
-    const talentSnap = await tx.get(talentRef);
-    if (talentSnap.exists) {
-      const talent = talentSnap.data();
-      const quality = tier.talentGain.quality || 1;
-      talentGained = {
-        id: talentSnap.id,
-        name: talent.name,
-        quality,
-        trainable: !!talent.trainable,
-        rarity: rarityFloor(talent.rarity, quality),
-        effect: talent.effect || "",
-        // Copied at grant time like every other talent field, so a hasTalentTag condition can be
-        // evaluated straight off the character document with no catalog lookup. Talents granted
-        // before this was added carry no tagIds and simply never match such a condition.
-        tagIds: talent.tagIds || [],
-        lastChangeDate: today,
-        lastChangeCircumstance: tier.talentGain.circumstance || "",
-      };
-    }
-  }
-
   const questObjectives = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
+  const narrativeText = narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPhrases });
 
-  // The quest's own objective/phrase pools are tried first so the result text stays
-  // on-theme with the drawn quest; if the quest has no pool for this outcome, fall
-  // back to the global pools exactly like a quest-less action would.
-  let narrativeText = tier.narrativeText || "";
-  if (tier.cible) {
-    const resultat = success ? "victoire" : "echec";
-    const questPhraseIds = resultat === "victoire" ? quest.successPhraseIds : quest.failurePhraseIds;
-    const questVerbPhrases = verbPhrases.filter((v) => (questPhraseIds || []).includes(v.id));
-    let generated = generateResultText({ resultat, cible: tier.cible, subjects: questObjectives, verbPhrases: questVerbPhrases });
-    if (!generated) {
-      generated = generateResultText({ resultat, cible: tier.cible, subjects: narrativeSubjects, verbPhrases });
-    }
-    if (generated) narrativeText = generated;
-  }
+  const loot = drawQuestLoot({
+    quest,
+    difficulty: quest.difficulty,
+    questObjectives,
+    lootTables,
+    objects,
+    accomplishmentMessage: narrativeText,
+  });
 
-  const loot = success
-    ? drawQuestLoot({
-        quest,
-        difficulty: quest.difficulty,
-        questObjectives,
-        lootTables,
-        objects,
-        accomplishmentMessage: narrativeText,
-      })
-    : [];
-
-  // Each success has a chance to evolve or unlock a talent sharing a tag with the quest, gated
-  // on a single objective drawn for this occurrence (same draw mechanism as loot's per-item
-  // objective, but rolled once for the whole talent pass rather than per talent) - see
-  // docs/TODO.md "Amélioration de talent".
-  const { talents: nextTalents, evolutions: talentEvolutions } = success
-    ? rollTalentEvolutions({
-        characterTalents: character.talents || [],
-        catalogTalents: talents,
-        quest,
-        objective: pickRandomLoot(questObjectives),
-        difficulty: quest.difficulty,
-        today,
-        circumstance: `lors de la quête « ${quest.name} »`,
-      })
-    : { talents: character.talents || [], evolutions: [] };
+  // Every quest has a chance to evolve or unlock a talent sharing a tag with it, gated on a
+  // single objective drawn for this occurrence (same draw mechanism as loot's per-item objective,
+  // but rolled once for the whole talent pass rather than per talent) - see docs/TODO.md
+  // "Amélioration de talent".
+  const { talents: nextTalents, evolutions: talentEvolutions } = rollTalentEvolutions({
+    characterTalents: character.talents || [],
+    catalogTalents: talents,
+    quest,
+    objective: pickRandomLoot(questObjectives),
+    difficulty: quest.difficulty,
+    today,
+    circumstance: `lors de la quête « ${quest.name} »`,
+  });
 
   const questSummary = {
     id: quest.id,
@@ -200,37 +183,28 @@ async function resolve({ tx, db, character, actionType, today, context }) {
     locationName,
   };
 
-  const updates = applyTierEffects({
-    tier,
-    today,
-    actionTypeId: ACTION_TYPE_ID,
-    character,
-    narrativeText,
-    talentGained,
-    lastActionExtra: {
+  const updates = {
+    lastActionDate: today,
+    lastActionAt: FieldValue.serverTimestamp(),
+    lastAction: {
+      actionTypeId: ACTION_TYPE_ID,
+      date: today,
+      success: true,
+      narrativeText,
       quest: questSummary,
       loot,
       talentEvolutions,
-      // A quest colors its own frame and countdown by the difficulty that was actually rolled,
+      // A quest colors its own frame and countdown by the difficulty that was actually drawn,
       // rather than falling back to the action's category color.
       accent: quest.difficulty ? { kind: "difficulty", value: quest.difficulty } : null,
     },
-  });
+  };
 
-  // applyTierEffects only knows how to arrayUnion a single freshly-granted talent; the evolution
-  // pass above may also bump an existing entry's quality in place or append an unlocked one, which
-  // arrayUnion can't express. Overwrite with the fully merged array whenever either mechanic fired.
-  if (talentGained || talentEvolutions.length > 0) {
-    updates.talents = talentGained && !nextTalents.some((t) => t.id === talentGained.id)
-      ? [...nextTalents, talentGained]
-      : nextTalents;
-  }
+  if (talentEvolutions.length > 0) updates.talents = nextTalents;
 
   const logFields = {
-    tierName: tier.name,
-    success,
+    success: true,
     narrativeText,
-    consequence: updates.lastAction.consequence,
     quest: questSummary,
   };
 
