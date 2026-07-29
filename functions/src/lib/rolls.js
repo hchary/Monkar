@@ -11,6 +11,11 @@ function rollWeighted(items) {
 
 const RARITY_ORDER = ["commun", "peu_commun", "rare", "tres_rare", "legendaire", "mythique", "divin", "unique"];
 
+// Quests' own 6-tier difficulty scale (see QuestsManager.jsx's DIFFICULTIES) - positionally
+// equivalent to the first six rarity tiers (docs/TODO.md "Quest difficulty") but kept as its
+// own array since quests have no "divin"/"unique" tier.
+const DIFFICULTY_ORDER = ["facile", "moyen", "difficile", "tres_difficile", "epique", "mythique"];
+
 function rarityFloor(rarity, quality) {
   let floor = "commun";
   if (quality >= 5) floor = "legendaire";
@@ -20,4 +25,4 @@ function rarityFloor(rarity, quality) {
   return RARITY_ORDER[idx];
 }
 
-module.exports = { rollWeighted, RARITY_ORDER, rarityFloor };
+module.exports = { rollWeighted, RARITY_ORDER, DIFFICULTY_ORDER, rarityFloor };
