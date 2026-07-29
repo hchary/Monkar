@@ -11,6 +11,7 @@ export function matchesTag(option, search) {
 export default function TagsManager() {
   const [tags, setTags] = useState([]);
   const [newName, setNewName] = useState("");
+  const [filterText, setFilterText] = useState("");
   const [selectedTag, setSelectedTag] = useState(null);
   const [editName, setEditName] = useState("");
   const dialogRef = useRef(null);
@@ -22,6 +23,7 @@ export default function TagsManager() {
   }, []);
 
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+  const filteredTags = sortedTags.filter((tag) => matchesTag(tag, filterText));
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -92,16 +94,28 @@ export default function TagsManager() {
     <div className="creator-section">
       <h2>Tags</h2>
 
-      <form className="tag-create-form" onSubmit={handleCreate}>
-        <input placeholder="Nouveau tag" value={newName} onChange={(e) => setNewName(e.target.value)} required />
-        <button type="submit">Confirmer</button>
-      </form>
+      <div className="tag-toolbar">
+        <form className="tag-create-form" onSubmit={handleCreate}>
+          <input placeholder="Nouveau tag" value={newName} onChange={(e) => setNewName(e.target.value)} required />
+          <button type="submit">Confirmer</button>
+        </form>
+        <input
+          type="search"
+          className="tag-filter-input"
+          placeholder="Rechercher par nom..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+      </div>
 
       <details className="collapsible-group" open>
-        <summary>Tags ({sortedTags.length})</summary>
+        <summary>
+          Tags ({filteredTags.length}
+          {filteredTags.length !== sortedTags.length ? ` / ${sortedTags.length}` : ""})
+        </summary>
         <ul className="creator-list">
-          {sortedTags.length === 0 && <li className="empty-state">Aucun tag.</li>}
-          {sortedTags.map((tag) => (
+          {filteredTags.length === 0 && <li className="empty-state">Aucun tag.</li>}
+          {filteredTags.map((tag) => (
             <li key={tag.id}>
               <button type="button" className="tag-list-item" onClick={() => openTag(tag)}>
                 {tag.name}
