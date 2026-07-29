@@ -476,6 +476,7 @@ fieldset label {
 }
 
 .inventory-tile {
+  position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   display: flex;
@@ -487,6 +488,17 @@ fieldset label {
   font: inherit;
   color: inherit;
   cursor: pointer;
+}
+
+.inventory-tile-count {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  color: #fff;
+  font-size: 0.85em;
+  font-weight: bold;
+  line-height: 1;
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
 }
 
 .inventory-tile:hover,
