@@ -500,6 +500,9 @@ A profession is characterized by:
 - **Evolution**: single-select referencing another `worldData/professions/items` entry (the
   profession this one evolves into) — self-referencing like talents' ancestor/descendant links,
   but single-valued here rather than a list.
+- **Actions associées**: multi-select against `worldData/actionTypes/items`, same
+  `MultiSelectModalField` + `matchesActionType` mechanism already exported by `ActionsManager.jsx`
+  (option labels come from each action type's `label` field, not `name`).
 
 **Interaction**: new "Métiers" tab in the creator dashboard, under the "Personnages" group.
 
@@ -514,6 +517,7 @@ worldData/professions/items/{id}
                              --   actionConditions.js's minReputation condition
   trainerTypeIds: string[]  -- worldData/trainerTypes/items ids
   evolutionId: string       -- worldData/professions/items id this profession evolves into, or ""
+  actionIds: string[]       -- worldData/actionTypes/items ids
 ```
 
 **Still open (deliberately deferred)**:
@@ -521,6 +525,7 @@ worldData/professions/items/{id}
   character creation, matched by the `profession` action condition in `actionConditions.js`) —
   whether assigning a character to a `worldData/professions/items` entry replaces or complements
   that existing string field is undecided.
-- No consumer reads `baseIncome`, `minReputation`, or `evolutionId` yet — this entry covers only
-  the catalog and creator UI, not any gameplay mechanic (income payout, reputation-gated
-  profession change, evolution trigger).
+- No consumer reads `baseIncome`, `minReputation`, `evolutionId`, or `actionIds` yet — this entry
+  covers only the catalog and creator UI, not any gameplay mechanic (income payout, reputation-gated
+  profession change, evolution trigger, or restricting an action's visibility to a profession's
+  `actionIds`).
