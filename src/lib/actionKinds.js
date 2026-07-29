@@ -9,9 +9,9 @@
 //
 // A kind is what "Partir en quête est une action héritant de l'action abstraite Aventure" means
 // in data: the action document carries kindId, the kind carries the behaviour shared by every
-// action beneath it. Today the tree is four roots deep by one; the point of the parentId edge is
-// that Métier will grow children (Artisanat, Récolte, Transport, Recherche…), each inheriting
-// Métier's profession gate without restating it.
+// action beneath it. Today the tree is four roots deep by one, plus Récolte under Métier; the
+// point of the parentId edge is that Métier will grow more children (Artisanat, Transport,
+// Recherche…), each inheriting Métier's profession gate without restating it.
 //
 // Small fixed enums live in JS rather than Firestore here (docs/ISSUE-02-ACTION-FRAMEWORK.md D6),
 // same as DIFFICULTIES / RARITIES / OBJECT_TYPES. Labels are French - creator-facing UI text.
@@ -24,12 +24,19 @@ export const ACTION_KINDS = [
   { value: "intermede", label: "Intermède", parentId: null },
   { value: "metier", label: "Métier", parentId: null },
   { value: "social", label: "Social", parentId: null },
+  { value: "recolte", label: "Récolte", parentId: "metier" },
 ];
 
 // The kind whose descendants are reserved to characters practising one of the action's
 // professions. Named rather than inlined because both the catalog (which injects the implicit
 // condition) and the creator UI (which shows the "Métiers associés" picker) ask the same question.
 export const PROFESSION_ACTION_KIND_ID = "metier";
+
+// The kind whose descendants draw from a loot table (picked by tag + rarity) instead of - or in
+// addition to - a rolled tier. Named the same way as PROFESSION_ACTION_KIND_ID: both the creator
+// UI (which shows the "Tags de butin"/"Rareté" fields) and the server handler ask the same
+// question.
+export const HARVEST_ACTION_KIND_ID = "recolte";
 
 export function findActionKind(kindId) {
   return ACTION_KINDS.find((kind) => kind.value === kindId) || null;

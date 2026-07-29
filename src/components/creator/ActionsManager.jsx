@@ -4,6 +4,7 @@ import { db } from "../../lib/firebase";
 import {
   ACTION_KINDS,
   PROFESSION_ACTION_KIND_ID,
+  HARVEST_ACTION_KIND_ID,
   actionKindInheritsFrom,
   actionKindLabel,
   actionKindsInTreeOrder,
@@ -12,7 +13,7 @@ import { CONDITION_TYPES } from "../../lib/actionConditions";
 import { resolveKindId } from "../../lib/actionCatalog";
 import { DEFAULT_DURATION_HOURS } from "../../lib/actionLifecycle";
 import { actionTypeRef, syncActionProfessions, unlinkDeletedAction } from "../../lib/professionActions";
-import { matchesTalent } from "./TalentsManager";
+import { matchesTalent, RARITIES } from "./TalentsManager";
 import { matchesTag } from "./TagsManager";
 import { matchesRegion } from "./RegionsManager";
 // ProfessionsManager imports matchesActionType back from here. The cycle is safe and stays safe as
@@ -25,7 +26,7 @@ import MultiSelectModalField from "./MultiSelectModalField";
 // null/unregistered - kept in step with functions/src/index.js's ACTION_HANDLERS by hand, since
 // the creator UI can't see the server's registry. The closest thing to compile-time safety a
 // Firestore-authored catalog can have (F2).
-const KNOWN_HANDLER_IDS = ["partirEnQuete"];
+const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte"];
 
 // Matches an action's label or description - for use as MultiSelectModalField's matchesFilter,
 // and as this manager's own free-text search.
@@ -189,6 +190,8 @@ const emptyForm = {
   unmetMessage: "",
   accentSource: "category",
   showLoot: false,
+  lootTagIds: [],
+  rarity: RARITIES[0].value,
 };
 
 export default function ActionsManager() {
@@ -212,8 +215,9 @@ export default function ActionsManager() {
     });
   }, []);
 
-  // Filtering by a kind includes everything beneath it, so picking "Métier" also lists the future
-  // Artisanat/Récolte actions rather than only the ones typed as Métier itself.
+  // Filtering by a kind includes everything beneath it, so picking "Métier" also lists Récolte
+  // actions (and any future Artisanat/Transport ones) rather than only the ones typed as Métier
+  // itself.
   const filteredActionTypes = actionTypes.filter((actionType) => {
     const kindId = resolveKindId(actionType);
     if (filters.kindIds.length > 0 && !filters.kindIds.some((id) => actionKindInheritsFrom(kindId, id))) return false;
@@ -252,6 +256,8 @@ export default function ActionsManager() {
       unmetMessage: availability.unmetMessage || "",
       accentSource: result.accentSource === "difficulty" ? "difficulty" : "category",
       showLoot: result.showLoot === true,
+      lootTagIds: actionType.lootTagIds || [],
+      rarity: actionType.rarity || RARITIES[0].value,
     });
     setPanelOpen(true);
   }
@@ -287,6 +293,9 @@ export default function ActionsManager() {
   // Only the Métier branch of the tree carries a profession link; every other kind hides the
   // picker and saves an empty list, so switching an action out of Métier drops its links.
   const isProfessionAction = actionKindInheritsFrom(form.kindId, PROFESSION_ACTION_KIND_ID);
+  // Only the Récolte branch carries loot tags/rarity - same convention as isProfessionAction:
+  // switching an action out of Récolte drops them rather than leaving stale, unused fields.
+  const isHarvestAction = actionKindInheritsFrom(form.kindId, HARVEST_ACTION_KIND_ID);
 
   function toggleProfessionId(id) {
     setForm((prev) => ({
@@ -294,6 +303,13 @@ export default function ActionsManager() {
       professionIds: prev.professionIds.includes(id)
         ? prev.professionIds.filter((x) => x !== id)
         : [...prev.professionIds, id],
+    }));
+  }
+
+  function toggleLootTagId(id) {
+    setForm((prev) => ({
+      ...prev,
+      lootTagIds: prev.lootTagIds.includes(id) ? prev.lootTagIds.filter((x) => x !== id) : [...prev.lootTagIds, id],
     }));
   }
 
@@ -333,6 +349,8 @@ export default function ActionsManager() {
           accentSource: form.accentSource,
           showLoot: form.showLoot,
         },
+        lootTagIds: isHarvestAction ? form.lootTagIds : [],
+        rarity: isHarvestAction ? form.rarity : null,
       },
       { merge: true }
     );
@@ -389,6 +407,7 @@ export default function ActionsManager() {
           const unknownHandler = actionType.handlerId && !KNOWN_HANDLER_IDS.includes(actionType.handlerId);
           const kindId = resolveKindId(actionType);
           const isMetier = actionKindInheritsFrom(kindId, PROFESSION_ACTION_KIND_ID);
+          const isHarvest = actionKindInheritsFrom(kindId, HARVEST_ACTION_KIND_ID);
           return (
             <li key={actionType.id}>
               <strong>{actionType.label}</strong>
@@ -400,6 +419,14 @@ export default function ActionsManager() {
                   {(actionType.professionIds || [])
                     .map((id) => professions.find((p) => p.id === id)?.name || id)
                     .join(", ") || <span className="error">aucun — l'action n'est accessible à personne</span>}
+                </div>
+              )}
+              {isHarvest && (
+                <div>
+                  Tags de butin :{" "}
+                  {(actionType.lootTagIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") ||
+                    "aucun"}
+                  {" — "}Rareté : {RARITIES.find((r) => r.value === actionType.rarity)?.label || "non définie"}
                 </div>
               )}
               <div>
@@ -473,6 +500,36 @@ export default function ActionsManager() {
                   Sans métier associé, cette action ne sera accessible à aucun personnage.
                 </p>
               )}
+            </>
+          )}
+
+          {isHarvestAction && (
+            <>
+              <MultiSelectModalField
+                legend="Tags de butin"
+                options={sortedTags}
+                selectedIds={form.lootTagIds}
+                onToggle={toggleLootTagId}
+                createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+                matchesFilter={matchesTag}
+                filterPlaceholder="Filtrer par nom..."
+                buttonLabel="Ajouter des tags de butin"
+              />
+              <label>
+                Rareté du butin
+                <select value={form.rarity} onChange={(e) => setForm({ ...form, rarity: e.target.value })}>
+                  {RARITIES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p>
+                Une table de tirage sera choisie au hasard parmi celles portant l'un de ces tags et cette rareté ; la
+                quantité de base récoltée est la somme des niveaux de maîtrise des métiers associés que le personnage
+                connaît.
+              </p>
             </>
           )}
 
