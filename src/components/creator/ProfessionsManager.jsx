@@ -41,7 +41,6 @@ const emptyForm = {
   name: "",
   description: "",
   talentIds: [],
-  baseIncome: "",
   minReputation: "",
   trainerTypeIds: [],
   evolutionId: "",
@@ -82,7 +81,6 @@ export default function ProfessionsManager() {
       name: profession.name || "",
       description: profession.description || "",
       talentIds: profession.talentIds || [],
-      baseIncome: profession.baseIncome ?? "",
       minReputation: profession.minReputation ?? "",
       trainerTypeIds: profession.trainerTypeIds || [],
       evolutionId: profession.evolutionId || "",
@@ -129,7 +127,6 @@ export default function ProfessionsManager() {
       name: form.name,
       description: form.description,
       talentIds: form.talentIds,
-      baseIncome: Math.max(0, Number(form.baseIncome) || 0),
       minReputation: Number(form.minReputation) || 0,
       trainerTypeIds: form.trainerTypeIds,
       evolutionId: form.evolutionId,
@@ -160,7 +157,6 @@ export default function ProfessionsManager() {
           <li key={profession.id}>
             <strong>{profession.name}</strong>
             <div>{profession.description}</div>
-            <div>Revenu de base : {profession.baseIncome || 0}</div>
             <div>Réputation minimale : {profession.minReputation || 0}</div>
             <div>
               Talents :{" "}
@@ -220,17 +216,6 @@ export default function ProfessionsManager() {
             filterPlaceholder="Filtrer par nom, effet ou rareté..."
             buttonLabel="Ajouter talents"
           />
-
-          <label>
-            Revenu de base
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={form.baseIncome}
-              onChange={(e) => setForm({ ...form, baseIncome: e.target.value })}
-            />
-          </label>
 
           <label>
             Réputation minimale

@@ -20,7 +20,6 @@ export default function ProfessionTab({ character }) {
 
   const profession = professions.find((p) => p.id === character.professionId);
   const knownProfessions = character.knownProfessions || [];
-  const income = (profession?.baseIncome || 0) * (character.professionLevel || 0);
 
   async function selectKnownProfession(professionId, level) {
     if (professionId === character.professionId) {
@@ -38,9 +37,6 @@ export default function ProfessionTab({ character }) {
           <h3>
             {profession.name} Niv {character.professionLevel}
           </h3>
-          <p>
-            Revenu : {income} pièce{income > 1 ? "s" : ""} de cuivre
-          </p>
           <p>{profession.description}</p>
           <div>
             <strong>Actions associées</strong>
