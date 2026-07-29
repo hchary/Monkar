@@ -3,7 +3,7 @@ import InventoryTab from "./InventoryTab";
 import ProfessionTab from "./ProfessionTab";
 import EmptyState from "./EmptyState";
 
-const TABS = ["Inventaire", "Talents", "Métier", "Blessures"];
+const TABS = ["Inventaire", "Talents", "Métier", "Santé"];
 
 function formatShortDate(dateStr) {
   if (!dateStr) return "";
@@ -49,18 +49,13 @@ export default function CharacterTabs({ character }) {
 
         {activeTab === "Métier" && <ProfessionTab character={character} />}
 
-        {activeTab === "Blessures" &&
-          (character.wounds?.length > 0 ? (
-            <ul>
-              {character.wounds.map((w, i) => (
-                <li key={i}>
-                  <strong>{w.name}</strong> ({w.date}) — {w.description}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState text="Aucune blessure, tant mieux." />
-          ))}
+        {activeTab === "Santé" && (
+          <ul className="wound-counters">
+            <li>Blessures légères : {character.woundsLight || 0}</li>
+            <li>Blessures graves : {character.woundsSevere || 0}</li>
+            <li>Blessures permanentes : {character.woundsPermanent || 0}</li>
+          </ul>
+        )}
       </div>
     </div>
   );

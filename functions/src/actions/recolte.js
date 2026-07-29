@@ -90,6 +90,7 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
     tier,
     today,
     actionTypeId,
+    character,
     narrativeText: tier.narrativeText || "",
     lastActionExtra: { loot },
   });
@@ -100,7 +101,7 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
       tierName: tier.name,
       success,
       narrativeText: tier.narrativeText || "",
-      consequence: tier.consequence || null,
+      consequence: updates.lastAction.consequence,
     },
   };
 }

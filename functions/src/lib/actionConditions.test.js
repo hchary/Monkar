@@ -13,7 +13,9 @@ const CHARACTER = {
   reputation: 40,
   legendLevel: 2,
   region: { id: "cote-des-brumes", name: "Côte des Brumes" },
-  wounds: [],
+  woundsLight: 0,
+  woundsSevere: 0,
+  woundsPermanent: 0,
   talents: [
     { id: "resistance-au-feu", quality: 3, tagIds: ["feu", "protection"] },
     { id: "peche", quality: 1, tagIds: [] },
@@ -164,8 +166,14 @@ describe("evaluateConditions - notWounded", () => {
   test("passes only while the character carries no wound", () => {
     assert.equal(check({ type: "notWounded" }), true);
 
-    const wounded = { ...CHARACTER, wounds: [{ name: "Côte fêlée" }] };
-    assert.equal(check({ type: "notWounded" }, ctx({ character: wounded })), false);
+    const lightlyWounded = { ...CHARACTER, woundsLight: 1 };
+    assert.equal(check({ type: "notWounded" }, ctx({ character: lightlyWounded })), false);
+
+    const severelyWounded = { ...CHARACTER, woundsSevere: 1 };
+    assert.equal(check({ type: "notWounded" }, ctx({ character: severelyWounded })), false);
+
+    const permanentlyWounded = { ...CHARACTER, woundsPermanent: 1 };
+    assert.equal(check({ type: "notWounded" }, ctx({ character: permanentlyWounded })), false);
   });
 });
 
@@ -196,7 +204,7 @@ describe("evaluateConditions - composition", () => {
 
   test("every reason is French player-facing text, never an id", () => {
     for (const { value } of CONDITION_TYPES) {
-      const result = evaluateConditions([{ type: value }], ctx({ character: { wounds: [{}] } }));
+      const result = evaluateConditions([{ type: value }], ctx({ character: { woundsLight: 1 } }));
       assert.equal(result.ok, false, `${value} should fail with an empty condition`);
       assert.match(result.reason, /^[A-ZÀ-Ü].*\.$/, `${value} reason should read as a sentence`);
     }

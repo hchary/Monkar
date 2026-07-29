@@ -220,7 +220,7 @@ describe("evaluateAvailability - Métier actions", () => {
 });
 
 describe("evaluateAvailability", () => {
-  const character = { reputation: 10, talents: [], wounds: [] };
+  const character = { reputation: 10, talents: [], woundsLight: 0, woundsSevere: 0, woundsPermanent: 0 };
   const ctx = { character, instanceTagIds: new Set() };
 
   test("an action with no conditions is available", () => {
