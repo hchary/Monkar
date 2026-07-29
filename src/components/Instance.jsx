@@ -25,7 +25,7 @@ const MAX_TILE_NAME_LENGTH = 18;
 // Rendered as a fixed-size grid tile — "Instance" stays a technical term, never shown to players.
 // Hovering shows a tooltip (name + description); clicking hands the pair up to the parent, which
 // opens the detail pop-up.
-export default function InstanceTile({ instance, object, onSelect }) {
+export default function InstanceTile({ instance, object, count = 1, onSelect }) {
   if (!object) return null;
   const typeLabel = OBJECT_TYPES.find((t) => t.value === object.type)?.label || object.type;
   const label = object.name.length > MAX_TILE_NAME_LENGTH ? typeLabel : object.name;
@@ -40,6 +40,7 @@ export default function InstanceTile({ instance, object, onSelect }) {
         onClick={() => onSelect({ instance, object })}
       >
         <span className="inventory-tile-label">{label}</span>
+        {count > 1 && <span className="inventory-tile-count">{count}</span>}
       </button>
     </li>
   );

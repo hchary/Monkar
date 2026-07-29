@@ -96,6 +96,17 @@ export default function InventoryTab({ character }) {
       return true;
     });
 
+  // Identical objects (same objectId) are stacked into a single tile showing a count badge;
+  // the first instance encountered represents the stack when its detail pop-up is opened.
+  const stacks = Object.values(
+    filteredInstances.reduce((acc, { instance, object }) => {
+      const stack = acc[instance.objectId] || { instance, object, count: 0 };
+      stack.count += 1;
+      acc[instance.objectId] = stack;
+      return acc;
+    }, {})
+  );
+
   return (
     <div className="inventory-tab">
       <p>Or : {character.gold}</p>
@@ -120,10 +131,10 @@ export default function InventoryTab({ character }) {
         </button>
       </fieldset>
 
-      {filteredInstances.length > 0 ? (
+      {stacks.length > 0 ? (
         <ul className="inventory-grid">
-          {filteredInstances.map(({ instance, object }) => (
-            <InstanceTile key={instance.id} instance={instance} object={object} onSelect={openDetail} />
+          {stacks.map(({ instance, object, count }) => (
+            <InstanceTile key={instance.objectId} instance={instance} object={object} count={count} onSelect={openDetail} />
           ))}
         </ul>
       ) : (
