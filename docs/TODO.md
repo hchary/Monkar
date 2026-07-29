@@ -490,7 +490,6 @@ A profession is characterized by:
 - **Talents**: multi-select against `worldData/talents/items`, same `MultiSelectModalField` +
   `matchesTalent` mechanism already used by `TalentsManager.jsx`'s own ancestor/descendant
   pickers.
-- **Base income**: a positive integer.
 - **Reputation condition**: a minimum reputation value required, mirroring the semantics of the
   existing `minReputation` predicate in `src/lib/actionConditions.js` (a single numeric threshold
   against `character.reputation`), rather than inventing a new condition shape.
@@ -512,7 +511,6 @@ worldData/professions/items/{id}
   name: string              -- French, e.g. "Forgeron"
   description: string
   talentIds: string[]       -- worldData/talents/items ids
-  baseIncome: number        -- positive integer
   minReputation: number     -- minimum character.reputation required, same semantics as
                              --   actionConditions.js's minReputation condition
   trainerTypeIds: string[]  -- worldData/trainerTypes/items ids
@@ -536,9 +534,10 @@ A character has at most one active profession plus a mastery level (`professionL
 ever held (`knownProfessions`), each with its own remembered level.
 
 Displayed in the character sheet's "Métier" tab (renamed from "Bénédictions", which it replaces —
-`CharacterTabs.jsx`), via `ProfessionTab.jsx`: profession name and level, income (`baseIncome *
-professionLevel`, in "pièces de cuivre"), description, and associated actions (resolved from
-`actionIds` against `worldData/actionTypes/items`). A "Métiers connus" control opens a popup listing
+`CharacterTabs.jsx`), via `ProfessionTab.jsx`: profession name and level, description, and associated
+actions (resolved from `actionIds` against `worldData/actionTypes/items`). A profession carries no
+income of its own — income is reserved for future actions, not tied to a profession. A "Métiers
+connus" control opens a popup listing
 `knownProfessions`; picking one swaps it in as the active profession, first upserting the previously
 active profession's current level back into `knownProfessions` so no progress is lost
 (`src/lib/professions.js`'s `withProfessionChange`).
