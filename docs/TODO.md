@@ -58,6 +58,24 @@ talentGain: {
 
 Known gap: granting the same talent to a character more than once (e.g. via two different tiers) currently appends a duplicate entry to `character.talents` rather than merging/bumping quality — acceptable for now since there's no quality-up path yet either.
 
+## Talent relations
+
+Status: **implemented** (relation storage and creator UI only). The actual unlock mechanic that consumes these relations is **not** implemented yet — see "Still open" below.
+
+Each talent catalog entry (`worldData/talents/items/{id}`) now carries two id lists describing its position in a talent graph: `ancestorIds` (talents that will, eventually, unlock this one) and `descendantIds` (talents this one will, eventually, unlock). The two lists are always kept as mirror images of each other — adding talent A as an ancestor of talent B also adds B as a descendant of A, and the same symmetry applies to removal and to deleting a talent entirely (its id is pruned from every other talent's `ancestorIds`/`descendantIds`). `TalentsManager.jsx` maintains this invariant with a Firestore batch write on every create/edit/delete rather than requiring the creator to edit both sides by hand.
+
+`worldData/talents/items/{id}` shape, new fields:
+```
+ancestorIds: [string]     -- other worldData/talents/items ids that unlock this talent (eventually)
+descendantIds: [string]   -- other worldData/talents/items ids this talent unlocks (eventually)
+```
+
+**Interaction**: the talent edit form gains two `MultiSelectModalField` pickers ("Talents ancêtres" / "Talents descendants"), reusing the existing `matchesTalent` filter (name, effect, or rarity) and listing every other talent (the talent being edited is excluded from its own options). The read-only list view shows both relations by name under each talent, alongside its existing tags/favored quests/trainer info.
+
+**Still open (deliberately deferred)**:
+- The actual unlock mechanic: a character currently owning a talent's ancestors doesn't grant or reveal that talent anywhere — these links are pure data for now.
+- Cycle prevention: nothing stops a creator from linking talents into a cycle (A ancestor of B, B ancestor of A) or from an ancestor/descendant list pointing back at itself indirectly. Not a problem while the graph has no gameplay consumer, but should be revisited once the unlock mechanic is designed.
+
 ## Trainers
 
 Design note only — nothing implemented. The talent system's "s'entraîner" (train) progression path was deliberately deferred because the trainer concept itself isn't designed yet: who/what a player trains with (an NPC? a location? a standalone action type?), whether training costs anything (gold, a full day's action slot, both), whether it's restricted to talents the character already has, and how it picks *which* trainable talent to bump when a character has several. Once this is designed, revisit "Still open" in [Expanded talent system](#expanded-talent-system) above — the mechanic should reuse the existing weighted-tier roll (a success tier grants +1 quality to a designated talent) rather than introduce a second RNG system, per prior decision.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, setDoc, writeBatch, arrayUnion, arrayRemove, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { matchesTag } from "./TagsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
@@ -24,6 +24,8 @@ const emptyForm = {
   favoredQuestIds: [],
   trainerTypeId: "",
   tagIds: [],
+  ancestorIds: [],
+  descendantIds: [],
 };
 
 // Matches a talent's name, effect text, or rarity — for use as MultiSelectModalField's matchesFilter.
@@ -83,6 +85,9 @@ export default function TalentsManager() {
   const trainerTypes = useItems("trainerTypes");
   const tags = useItems("tags");
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+  const selectableTalents = talents
+    .filter((talent) => talent.id !== editingId)
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "talents", "items"), (snap) => {
@@ -117,6 +122,8 @@ export default function TalentsManager() {
       favoredQuestIds: talent.favoredQuestIds || [],
       trainerTypeId: talent.trainerTypeId || "",
       tagIds: talent.tagIds || [],
+      ancestorIds: talent.ancestorIds || [],
+      descendantIds: talent.descendantIds || [],
     });
     setPanelOpen(true);
   }
@@ -142,11 +149,38 @@ export default function TalentsManager() {
     }));
   }
 
+  function toggleAncestorId(id) {
+    setForm((prev) => ({
+      ...prev,
+      ancestorIds: prev.ancestorIds.includes(id) ? prev.ancestorIds.filter((x) => x !== id) : [...prev.ancestorIds, id],
+    }));
+  }
+
+  function toggleDescendantId(id) {
+    setForm((prev) => ({
+      ...prev,
+      descendantIds: prev.descendantIds.includes(id)
+        ? prev.descendantIds.filter((x) => x !== id)
+        : [...prev.descendantIds, id],
+    }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     const ref = editingId ? doc(db, "worldData", "talents", "items", editingId) : doc(collection(db, "worldData", "talents", "items"));
 
-    await setDoc(ref, {
+    const previousTalent = editingId ? talents.find((t) => t.id === editingId) : null;
+    const previousAncestorIds = previousTalent?.ancestorIds || [];
+    const previousDescendantIds = previousTalent?.descendantIds || [];
+
+    const addedAncestorIds = form.ancestorIds.filter((id) => !previousAncestorIds.includes(id));
+    const removedAncestorIds = previousAncestorIds.filter((id) => !form.ancestorIds.includes(id));
+    const addedDescendantIds = form.descendantIds.filter((id) => !previousDescendantIds.includes(id));
+    const removedDescendantIds = previousDescendantIds.filter((id) => !form.descendantIds.includes(id));
+
+    const batch = writeBatch(db);
+
+    batch.set(ref, {
       name: form.name,
       trainable: form.trainable,
       rarity: form.rarity,
@@ -154,8 +188,38 @@ export default function TalentsManager() {
       favoredQuestIds: form.favoredQuestIds,
       trainerTypeId: form.trainable ? form.trainerTypeId : "",
       tagIds: form.tagIds,
+      ancestorIds: form.ancestorIds,
+      descendantIds: form.descendantIds,
     });
+
+    // A talent added as ancestor gains this talent as a descendant, and vice versa (bidirectional link).
+    for (const ancestorId of addedAncestorIds) {
+      batch.update(doc(db, "worldData", "talents", "items", ancestorId), { descendantIds: arrayUnion(ref.id) });
+    }
+    for (const ancestorId of removedAncestorIds) {
+      batch.update(doc(db, "worldData", "talents", "items", ancestorId), { descendantIds: arrayRemove(ref.id) });
+    }
+    for (const descendantId of addedDescendantIds) {
+      batch.update(doc(db, "worldData", "talents", "items", descendantId), { ancestorIds: arrayUnion(ref.id) });
+    }
+    for (const descendantId of removedDescendantIds) {
+      batch.update(doc(db, "worldData", "talents", "items", descendantId), { ancestorIds: arrayRemove(ref.id) });
+    }
+
+    await batch.commit();
     resetForm();
+  }
+
+  async function deleteTalent(talent) {
+    const batch = writeBatch(db);
+    for (const ancestorId of talent.ancestorIds || []) {
+      batch.update(doc(db, "worldData", "talents", "items", ancestorId), { descendantIds: arrayRemove(talent.id) });
+    }
+    for (const descendantId of talent.descendantIds || []) {
+      batch.update(doc(db, "worldData", "talents", "items", descendantId), { ancestorIds: arrayRemove(talent.id) });
+    }
+    batch.delete(doc(db, "worldData", "talents", "items", talent.id));
+    await batch.commit();
   }
 
   return (
@@ -223,10 +287,22 @@ export default function TalentsManager() {
                       Tags : {talent.tagIds.map((id) => tags.find((t) => t.id === id)?.name || id).join(", ")}
                     </div>
                   )}
+                  {(talent.ancestorIds || []).length > 0 && (
+                    <div>
+                      Talents ancêtres :{" "}
+                      {talent.ancestorIds.map((id) => talents.find((t) => t.id === id)?.name || id).join(", ")}
+                    </div>
+                  )}
+                  {(talent.descendantIds || []).length > 0 && (
+                    <div>
+                      Talents descendants :{" "}
+                      {talent.descendantIds.map((id) => talents.find((t) => t.id === id)?.name || id).join(", ")}
+                    </div>
+                  )}
                   <button type="button" onClick={() => startEdit(talent)}>
                     Modifier
                   </button>
-                  <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "talents", "items", talent.id))}>
+                  <button type="button" onClick={() => deleteTalent(talent)}>
                     Supprimer
                   </button>
                 </li>
@@ -281,6 +357,26 @@ export default function TalentsManager() {
             matchesFilter={matchesTag}
             filterPlaceholder="Filtrer par nom..."
             buttonLabel="Ajouter tags"
+          />
+
+          <MultiSelectModalField
+            legend="Talents ancêtres"
+            options={selectableTalents}
+            selectedIds={form.ancestorIds}
+            onToggle={toggleAncestorId}
+            matchesFilter={matchesTalent}
+            filterPlaceholder="Filtrer par nom, effet ou rareté..."
+            buttonLabel="Ajouter ancêtres"
+          />
+
+          <MultiSelectModalField
+            legend="Talents descendants"
+            options={selectableTalents}
+            selectedIds={form.descendantIds}
+            onToggle={toggleDescendantId}
+            matchesFilter={matchesTalent}
+            filterPlaceholder="Filtrer par nom, effet ou rareté..."
+            buttonLabel="Ajouter descendants"
           />
 
           {form.trainable && (
