@@ -4,7 +4,9 @@ import { db } from "../../lib/firebase";
 import { matchesRegion } from "./RegionsManager";
 import { matchesTalent } from "./TalentsManager";
 import { matchesObject } from "./ObjectsManager";
+import { matchesProfession } from "./ProfessionsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
+import SoloSelectModalField from "./SoloSelectModalField";
 
 const emptyForm = {
   name: "",
@@ -43,6 +45,8 @@ export default function OriginsManager() {
   const regions = useItems("regions");
   const talents = useItems("talents");
   const objects = useItems("objects");
+  const professions = useItems("professions");
+  const sortedProfessions = [...professions].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "origins", "items"), (snap) => {
@@ -186,14 +190,16 @@ export default function OriginsManager() {
             buttonLabel="Choisir des talents"
           />
 
-          <label>
-            Métier associé
-            <input
-              placeholder="Métier (optionnel)"
-              value={form.profession}
-              onChange={(e) => setForm({ ...form, profession: e.target.value })}
-            />
-          </label>
+          <SoloSelectModalField
+            legend="Métier associé"
+            options={sortedProfessions}
+            selectedId={form.profession || null}
+            onSelect={(id) => setForm({ ...form, profession: id })}
+            createLink={`/creator?section=${encodeURIComponent("Métiers")}`}
+            matchesFilter={matchesProfession}
+            filterPlaceholder="Filtrer par nom ou description..."
+            buttonLabel="Choisir un métier"
+          />
 
           <label>
             Réputation de départ
