@@ -714,10 +714,23 @@ fieldset label {
   margin-top: 8px;
 }
 
+.tag-toolbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .tag-create-form {
   flex-direction: row !important;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 0;
+}
+
+.tag-filter-input {
+  min-width: 220px;
 }
 
 .tag-list-item {
