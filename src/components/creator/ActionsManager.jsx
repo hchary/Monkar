@@ -359,7 +359,13 @@ export default function ActionsManager() {
         })}
       </ul>
 
-      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+      <details
+        className="collapsible-group"
+        open={panelOpen}
+        onToggle={(e) => {
+          if (e.target === e.currentTarget) setPanelOpen(e.target.open);
+        }}
+      >
         <summary>{editingId ? "Modifier l'action" : "Nouvelle action"}</summary>
         <form onSubmit={handleSubmit}>
           <input placeholder="Nom" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} required />

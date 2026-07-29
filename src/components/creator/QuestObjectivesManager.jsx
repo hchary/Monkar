@@ -120,7 +120,13 @@ export default function QuestObjectivesManager() {
         tagsCatalog={tags}
       />
 
-      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+      <details
+        className="collapsible-group"
+        open={panelOpen}
+        onToggle={(e) => {
+          if (e.target === e.currentTarget) setPanelOpen(e.target.open);
+        }}
+      >
         <summary>{editingId ? "Modifier l'objectif de quête" : "Nouvel objectif de quête"}</summary>
         <form onSubmit={handleSubmit}>
           <label>
