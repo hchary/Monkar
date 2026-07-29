@@ -1,6 +1,6 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { resolveDurationHours, normalizeActionType, evaluateAvailability } = require("./actionCatalog");
+const { resolveDurationHours, resolveConditions, normalizeActionType, evaluateAvailability } = require("./actionCatalog");
 const { UNKNOWN_CONDITION_REASON } = require("./actionConditions");
 
 describe("resolveDurationHours", () => {
@@ -32,7 +32,9 @@ describe("normalizeActionType", () => {
     });
 
     assert.equal(normalized.label, "Partir en quête");
+    assert.equal(normalized.kindId, null);
     assert.equal(normalized.categoryId, null);
+    assert.deepStrictEqual(normalized.professionIds, []);
     assert.equal(normalized.description, "");
     assert.equal(normalized.order, 0);
     assert.equal(normalized.enabled, true);
@@ -77,6 +79,7 @@ describe("normalizeActionType", () => {
       result: { accentSource: "difficulty", showLoot: true },
     });
 
+    assert.equal(normalized.kindId, "intermede");
     assert.equal(normalized.categoryId, "intermede");
     assert.equal(normalized.order, 3);
     assert.equal(normalized.handlerId, "seReposer");
@@ -107,6 +110,106 @@ describe("normalizeActionType", () => {
   test("is idempotent - normalizing twice changes nothing", () => {
     const once = normalizeActionType({ label: "Partir en quête", durationHours: 6 });
     assert.deepStrictEqual(normalizeActionType(once), once);
+  });
+
+  test("is idempotent for a Métier action too - the implicit gate isn't injected twice", () => {
+    const once = normalizeActionType({ label: "Forger", kindId: "metier", professionIds: ["forgeron"] });
+    assert.deepStrictEqual(normalizeActionType(once), once);
+    assert.equal(once.availability.conditions.filter((c) => c.type === "hasProfession").length, 1);
+  });
+});
+
+// An action carries a kindId and its category falls out of the kind's root - the four categories
+// being exactly the four root kinds is what lets a pre-kinds document read as the kind it always
+// implied, with no migration.
+describe("normalizeActionType - kinds", () => {
+  test("a document authored before kinds reads its categoryId as its kind", () => {
+    const normalized = normalizeActionType({ label: "Partir en quête", categoryId: "aventure" });
+    assert.equal(normalized.kindId, "aventure");
+    assert.equal(normalized.categoryId, "aventure");
+  });
+
+  test("an authored kindId wins over a stale categoryId", () => {
+    const normalized = normalizeActionType({ kindId: "metier", categoryId: "aventure" });
+    assert.equal(normalized.kindId, "metier");
+    assert.equal(normalized.categoryId, "metier");
+  });
+
+  test("a kind this build doesn't know keeps whatever category it was filed under", () => {
+    const normalized = normalizeActionType({ kindId: "recolte", categoryId: "metier" });
+    assert.equal(normalized.kindId, "recolte");
+    assert.equal(normalized.categoryId, "metier");
+  });
+
+  test("professionIds drops anything that isn't an id", () => {
+    assert.deepStrictEqual(normalizeActionType({ professionIds: "forgeron" }).professionIds, []);
+    assert.deepStrictEqual(normalizeActionType({ professionIds: ["forgeron", null, 3] }).professionIds, ["forgeron"]);
+  });
+});
+
+// "Une action de Métier est une action disponible uniquement pour les personnages possédant le
+// métier associé" - expressed as a condition the catalog injects, never one the creator authors,
+// so the "Métiers associés" field is the single place that rule is edited.
+describe("resolveConditions - the implicit profession gate", () => {
+  test("a Métier action is gated on its own professionIds", () => {
+    const conditions = resolveConditions({ kindId: "metier", professionIds: ["forgeron", "armurier"] });
+    assert.deepStrictEqual(conditions, [{ type: "hasProfession", professionIds: ["forgeron", "armurier"] }]);
+  });
+
+  test("the gate is appended to the authored conditions, not substituted for them", () => {
+    const conditions = resolveConditions({
+      kindId: "metier",
+      professionIds: ["forgeron"],
+      availability: { conditions: [{ type: "notWounded" }] },
+    });
+    assert.deepStrictEqual(conditions, [
+      { type: "notWounded" },
+      { type: "hasProfession", professionIds: ["forgeron"] },
+    ]);
+  });
+
+  test("actions outside the Métier branch are left alone", () => {
+    for (const kindId of ["aventure", "intermede", "social"]) {
+      assert.deepStrictEqual(resolveConditions({ kindId, professionIds: ["forgeron"] }), []);
+    }
+  });
+
+  test("a Métier action reserved to nobody is available to nobody", () => {
+    const character = { professionId: "forgeron" };
+    const ctx = { character, instanceTagIds: new Set() };
+    assert.equal(evaluateAvailability({ kindId: "metier", professionIds: [] }, ctx).ok, false);
+    assert.equal(evaluateAvailability({ kindId: "metier" }, ctx).ok, false);
+  });
+});
+
+describe("evaluateAvailability - Métier actions", () => {
+  const actionType = { kindId: "metier", professionIds: ["forgeron"] };
+  const ctxFor = (character) => ({ character, instanceTagIds: new Set() });
+
+  test("the character practising the profession may act", () => {
+    assert.equal(evaluateAvailability(actionType, ctxFor({ professionId: "forgeron" })).ok, true);
+  });
+
+  test("a character practising another profession may not", () => {
+    const result = evaluateAvailability(actionType, ctxFor({ professionId: "pecheur" }));
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "Vous n'exercez pas le métier requis pour cette action.");
+  });
+
+  test("a character with no profession at all may not", () => {
+    assert.equal(evaluateAvailability(actionType, ctxFor({ professionId: null })).ok, false);
+    assert.equal(evaluateAvailability(actionType, ctxFor({})).ok, false);
+  });
+
+  // The gate must hold for a caller that passed the raw Firestore document straight through,
+  // exactly as it does for a normalized one - otherwise skipping normalizeActionType would
+  // silently open a Métier action to everyone.
+  test("holds whether the action type is raw or normalized", () => {
+    const character = { professionId: "pecheur" };
+    assert.deepStrictEqual(
+      evaluateAvailability(normalizeActionType(actionType), ctxFor(character)),
+      evaluateAvailability(actionType, ctxFor(character))
+    );
   });
 });
 

@@ -9,6 +9,7 @@ const {
 
 const CHARACTER = {
   profession: "Pêcheur",
+  professionId: "pecheur",
   reputation: 40,
   legendLevel: 2,
   region: { id: "cote-des-brumes", name: "Côte des Brumes" },
@@ -114,6 +115,35 @@ describe("evaluateConditions - profession and region", () => {
   test("an empty allowlist allows nobody", () => {
     assert.equal(check({ type: "profession", values: [] }), false);
     assert.equal(check({ type: "region", regionIds: [] }), false);
+    assert.equal(check({ type: "hasProfession", professionIds: [] }), false);
+  });
+});
+
+// The gate behind every Métier action. Injected by the catalog from the action's professionIds
+// (see actionCatalog.js's resolveConditions), which is why it isn't offered by CONDITION_TYPES.
+describe("evaluateConditions - hasProfession", () => {
+  test("matches the profession the character is actually practising", () => {
+    assert.equal(check({ type: "hasProfession", professionIds: ["pecheur", "forgeron"] }), true);
+    assert.equal(check({ type: "hasProfession", professionIds: ["forgeron"] }), false);
+  });
+
+  // Distinct from the older `profession` predicate: that one reads the free-text trade copied
+  // from the rolled background, this one reads the profession catalog id.
+  test("reads professionId, not the free-text profession string", () => {
+    assert.equal(check({ type: "hasProfession", professionIds: ["Pêcheur"] }), false);
+  });
+
+  test("a character practising nothing matches nothing", () => {
+    const noProfession = { ...CHARACTER, professionId: null };
+    assert.equal(
+      check({ type: "hasProfession", professionIds: ["pecheur"] }, ctx({ character: noProfession })),
+      false
+    );
+  });
+
+  test("a known-but-not-active profession does not open the action", () => {
+    const retired = { ...CHARACTER, professionId: "forgeron", knownProfessions: [{ professionId: "pecheur", level: 3 }] };
+    assert.equal(check({ type: "hasProfession", professionIds: ["pecheur"] }, ctx({ character: retired })), false);
   });
 });
 

@@ -110,6 +110,26 @@ const PREDICATES = {
     },
   },
 
+  // Matches character.professionId, the profession the character is actually practising, against
+  // the professions an action is reserved to. Deliberately absent from CONDITION_TYPES: nobody
+  // authors this row in the condition editor - the catalog injects it from the action's own
+  // professionIds whenever its kind inherits from Métier (see actionCatalog.js's
+  // resolveConditions), so "which métiers may do this" is edited in exactly one field.
+  //
+  // Distinct from the older `profession` predicate above, which matches the free-text
+  // character.profession copied from the rolled background. Both survive: that one gates on the
+  // background's trade, this one on the profession catalog.
+  //
+  // An empty professionIds fails closed like every other malformed condition: a Métier action
+  // reserved to nobody is unavailable, never universal.
+  hasProfession: {
+    reason: "Vous n'exercez pas le métier requis pour cette action.",
+    test(condition, ctx) {
+      const professionIds = requiredStringList(condition.professionIds);
+      return professionIds != null && professionIds.includes(ctx.character?.professionId);
+    },
+  },
+
   region: {
     reason: "Cette action n'est pas disponible dans votre région.",
     test(condition, ctx) {

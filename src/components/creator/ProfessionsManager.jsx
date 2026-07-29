@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, writeBatch, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { PROFESSION_ACTION_KIND_ID, actionKindInheritsFrom } from "../../lib/actionKinds";
+import { resolveKindId } from "../../lib/actionCatalog";
+import { professionRef, syncProfessionActions, unlinkDeletedProfession } from "../../lib/professionActions";
 import { matchesTalent } from "./TalentsManager";
 import { matchesActionType } from "./ActionsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
@@ -60,7 +63,10 @@ export default function ProfessionsManager() {
   const sortedTalents = [...talents].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
   const trainerTypes = useItems("trainerTypes");
   const actionTypes = useItems("actionTypes");
-  const sortedActionTypes = [...actionTypes]
+  // Only Métier actions can be attached to a profession: the link is what gates them, and an
+  // Aventure action carrying professionIds would be a link nothing reads.
+  const sortedActionTypes = actionTypes
+    .filter((a) => actionKindInheritsFrom(resolveKindId(a), PROFESSION_ACTION_KIND_ID))
     .map((a) => ({ ...a, name: a.label }))
     .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
   const selectableProfessions = professions
@@ -119,11 +125,13 @@ export default function ProfessionsManager() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const ref = editingId
-      ? doc(db, "worldData", "professions", "items", editingId)
-      : doc(collection(db, "worldData", "professions", "items"));
+    const ref = editingId ? professionRef(editingId) : doc(collection(db, "worldData", "professions", "items"));
+    const previousActionIds = editingId ? professions.find((p) => p.id === editingId)?.actionIds || [] : [];
 
-    await setDoc(ref, {
+    // Attaching an action here writes the profession onto that action too, so the pair can't
+    // disagree about which métiers may run it - see src/lib/professionActions.js.
+    const batch = writeBatch(db);
+    batch.set(ref, {
       name: form.name,
       description: form.description,
       talentIds: form.talentIds,
@@ -132,7 +140,18 @@ export default function ProfessionsManager() {
       evolutionId: form.evolutionId,
       actionIds: form.actionIds,
     });
+    syncProfessionActions(batch, ref.id, previousActionIds, form.actionIds);
+
+    await batch.commit();
     resetForm();
+  }
+
+  async function handleDelete(profession) {
+    const batch = writeBatch(db);
+    batch.delete(professionRef(profession.id));
+    unlinkDeletedProfession(batch, profession.id, actionTypes);
+    await batch.commit();
+    if (editingId === profession.id) resetForm();
   }
 
   return (
@@ -183,7 +202,7 @@ export default function ProfessionsManager() {
             <button type="button" onClick={() => startEdit(profession)}>
               Modifier
             </button>
-            <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "professions", "items", profession.id))}>
+            <button type="button" onClick={() => handleDelete(profession)}>
               Supprimer
             </button>
           </li>
@@ -244,6 +263,10 @@ export default function ProfessionsManager() {
             filterPlaceholder="Filtrer par nom ou description..."
             buttonLabel="Ajouter des actions"
           />
+          <p>
+            Seules les actions de type Métier peuvent être associées. Les ajouter ici associe aussi ce métier à
+            chacune d'elles.
+          </p>
 
           <label>
             Évolution
