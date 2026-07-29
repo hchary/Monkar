@@ -37,7 +37,7 @@ export default function CharacterTabs({ character }) {
           (character.talents?.length > 0 ? (
             <div className="talent-list">
               {character.talents.map((t, i) => (
-                <div key={i} className={`talent-card rarity-${t.rarity}`} title={talentTooltip(t)}>
+                <div key={i} className={`talent-card rarity-${t.rarity}`} data-tooltip={talentTooltip(t)}>
                   {t.name}
                   {t.trainable && "*"} {t.quality}
                 </div>

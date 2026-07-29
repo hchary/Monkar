@@ -36,7 +36,7 @@ export default function InstanceTile({ instance, object, count = 1, onSelect }) 
       <button
         type="button"
         className={`instance-card inventory-tile rarity-${object.rarity}`}
-        title={description ? `${object.name} — ${description}` : object.name}
+        data-tooltip={description ? `${object.name} — ${description}` : object.name}
         onClick={() => onSelect({ instance, object })}
       >
         <span className="inventory-tile-label">{label}</span>
