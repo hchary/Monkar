@@ -3,9 +3,10 @@ import { Navigate } from "react-router-dom";
 import useOwnCharacter from "../hooks/useOwnCharacter";
 import CharacterBanner from "../components/CharacterBanner";
 import CharacterHistoryTab from "../components/CharacterHistoryTab";
+import XerotexRecipesTab from "../components/XerotexRecipesTab";
 import EmptyState from "../components/EmptyState";
 
-const TABS = ["Savoir du monde", "Historique du personnage", "Journal des quêtes"];
+const TABS = ["Savoir du monde", "Recettes", "Historique du personnage", "Journal des quêtes"];
 
 export default function Xerotex() {
   const { character, checked } = useOwnCharacter();
@@ -30,6 +31,7 @@ export default function Xerotex() {
           {activeTab === "Savoir du monde" && (
             <EmptyState text="Section à venir — le créateur enrichira le savoir du monde ici." />
           )}
+          {activeTab === "Recettes" && <XerotexRecipesTab character={character} />}
           {activeTab === "Historique du personnage" && <CharacterHistoryTab character={character} />}
           {activeTab === "Journal des quêtes" && <EmptyState text="Section à venir." />}
         </div>

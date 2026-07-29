@@ -40,20 +40,22 @@ function MultiSelectField({ legend, options, selectedIds, onToggle }) {
   );
 }
 
-function tagNames(ids, tags) {
+// Shared with XerotexRecipesTab.jsx, which reuses the same sort/label logic for the
+// player-facing "known recipes" read-only list.
+export function tagNames(ids, tags) {
   return (ids || [])
     .map((id) => tags.find((t) => t.id === id)?.name || id)
     .sort((a, b) => a.localeCompare(b, "fr"));
 }
 
-function objectEntryLabel(entries, objects) {
+export function objectEntryLabel(entries, objects) {
   return (entries || []).map((entry) => {
     const name = objects.find((o) => o.id === entry.objectId)?.name || entry.objectId;
     return `${entry.qty}x ${name}`;
   });
 }
 
-const SORT_FIELDS = [
+export const SORT_FIELDS = [
   { value: "name", label: "Nom" },
   { value: "rarity", label: "Rareté" },
   { value: "category", label: "Catégorie" },
@@ -62,7 +64,7 @@ const SORT_FIELDS = [
   { value: "results", label: "Résultats" },
 ];
 
-function compareRecettes(a, b, sortBy, tags) {
+export function compareRecettes(a, b, sortBy, tags) {
   switch (sortBy) {
     case "rarity": {
       const ai = RARITIES.findIndex((r) => r.value === (a.rarity || "commun"));
