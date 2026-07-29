@@ -79,6 +79,41 @@ a:hover {
   color: #d33;
 }
 
+/* Global tooltip: give any element a `data-tooltip="..."` attribute to get a custom tooltip
+   instead of the browser's native `title` (which has a built-in show delay and can't be styled).
+   Appears instantly on hover/focus, styled like the rest of the UI (pixel-framed panel). */
+[data-tooltip]:not([data-tooltip=""]) {
+  position: relative;
+}
+
+[data-tooltip]:not([data-tooltip=""])::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  clip-path: var(--pixel-frame);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85em;
+  line-height: 1.4;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 30;
+}
+
+[data-tooltip]:not([data-tooltip=""]):hover::after,
+[data-tooltip]:not([data-tooltip=""]):focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+}
+
 .result {
   margin-top: 16px;
   padding: 12px;

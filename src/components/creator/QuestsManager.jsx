@@ -67,7 +67,7 @@ function MultiSelectField({ legend, options, selectedIds, onToggle, createLink, 
       </legend>
       {options.length === 0 && <p>Aucun élément créé pour l'instant.</p>}
       {options.map((option) => (
-        <label key={option.id} title={getTooltip ? getTooltip(option) : undefined}>
+        <label key={option.id} data-tooltip={getTooltip ? getTooltip(option) : undefined}>
           <input type="checkbox" checked={selectedIds.includes(option.id)} onChange={() => onToggle(option.id)} />
           {option.name}
         </label>

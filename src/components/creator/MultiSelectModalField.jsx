@@ -70,7 +70,7 @@ export default function MultiSelectModalField({
           <ul className="modal-select-list">
             {filteredOptions.length === 0 && <li className="empty-state">Aucun élément.</li>}
             {filteredOptions.map((option) => (
-              <li key={option.id} title={getTooltip ? getTooltip(option) : undefined}>
+              <li key={option.id} data-tooltip={getTooltip ? getTooltip(option) : undefined}>
                 <label>
                   <input
                     type="checkbox"
