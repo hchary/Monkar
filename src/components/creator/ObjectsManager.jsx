@@ -1,6 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { collection, doc, deleteDoc, setDoc, onSnapshot, getDocs, query, where, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  deleteDoc,
+  setDoc,
+  writeBatch,
+  onSnapshot,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { RARITIES } from "./TalentsManager";
 import { matchesTag } from "./TagsManager";
@@ -33,6 +44,15 @@ export function matchesObject(option, query) {
   );
 }
 
+function lowerFirst(str) {
+  return str ? str.charAt(0).toLowerCase() + str.slice(1) : str;
+}
+
+function buildGeneratedName(baseName, prefix, suffix) {
+  const name = prefix ? lowerFirst(baseName) : baseName;
+  return `${prefix}${name}${suffix}`;
+}
+
 function useItems(collectionName) {
   const [items, setItems] = useState([]);
   useEffect(() => {
@@ -60,6 +80,7 @@ function MultiSelectField({ legend, options, selectedIds, onToggle }) {
 
 const emptyFilters = { rarities: [], types: [], tagIds: [], text: "" };
 const emptyForm = { name: "", description: "", rarity: "commun", type: OBJECT_TYPES[0].value, tagIds: [] };
+const emptyGenerateForm = { tagIds: [], prefix: "", suffix: "", rarity: "commun" };
 
 export default function ObjectsManager() {
   const [objects, setObjects] = useState([]);
@@ -68,6 +89,8 @@ export default function ObjectsManager() {
   const [filters, setFilters] = useState(emptyFilters);
   const [panelOpen, setPanelOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [generateForm, setGenerateForm] = useState(emptyGenerateForm);
+  const generateDialogRef = useRef(null);
 
   const tags = useItems("tags");
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
@@ -123,6 +146,41 @@ export default function ObjectsManager() {
       ...prev,
       tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
     }));
+  }
+
+  function openGenerateDialog() {
+    setGenerateForm(emptyGenerateForm);
+    generateDialogRef.current?.showModal();
+  }
+
+  function closeGenerateDialog() {
+    generateDialogRef.current?.close();
+  }
+
+  function toggleGenerateTag(id) {
+    setGenerateForm((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
+    }));
+  }
+
+  async function handleGenerateSubmit(e) {
+    e.preventDefault();
+    if (!generateForm.prefix.trim() && !generateForm.suffix.trim()) return;
+
+    const batch = writeBatch(db);
+    for (const object of filteredObjects) {
+      const ref = doc(collection(db, "worldData", "objects", "items"));
+      batch.set(ref, {
+        name: buildGeneratedName(object.name || "", generateForm.prefix, generateForm.suffix),
+        description: "",
+        rarity: generateForm.rarity,
+        type: object.type,
+        tagIds: Array.from(new Set([...(object.tagIds || []), ...generateForm.tagIds])),
+      });
+    }
+    await batch.commit();
+    closeGenerateDialog();
   }
 
   function startEdit(object) {
@@ -221,6 +279,9 @@ export default function ObjectsManager() {
         <button type="button" onClick={() => setFilters(emptyFilters)}>
           Réinitialiser les filtres
         </button>
+        <button type="button" onClick={openGenerateDialog}>
+          Générer nouveaux objets
+        </button>
       </fieldset>
 
       <ul className="creator-list">
@@ -302,6 +363,60 @@ export default function ObjectsManager() {
           </div>
         </form>
       </details>
+
+      <dialog
+        ref={generateDialogRef}
+        className="generate-objects-dialog"
+        onClick={(e) => {
+          if (e.target === generateDialogRef.current) closeGenerateDialog();
+        }}
+      >
+        <form className="generate-objects-content" onSubmit={handleGenerateSubmit}>
+          <h4>Génération d'objet</h4>
+          <p>{filteredObjects.length} objet(s) sélectionné(s) par les filtres.</p>
+
+          <input
+            placeholder="Préfixe"
+            value={generateForm.prefix}
+            onChange={(e) => setGenerateForm({ ...generateForm, prefix: e.target.value })}
+          />
+          <input
+            placeholder="Suffixe"
+            value={generateForm.suffix}
+            onChange={(e) => setGenerateForm({ ...generateForm, suffix: e.target.value })}
+          />
+
+          <label>
+            Rareté
+            <select
+              value={generateForm.rarity}
+              onChange={(e) => setGenerateForm({ ...generateForm, rarity: e.target.value })}
+            >
+              {RARITIES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <MultiSelectField
+            legend="Tags à ajouter"
+            options={sortedTags}
+            selectedIds={generateForm.tagIds}
+            onToggle={toggleGenerateTag}
+          />
+
+          <div className="generate-objects-actions">
+            <button type="submit" disabled={!generateForm.prefix.trim() && !generateForm.suffix.trim()}>
+              Confirmer
+            </button>
+            <button type="button" onClick={closeGenerateDialog}>
+              Annuler
+            </button>
+          </div>
+        </form>
+      </dialog>
     </div>
   );
 }

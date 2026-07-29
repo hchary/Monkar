@@ -886,6 +886,38 @@ fieldset label {
   gap: 8px;
 }
 
+.generate-objects-dialog {
+  width: min(480px, 90vw);
+  max-height: 80vh;
+  padding: 0;
+  border: 1px solid var(--border);
+  clip-path: var(--pixel-frame);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.generate-objects-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.generate-objects-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.generate-objects-content h4 {
+  margin: 0;
+}
+
+.generate-objects-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .loot-table-item {
   display: flex;
   align-items: center;
