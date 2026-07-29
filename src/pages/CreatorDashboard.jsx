@@ -16,6 +16,7 @@ import ObjectsManager from "../components/creator/ObjectsManager";
 import ProfessionsManager from "../components/creator/ProfessionsManager";
 import TablesDeTirageManager from "../components/creator/TablesDeTirageManager";
 import ActionsManager from "../components/creator/ActionsManager";
+import RecettesManager from "../components/creator/RecettesManager";
 
 const DEFAULT_SECTION = "Régions";
 
@@ -40,6 +41,7 @@ const GROUPS = [
     name: "Actions",
     tabs: {
       Actions: ActionsManager,
+      Recettes: RecettesManager,
     },
   },
   {

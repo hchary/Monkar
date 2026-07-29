@@ -158,6 +158,23 @@ export default function ObjectsManager() {
         updateDoc(tableDoc.ref, { itemIds: (tableDoc.data().itemIds || []).filter((id) => id !== objectId) })
       )
     );
+    // Ingredients/results are arrays of {objectId, qty} maps, so array-contains can't target
+    // them directly — fetch every recette and filter client-side instead.
+    const allRecettes = await getDocs(collection(db, "worldData", "recettes", "items"));
+    await Promise.all(
+      allRecettes.docs
+        .filter(
+          (recetteDoc) =>
+            (recetteDoc.data().ingredients || []).some((e) => e.objectId === objectId) ||
+            (recetteDoc.data().results || []).some((e) => e.objectId === objectId)
+        )
+        .map((recetteDoc) =>
+          updateDoc(recetteDoc.ref, {
+            ingredients: (recetteDoc.data().ingredients || []).filter((e) => e.objectId !== objectId),
+            results: (recetteDoc.data().results || []).filter((e) => e.objectId !== objectId),
+          })
+        )
+    );
     await deleteDoc(doc(db, "worldData", "objects", "items", objectId));
   }
 

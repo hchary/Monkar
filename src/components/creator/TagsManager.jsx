@@ -69,6 +69,12 @@ export default function TagsManager() {
     const referencingTalents = await getDocs(
       query(collection(db, "worldData", "talents", "items"), where("tagIds", "array-contains", selectedTag.id))
     );
+    const referencingRecettesByTag = await getDocs(
+      query(collection(db, "worldData", "recettes", "items"), where("tagIds", "array-contains", selectedTag.id))
+    );
+    const referencingRecettesByCategory = await getDocs(
+      query(collection(db, "worldData", "recettes", "items"), where("categoryIds", "array-contains", selectedTag.id))
+    );
     await Promise.all([
       ...referencingQuests.docs.map((questDoc) =>
         updateDoc(questDoc.ref, { tagIds: (questDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
@@ -84,6 +90,14 @@ export default function TagsManager() {
       ),
       ...referencingTalents.docs.map((talentDoc) =>
         updateDoc(talentDoc.ref, { tagIds: (talentDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
+      ),
+      ...referencingRecettesByTag.docs.map((recetteDoc) =>
+        updateDoc(recetteDoc.ref, { tagIds: (recetteDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
+      ),
+      ...referencingRecettesByCategory.docs.map((recetteDoc) =>
+        updateDoc(recetteDoc.ref, {
+          categoryIds: (recetteDoc.data().categoryIds || []).filter((id) => id !== selectedTag.id),
+        })
       ),
     ]);
     await deleteDoc(doc(db, "worldData", "tags", "items", selectedTag.id));

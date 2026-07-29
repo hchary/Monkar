@@ -653,6 +653,33 @@ fieldset label {
   font-size: 0.85em;
 }
 
+.quantity-select-chips {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quantity-select-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 6px 2px 10px;
+  font-size: 0.85em;
+}
+
+.quantity-select-chip input[type="number"] {
+  width: 3.5em;
+}
+
+.quantity-select-chip button {
+  padding: 0 6px;
+}
+
 .modal-select-dialog {
   width: min(480px, 90vw);
   max-height: 80vh;
