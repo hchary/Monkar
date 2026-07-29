@@ -84,20 +84,19 @@ describe("applyTierEffects", () => {
     });
   });
 
-  test("a wound tier records the wound and grants nothing", () => {
-    const consequence = { type: "wound", name: "Côte fêlée", description: "Un coup de massue" };
+  test("a wound tier increments the matching counter and grants nothing", () => {
+    const consequence = { type: "wound", severity: "severe", name: "Côte fêlée", description: "Un coup de massue" };
 
     const updates = applyTierEffects({
       tier: { name: "Défaite", success: false, goldGain: 10, reputationGain: 2, consequence },
       today: TODAY,
       actionTypeId: "partir-en-quete",
+      character: { woundsLight: 1, woundsSevere: 0, woundsPermanent: 0 },
     });
 
-    assert.deepStrictEqual(updates.wounds, FieldValue.arrayUnion({
-      name: "Côte fêlée",
-      description: "Un coup de massue",
-      date: TODAY,
-    }));
+    assert.equal(updates.woundsLight, 1);
+    assert.equal(updates.woundsSevere, 1);
+    assert.equal(updates.woundsPermanent, 0);
     assert.equal(updates.lastAction.success, false);
     assert.deepStrictEqual(updates.lastAction.consequence, consequence);
     // The tier's gains are still reported in lastAction, but never applied on a failure.
@@ -107,21 +106,35 @@ describe("applyTierEffects", () => {
     assert.equal("alive" in updates, false);
   });
 
-  test("a wound with no name or description falls back to the tier name and an empty string", () => {
+  test("a wound with no severity defaults to light", () => {
     const updates = applyTierEffects({
       tier: { name: "Embuscade", success: false, consequence: { type: "wound" } },
       today: TODAY,
       actionTypeId: "partir-en-quete",
+      character: {},
     });
 
-    assert.deepStrictEqual(updates.wounds, FieldValue.arrayUnion({
-      name: "Embuscade",
-      description: "",
-      date: TODAY,
-    }));
+    assert.equal(updates.woundsLight, 1);
+    assert.equal(updates.woundsSevere, 0);
+    assert.equal(updates.woundsPermanent, 0);
   });
 
-  test("a death tier kills the character and records no wound", () => {
+  test("a wound that escalates past 3 permanent wounds kills the character and flags the consequence fatal", () => {
+    const consequence = { type: "wound", severity: "severe", name: "Coup fatal", description: "Une lame profonde" };
+
+    const updates = applyTierEffects({
+      tier: { name: "Défaite", success: false, consequence },
+      today: TODAY,
+      actionTypeId: "partir-en-quete",
+      character: { woundsLight: 0, woundsSevere: 0, woundsPermanent: 3 },
+    });
+
+    assert.equal(updates.alive, false);
+    assert.equal(updates.woundsPermanent, 3);
+    assert.deepStrictEqual(updates.lastAction.consequence, { ...consequence, fatal: true });
+  });
+
+  test("a death tier kills the character and touches no wound counter", () => {
     const updates = applyTierEffects({
       tier: {
         name: "Mort",
@@ -133,7 +146,9 @@ describe("applyTierEffects", () => {
     });
 
     assert.equal(updates.alive, false);
-    assert.equal("wounds" in updates, false);
+    assert.equal("woundsLight" in updates, false);
+    assert.equal("woundsSevere" in updates, false);
+    assert.equal("woundsPermanent" in updates, false);
   });
 
   test("lastActionExtra is merged into lastAction, leaving the shared fields intact", () => {
@@ -186,12 +201,14 @@ describe("genericResolve", () => {
       tiers: [{ name: "Échec", weight: 1, success: false, consequence: { type: "wound", name: "Foulure" } }],
     };
 
-    const { updates, logFields } = genericResolve({ actionType, actionTypeId: "se-reposer", today: TODAY });
+    const { updates, logFields } = genericResolve({
+      actionType,
+      actionTypeId: "se-reposer",
+      today: TODAY,
+      character: {},
+    });
 
-    assert.deepStrictEqual(
-      updates.wounds,
-      FieldValue.arrayUnion({ name: "Foulure", description: "", date: TODAY })
-    );
+    assert.equal(updates.woundsLight, 1);
     assert.equal(logFields.success, false);
     assert.deepStrictEqual(logFields.consequence, { type: "wound", name: "Foulure" });
   });

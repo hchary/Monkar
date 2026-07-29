@@ -204,6 +204,7 @@ async function resolve({ tx, db, character, actionType, today, context }) {
     tier,
     today,
     actionTypeId: ACTION_TYPE_ID,
+    character,
     narrativeText,
     talentGained,
     lastActionExtra: {
@@ -229,7 +230,7 @@ async function resolve({ tx, db, character, actionType, today, context }) {
     tierName: tier.name,
     success,
     narrativeText,
-    consequence: tier.consequence || null,
+    consequence: updates.lastAction.consequence,
     quest: questSummary,
   };
 

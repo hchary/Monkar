@@ -2,6 +2,7 @@ const { FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { rollWeighted } = require("./rolls");
 const { HOUR_MS } = require("./actionLifecycle");
 const { resolveDurationHours } = require("./actionCatalog");
+const { applyWound } = require("./wounds");
 
 // A tier is a success unless it explicitly says otherwise - the same rule every action
 // applies, kept in one place so the generic path and per-action handlers can't drift apart.
@@ -11,37 +12,29 @@ function isSuccess(tier) {
 
 // Builds the `characters/{id}` patch a rolled tier implies: the `lastAction` record, plus the
 // stat mutations that follow from it (gold/inventory/talents/reputation/legendLevel on success,
-// alive/wounds on failure). Handler-specific `lastAction` fields - a quest summary, drawn
+// alive/wound counters on failure). Handler-specific `lastAction` fields - a quest summary, drawn
 // loot... - are merged in through `lastActionExtra` rather than being special-cased here, so an
 // action with no handler of its own can reuse this untouched (see
 // docs/ISSUE-02-ACTION-FRAMEWORK.md).
+//
+// `character` is the fresh in-transaction read: a wound consequence needs the character's current
+// wound counters to decide whether it escalates to a worse severity or kills them outright (see
+// wounds.js), which a plain FieldValue.increment can't express.
 function applyTierEffects({
   tier,
   today,
   actionTypeId,
+  character,
   narrativeText = "",
   talentGained = null,
   lastActionExtra,
 }) {
   const success = isSuccess(tier);
+  let consequence = tier.consequence || null;
 
   const updates = {
     lastActionDate: today,
     lastActionAt: FieldValue.serverTimestamp(),
-    lastAction: {
-      actionTypeId,
-      date: today,
-      tierName: tier.name,
-      success,
-      narrativeText,
-      goldGain: tier.goldGain || 0,
-      itemGain: tier.itemGain || null,
-      talentGain: talentGained,
-      reputationGain: tier.reputationGain || 0,
-      legendary: !!tier.legendary,
-      consequence: tier.consequence || null,
-      ...lastActionExtra,
-    },
   };
 
   if (success) {
@@ -53,12 +46,31 @@ function applyTierEffects({
   } else if (tier.consequence?.type === "death") {
     updates.alive = false;
   } else if (tier.consequence?.type === "wound") {
-    updates.wounds = FieldValue.arrayUnion({
-      name: tier.consequence.name || tier.name,
-      description: tier.consequence.description || "",
-      date: today,
-    });
+    const severity = tier.consequence.severity || "light";
+    const result = applyWound(character, severity);
+    updates.woundsLight = result.woundsLight;
+    updates.woundsSevere = result.woundsSevere;
+    updates.woundsPermanent = result.woundsPermanent;
+    if (result.died) {
+      updates.alive = false;
+      consequence = { ...tier.consequence, fatal: true };
+    }
   }
+
+  updates.lastAction = {
+    actionTypeId,
+    date: today,
+    tierName: tier.name,
+    success,
+    narrativeText,
+    goldGain: tier.goldGain || 0,
+    itemGain: tier.itemGain || null,
+    talentGain: talentGained,
+    reputationGain: tier.reputationGain || 0,
+    legendary: !!tier.legendary,
+    consequence,
+    ...lastActionExtra,
+  };
 
   return updates;
 }
@@ -68,11 +80,11 @@ function applyTierEffects({
 // narrativeText used verbatim. This is what makes "add an action" mostly a content-authoring
 // task (docs/ISSUE-02-ACTION-FRAMEWORK.md Phase 3) - a handler exists only for mechanics this
 // can't express, such as drawing a quest or generating narrative text from a pool.
-function genericResolve({ actionType, actionTypeId, today }) {
+function genericResolve({ actionType, actionTypeId, today, character }) {
   const tier = rollWeighted(actionType.tiers);
   const narrativeText = tier.narrativeText || "";
 
-  const updates = applyTierEffects({ tier, today, actionTypeId, narrativeText });
+  const updates = applyTierEffects({ tier, today, actionTypeId, character, narrativeText });
 
   return {
     updates,
@@ -80,7 +92,7 @@ function genericResolve({ actionType, actionTypeId, today }) {
       tierName: tier.name,
       success: isSuccess(tier),
       narrativeText,
-      consequence: tier.consequence || null,
+      consequence: updates.lastAction.consequence,
     },
   };
 }

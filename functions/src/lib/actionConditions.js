@@ -151,7 +151,10 @@ const PREDICATES = {
   notWounded: {
     reason: "Vous êtes trop blessé pour cela.",
     test(condition, ctx) {
-      return (ctx.character?.wounds || []).length === 0;
+      const character = ctx.character;
+      return (
+        (character?.woundsLight || 0) + (character?.woundsSevere || 0) + (character?.woundsPermanent || 0) === 0
+      );
     },
   },
 };

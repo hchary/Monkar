@@ -71,7 +71,12 @@ async function seed() {
         weight: 20,
         success: false,
         narrativeText: "La quête tourne court, tu rentres blessé.",
-        consequence: { type: "wound", name: "Jambe foulée", description: "Une chute t'a laissé une entorse." },
+        consequence: {
+          type: "wound",
+          severity: "light",
+          name: "Jambe foulée",
+          description: "Une chute t'a laissé une entorse.",
+        },
       },
       {
         name: "Réussite",

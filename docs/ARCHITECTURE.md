@@ -51,7 +51,12 @@ characters/{characterId}
                                     -- copy taken at grant time, same convention as `background` above
   blessings: [string]              -- not yet granted by any code path (stub)
   curses: [string]                 -- not yet granted by any code path (stub)
-  wounds: [{ name, description, date }]
+  woundsLight: number         -- "blessures légères"; attributing a 4th escalates to woundsSevere instead
+  woundsSevere: number        -- "blessures graves"; attributing a 4th escalates to woundsPermanent instead
+  woundsPermanent: number     -- "blessures permanentes"; attributing a severe/permanent wound while
+                                  already at 3 kills the character (alive: false) instead of incrementing
+                                  further - see functions/src/lib/wounds.js. Shown in the character's
+                                  "Santé" tab (CharacterTabs.jsx).
   knownRecipes: [string]           -- worldData/recettes/items ids; shown read-only in the Xerotex
                                     -- page's "Recettes" tab (XerotexRecipesTab.jsx), and gates which
                                     -- recettes an Artisanat action's crafting tab offers
@@ -66,7 +71,10 @@ actionsLog/{logId}                 -- permanent history, independent of lastActi
   characterId, ownerUid, actionTypeId, date
   tierName: string, success: boolean
   narrativeText: string
-  consequence: { type: "wound" | "death", name?, description } | null
+  consequence: { type: "wound" | "death", name?, description, severity?, fatal? } | null
+                                    -- fatal: true when a "wound" consequence escalated into death
+                                    -- (see functions/src/lib/wounds.js), distinct from a tier
+                                    -- authored with consequence.type "death" directly
   quest: { id, name, difficulty, locationId, locationName } | undefined  -- "partir-en-quete" only, see below
   createdAt: server timestamp
 
@@ -82,7 +90,9 @@ worldData/actionTypes/items/{id}
                                                        -- circumstance is French narrative text (see Talents below)
     reputationGain: number,               -- success only
     legendary: boolean,                   -- success only, bumps legendLevel
-    consequence: { type: "wound"|"death", name?, description }  -- failure only
+    consequence: { type: "wound"|"death", name?, description, severity? }  -- failure only;
+                                           severity: "light"|"severe"|"permanent" (wound only,
+                                           defaults to "light") - see functions/src/lib/wounds.js
   }]
   -- weight is a relative weight; the acting handler sums all tiers' weights and rolls against that total
   questDifficultyWeights: [{ difficulty, weight }]  -- "partir-en-quete" only, optional; defaults to
@@ -225,7 +235,7 @@ Region is a player *choice*; background is *rolled* server-side specifically so 
 `performAction` (`functions/src/index.js`) is a thin dispatcher, not a monolithic roller — each `actionTypeId` has its own handler module under `functions/src/actions/` (today: `partirEnQuete.js`; future actions like marchander/s'entraîner/voyager/explorer/travailler get their own module rather than being squeezed into one generic tier-roller, since their mechanics have little in common). A handler exports:
 
 - `prepare({ db, character, actionType })` — async, runs **before** the transaction. Does any read-only setup specific to that action (e.g. drawing a quest, see below) and can `throw HttpsError` for a precondition that should block the action *without* consuming the daily lock (nothing has been written yet at this point).
-- `resolve({ tx, db, character, actionType, today, context })` — runs **inside** the transaction, after the once-per-day lock re-check. Returns `{ updates, logFields }`: `updates` is the full `characters/{id}` patch (`lastActionDate`, `lastActionAt`, `lastAction`, plus whatever gold/inventory/talents/reputation/legendLevel/alive/wounds changes apply), `logFields` is the handler-specific subset merged into the `actionsLog` entry (the dispatcher adds the common `characterId`/`ownerUid`/`actionTypeId`/`date`/`createdAt` fields itself).
+- `resolve({ tx, db, character, actionType, today, context })` — runs **inside** the transaction, after the once-per-day lock re-check. Returns `{ updates, logFields }`: `updates` is the full `characters/{id}` patch (`lastActionDate`, `lastActionAt`, `lastAction`, plus whatever gold/inventory/talents/reputation/legendLevel/alive/wound counter changes apply), `logFields` is the handler-specific subset merged into the `actionsLog` entry (the dispatcher adds the common `characterId`/`ownerUid`/`actionTypeId`/`date`/`createdAt` fields itself).
 
 Given an `actionTypeId`, `performAction`:
 1. Rejects if the caller isn't authenticated, has no character with `alive == true`, or `actionTypeId` has no registered handler.

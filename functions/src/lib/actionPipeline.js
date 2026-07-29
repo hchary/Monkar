@@ -75,7 +75,7 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
           context,
           payload,
         })
-      : genericResolve({ actionType, actionTypeId, today });
+      : genericResolve({ actionType, actionTypeId, today, character: freshCharacter });
 
     tx.update(characterRef, stampLifecycle(updates, { actionType, now }));
 
