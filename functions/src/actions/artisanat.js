@@ -93,7 +93,7 @@ async function resolve({ tx, db, characterRef, actionTypeId, today, context }) {
         actionTypeId,
         date: today,
         success: true,
-        narrativeText: "",
+        narrativeText: "Vous reposez vos outils et contemplez votre oeuvre.",
         recetteId: recette.id,
         recetteName: recette.name,
         craftResults: results,
