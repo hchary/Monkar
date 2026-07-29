@@ -2,6 +2,7 @@ const { HttpsError } = require("firebase-functions/v2/https");
 const { rollWeighted, rarityFloor } = require("../lib/rolls");
 const { applyTierEffects, isSuccess } = require("../lib/actionEffects");
 const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
+const { rollTalentEvolutions } = require("../lib/talentEvolution");
 const { generateResultText } = require("../textGeneration");
 
 const ACTION_TYPE_ID = "partir-en-quete";
@@ -65,18 +66,20 @@ async function prepare({ db, character, actionType }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap] = await Promise.all([
+  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
     db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
     db.collection("worldData").doc("verbPhrases").collection("items").get(),
     db.collection("worldData").doc("lootTables").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
+    db.collection("worldData").doc("talents").collection("items").get(),
   ]);
   const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects };
+  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
 }
 
 // Draws the quest's loot: one loot table per item, picked among those sharing at least one
@@ -116,7 +119,7 @@ function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects
 }
 
 async function resolve({ tx, db, character, actionType, today, context }) {
-  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects } = context;
+  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
 
   const tier = rollWeighted(actionType.tiers);
   const success = isSuccess(tier);
@@ -173,6 +176,22 @@ async function resolve({ tx, db, character, actionType, today, context }) {
       })
     : [];
 
+  // Each success has a chance to evolve or unlock a talent sharing a tag with the quest, gated
+  // on a single objective drawn for this occurrence (same draw mechanism as loot's per-item
+  // objective, but rolled once for the whole talent pass rather than per talent) - see
+  // docs/TODO.md "Amélioration de talent".
+  const { talents: nextTalents, evolutions: talentEvolutions } = success
+    ? rollTalentEvolutions({
+        characterTalents: character.talents || [],
+        catalogTalents: talents,
+        quest,
+        objective: pickRandomLoot(questObjectives),
+        difficulty: quest.difficulty,
+        today,
+        circumstance: `lors de la quête « ${quest.name} »`,
+      })
+    : { talents: character.talents || [], evolutions: [] };
+
   const questSummary = {
     id: quest.id,
     name: quest.name,
@@ -190,11 +209,21 @@ async function resolve({ tx, db, character, actionType, today, context }) {
     lastActionExtra: {
       quest: questSummary,
       loot,
+      talentEvolutions,
       // A quest colors its own frame and countdown by the difficulty that was actually rolled,
       // rather than falling back to the action's category color.
       accent: quest.difficulty ? { kind: "difficulty", value: quest.difficulty } : null,
     },
   });
+
+  // applyTierEffects only knows how to arrayUnion a single freshly-granted talent; the evolution
+  // pass above may also bump an existing entry's quality in place or append an unlocked one, which
+  // arrayUnion can't express. Overwrite with the fully merged array whenever either mechanic fired.
+  if (talentGained || talentEvolutions.length > 0) {
+    updates.talents = talentGained && !nextTalents.some((t) => t.id === talentGained.id)
+      ? [...nextTalents, talentGained]
+      : nextTalents;
+  }
 
   const logFields = {
     tierName: tier.name,

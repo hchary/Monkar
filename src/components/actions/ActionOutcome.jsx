@@ -8,6 +8,9 @@ export default function ActionOutcome({ lastAction, showLoot }) {
   const sortedLoot = [...(lastAction.loot || [])].sort(
     (a, b) => RARITIES.findIndex((r) => r.value === b.rarity) - RARITIES.findIndex((r) => r.value === a.rarity)
   );
+  const sortedTalentEvolutions = [...(lastAction.talentEvolutions || [])].sort(
+    (a, b) => RARITIES.findIndex((r) => r.value === b.rarity) - RARITIES.findIndex((r) => r.value === a.rarity)
+  );
 
   return (
     <>
@@ -53,6 +56,20 @@ export default function ActionOutcome({ lastAction, showLoot }) {
             {sortedLoot.map((item, index) => (
               <li key={index} className={`instance-card rarity-${item.rarity}`}>
                 {item.name}
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
+
+      {sortedTalentEvolutions.length > 0 && (
+        <fieldset className="action-loot-box">
+          <legend>Amélioration de talent</legend>
+          <ul className="instance-list">
+            {sortedTalentEvolutions.map((t, index) => (
+              <li key={index} className={`talent-card rarity-${t.rarity}`}>
+                {t.kind === "unlock" ? "Nouveau : " : ""}
+                {t.name} {t.quality}
               </li>
             ))}
           </ul>

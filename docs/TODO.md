@@ -4,7 +4,7 @@ Design notes for features that aren't implemented yet. Not a task tracker for in
 
 ## Expanded talent system
 
-Status: **implemented** (data model, catalog, grant flow, and UI). Quality-up progression is **not** implemented yet — see "Still open" below and [Trainers](#trainers).
+Status: **implemented** (data model, catalog, grant flow, and UI). Quality-up progression via a lucky quest roll is now implemented — see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success). The training-driven path is still **not** implemented — see [Trainers](#trainers).
 
 `character.talents` moved from a flat array of strings to an array of richer objects, granted via `tier.talentGain` in `performAction`. Talents support:
 
@@ -52,11 +52,34 @@ talentGain: {
 ```
 
 **Still open (deliberately deferred)**:
-- How a quest tier signals it's "relevant" to a given talent, for a random quality-up roll on quest success. Not implemented — for now, quality never changes after grant.
 - The training-driven quality-up mechanic (via a "s'entraîner" action) — deferred entirely until the trainer system itself is designed, see [Trainers](#trainers) below.
-- **Decided for whenever either path above ships**: each trigger bumps quality by a flat **+1** (no variable amounts).
 
-Known gap: granting the same talent to a character more than once (e.g. via two different tiers) currently appends a duplicate entry to `character.talents` rather than merging/bumping quality — acceptable for now since there's no quality-up path yet either.
+The quest-luck quality-up path (tag + rarity based, no per-tier signal needed) is now implemented — see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success). As previously decided, it bumps quality by a flat **+1** per trigger.
+
+Known gap: granting the same talent via `tier.talentGain` more than once (e.g. via two different tiers) still appends a duplicate entry to `character.talents` rather than merging/bumping quality. The quest-luck evolution path itself doesn't have this gap (it updates the existing entry in place, or skips unlocking an id the character already owns).
+
+## Talent evolution and unlock on quest success
+
+Status: **implemented**.
+
+A successful quest ("Partir en quête") has a chance to evolve an owned talent or unlock a new one, for every talent sharing at least one tag with the quest or with a quest objective drawn (once per resolution, the same random-pick mechanism used for loot) for that occurrence:
+
+- **Eligible talents**: the union of `character.talents` (evolution candidates) and every `worldData/talents/items` catalog entry the character doesn't own yet (unlock candidates), filtered down to those sharing a `tagIds` entry with `quest.tagIds` or the drawn objective's `tagIds`.
+- **Rank**: a talent's "rank" is simply its own `rarity`, read as a 1-indexed position in the shared 8-tier scale (commun=1 .. unique=8) — the same field already used everywhere else, no new field introduced.
+- **Rank gate**: evolution requires the objective's rarity to be **greater than or equal to** the talent's current rank; unlocking a not-yet-owned talent requires it to be **strictly greater** — a talent can never be unlocked by an objective merely as rare as it.
+- **Chance formula**: `5% + 10% × quest difficulty level − 5% × talent rank level`, both levels 1-indexed on their own scale (difficulty: facile=1 .. mythique=6, positionally aligned with rarity per [Quest difficulty](#quest-difficulty)), clamped to [0%, 100%]. Example: a "difficile" (level 3) quest evolves a "commun" (level 1) talent at 30%. Each eligible talent is rolled independently.
+- **On success**:
+  - Evolution: quality +1, capped at 5 (the flat **+1** per trigger already decided in [Expanded talent system](#expanded-talent-system)), then `rarityFloor` is re-applied so rarity only ever rises with it, never drops.
+  - Unlock: the talent is granted at quality 1, rarity = its catalog `rarity` (through the same `rarityFloor`, for consistency).
+  - Both stamp `lastChangeDate`/`lastChangeCircumstance` (`"lors de la quête « {quest.name} »"`), exactly like any other talent change.
+- Only rolled when the quest tier succeeds; nothing happens on a failure, and a quest with no objectives (or none drawn) is skipped entirely.
+- Applied immediately in `resolve()` — like `tier.talentGain` — not deferred to `acknowledgeAction` the way loot is, since there's no equivalent "claim" step for a talent change.
+
+Implemented in `functions/src/lib/talentEvolution.js` (`rollTalentEvolutions`/`evolutionChance`), called from `functions/src/actions/partirEnQuete.js`'s `resolve()`, which also now fetches the full talent catalog in `prepare()`.
+
+**Interaction**: results appear in the end-of-quest pop-up (`ActionOutcome.jsx`), in a `fieldset` below "Butin obtenu" ("Amélioration de talent"), one chip per talent styled like the existing talent tab (`talent-card rarity-{rarity}`), prefixed "Nouveau : " for an unlock.
+
+**Dependencies**: the 8-tier rarity scale and `rarityFloor` ([Expanded talent system](#expanded-talent-system)), the quest difficulty scale ([Quest difficulty](#quest-difficulty)), and quest/objective `tagIds` (same tag-union pattern as [Quest loot draw](#quest-loot-draw)). Independent from the ancestor/descendant talent graph — see [Talent relations](#talent-relations) below, whose own unlock mechanic remains a separate, still-undesigned feature.
 
 ## Talent relations
 
