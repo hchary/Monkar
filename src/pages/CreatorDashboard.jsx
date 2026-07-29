@@ -13,6 +13,7 @@ import TextGenerationManager from "../components/creator/TextGenerationManager";
 import TagsManager from "../components/creator/TagsManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 import ObjectsManager from "../components/creator/ObjectsManager";
+import ProfessionsManager from "../components/creator/ProfessionsManager";
 import TablesDeTirageManager from "../components/creator/TablesDeTirageManager";
 import ActionsManager from "../components/creator/ActionsManager";
 
@@ -61,6 +62,7 @@ const GROUPS = [
       Personnages: CharactersOverview,
       Origines: OriginsManager,
       Talents: TalentsManager,
+      Métiers: ProfessionsManager,
       Objets: ObjectsManager,
       "Tables de tirage": TablesDeTirageManager,
     },

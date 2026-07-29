@@ -476,3 +476,51 @@ Not implemented yet, deliberately deferred as independent from and not a prerequ
 [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)'s grammar engine (see that doc's
 Non-goals section) — the tag vocabulary bridge meets the grammar engine's immediate need without
 this migration.
+
+## Profession (métier) creation
+
+Status: **implemented** (catalog and creator UI). `worldData/professions/items` via
+`ProfessionsManager.jsx`, registered as the "Métiers" tab in `CreatorDashboard.jsx`, under the
+"Personnages" group alongside Talents and Objets.
+
+A profession is characterized by:
+
+- **Name**.
+- **Description**.
+- **Talents**: multi-select against `worldData/talents/items`, same `MultiSelectModalField` +
+  `matchesTalent` mechanism already used by `TalentsManager.jsx`'s own ancestor/descendant
+  pickers.
+- **Base income**: a positive integer.
+- **Reputation condition**: a minimum reputation value required, mirroring the semantics of the
+  existing `minReputation` predicate in `src/lib/actionConditions.js` (a single numeric threshold
+  against `character.reputation`), rather than inventing a new condition shape.
+- **Trainers**: multi-select against `worldData/trainerTypes/items` — the only "entraîneur"
+  catalog that exists today (see [Trainer type creation page](#trainer-type-creation-page)),
+  via `TrainerTypesManager.jsx`.
+- **Evolution**: single-select referencing another `worldData/professions/items` entry (the
+  profession this one evolves into) — self-referencing like talents' ancestor/descendant links,
+  but single-valued here rather than a list.
+
+**Interaction**: new "Métiers" tab in the creator dashboard, under the "Personnages" group.
+
+**Data model implications**:
+```
+worldData/professions/items/{id}
+  name: string              -- French, e.g. "Forgeron"
+  description: string
+  talentIds: string[]       -- worldData/talents/items ids
+  baseIncome: number        -- positive integer
+  minReputation: number     -- minimum character.reputation required, same semantics as
+                             --   actionConditions.js's minReputation condition
+  trainerTypeIds: string[]  -- worldData/trainerTypes/items ids
+  evolutionId: string       -- worldData/professions/items id this profession evolves into, or ""
+```
+
+**Still open (deliberately deferred)**:
+- This catalog isn't wired to `character.profession` (today a flat denormalized string set at
+  character creation, matched by the `profession` action condition in `actionConditions.js`) —
+  whether assigning a character to a `worldData/professions/items` entry replaces or complements
+  that existing string field is undecided.
+- No consumer reads `baseIncome`, `minReputation`, or `evolutionId` yet — this entry covers only
+  the catalog and creator UI, not any gameplay mechanic (income payout, reputation-gated
+  profession change, evolution trigger).
