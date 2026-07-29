@@ -23,10 +23,11 @@ import { matchesRegion } from "./RegionsManager";
 import { matchesProfession } from "./ProfessionsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
 
-// A handler is the escape hatch functions/src/lib/actionPipeline.js falls back from when it's
-// null/unregistered - kept in step with functions/src/index.js's ACTION_HANDLERS by hand, since
-// the creator UI can't see the server's registry. The closest thing to compile-time safety a
-// Firestore-authored catalog can have (F2).
+// Every action must resolve through one of these - functions/src/lib/actionPipeline.js refuses to
+// start an action whose handlerId names nothing in functions/src/index.js's ACTION_HANDLERS (see
+// "Abandoning the paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md). Kept in step with that
+// registry by hand, since the creator UI can't see the server's registry - the closest thing to
+// compile-time safety a Firestore-authored catalog can have (F2).
 const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte", "artisanat"];
 
 // Matches an action's label or description - for use as MultiSelectModalField's matchesFilter,
@@ -340,8 +341,11 @@ export default function ActionsManager() {
     // disagreeing about which métiers may run this action.
     const batch = writeBatch(db);
 
-    // tiers and questDifficultyWeights are out of scope here (§3.8, D14) and are left exactly as
-    // they are in Firestore - merge:true only touches the fields this form actually owns.
+    // questDifficultyWeights is out of scope here (§3.8) and left exactly as it is in Firestore -
+    // merge:true only touches the fields this form actually owns. tiers is no longer a field the
+    // framework understands at all (paliers were retired - see "Abandoning the paliers system" in
+    // docs/ISSUE-02-ACTION-FRAMEWORK.md); a leftover tiers array on an old document is inert
+    // clutter, safe to delete by hand.
     // categoryId is no longer written at all: it is derived from kindId at read time.
     batch.set(
       ref,
@@ -420,6 +424,7 @@ export default function ActionsManager() {
         {filteredActionTypes.length === 0 && <li className="empty-state">Aucune action.</li>}
         {filteredActionTypes.map((actionType) => {
           const unknownHandler = actionType.handlerId && !KNOWN_HANDLER_IDS.includes(actionType.handlerId);
+          const missingHandler = !actionType.handlerId;
           const kindId = resolveKindId(actionType);
           const isMetier = actionKindInheritsFrom(kindId, PROFESSION_ACTION_KIND_ID);
           const isHarvest = actionKindInheritsFrom(kindId, HARVEST_ACTION_KIND_ID);
@@ -453,8 +458,9 @@ export default function ActionsManager() {
                 </div>
               )}
               <div>
-                Gestionnaire : {actionType.handlerId || "générique"}
+                Gestionnaire : {actionType.handlerId || "aucun"}
                 {unknownHandler && <span className="error"> — gestionnaire inconnu</span>}
+                {missingHandler && <span className="error"> — action inutilisable, aucun gestionnaire configuré</span>}
               </div>
               <div>Durée : {actionType.durationHours || DEFAULT_DURATION_HOURS} h</div>
               <div>Conditions : {(actionType.availability?.conditions || []).length}</div>
@@ -592,8 +598,14 @@ export default function ActionsManager() {
 
           <label>
             Gestionnaire
-            <select value={form.handlerId} onChange={(e) => setForm({ ...form, handlerId: e.target.value })}>
-              <option value="">Aucun (générique)</option>
+            <select
+              value={form.handlerId}
+              onChange={(e) => setForm({ ...form, handlerId: e.target.value })}
+              required
+            >
+              <option value="" disabled>
+                Choisir un gestionnaire...
+              </option>
               {KNOWN_HANDLER_IDS.map((id) => (
                 <option key={id} value={id}>
                   {id}
@@ -602,10 +614,13 @@ export default function ActionsManager() {
               {handlerIsUnknown && <option value={form.handlerId}>{form.handlerId} (inconnu)</option>}
             </select>
           </label>
+          <p>
+            Une action sans gestionnaire ne peut pas être lancée par un joueur - le serveur la refuse.
+          </p>
           {handlerIsUnknown && (
             <p className="error">
-              Ce gestionnaire n'est pas enregistré côté serveur (functions/src/index.js) — l'action résoudra en
-              générique tant qu'il n'y est pas ajouté.
+              Ce gestionnaire n'est pas enregistré côté serveur (functions/src/index.js) — l'action sera refusée
+              tant qu'il n'y est pas ajouté.
             </p>
           )}
 

@@ -4,15 +4,17 @@
 // pêcheur...) all sharing this mechanic. actionTypeId is read from the pipeline's own argument
 // rather than a module constant for that reason.
 //
-// Mechanic (docs/TODO.md "Action de récolte"): on a successful tier, draw a random loot table
-// among those matching the action's own lootTagIds (tag overlap) and rarity, then pull
-// baseQuantity items from it via harvestFromLootTable - baseQuantity being the sum of the
-// character's mastery level in every profession the action is associated with, counting only
-// professions the character actually knows (active or previously held). A profession the
-// character never held contributes nothing to the sum.
+// Mechanic (docs/TODO.md "Action de récolte"): the harvest always runs to completion - no more
+// weighted roll deciding whether it fails outright (see "Abandoning the paliers system" in
+// docs/ISSUE-02-ACTION-FRAMEWORK.md). It draws a random loot table among those matching the
+// action's own lootTagIds (tag overlap) and rarity, then pulls baseQuantity items from it via
+// harvestFromLootTable - baseQuantity being the sum of the character's mastery level in every
+// profession the action is associated with, counting only professions the character actually
+// knows (active or previously held). A profession the character never held contributes nothing to
+// the sum, and neither does a missing candidate table - the harvest simply yields no loot rather
+// than failing, exactly like a Récolte action nobody is skilled enough for.
 
-const { rollWeighted } = require("../lib/rolls");
-const { applyTierEffects, isSuccess } = require("../lib/actionEffects");
+const { FieldValue } = require("firebase-admin/firestore");
 const { harvestFromLootTable } = require("../lib/harvest");
 const { pickRandom } = require("../lib/loot");
 
@@ -71,37 +73,33 @@ function toLootEntries({ objectIds, objects, table }) {
 
 async function resolve({ character, actionType, actionTypeId, today, context }) {
   const { candidateTables, objects } = context;
-  const tier = rollWeighted(actionType.tiers);
-  const success = isSuccess(tier);
 
   let loot = [];
-  if (success) {
-    const table = pickRandom(candidateTables);
-    if (table) {
-      const baseQuantity = masteryLevelSum(character, actionType.professionIds);
-      if (baseQuantity > 0) {
-        const objectIds = harvestFromLootTable({ lootTable: table, baseQuantity });
-        loot = toLootEntries({ objectIds, objects, table });
-      }
+  const table = pickRandom(candidateTables);
+  if (table) {
+    const baseQuantity = masteryLevelSum(character, actionType.professionIds);
+    if (baseQuantity > 0) {
+      const objectIds = harvestFromLootTable({ lootTable: table, baseQuantity });
+      loot = toLootEntries({ objectIds, objects, table });
     }
   }
 
-  const updates = applyTierEffects({
-    tier,
-    today,
-    actionTypeId,
-    character,
-    narrativeText: tier.narrativeText || "",
-    lastActionExtra: { loot },
-  });
-
   return {
-    updates,
+    updates: {
+      lastActionDate: today,
+      lastActionAt: FieldValue.serverTimestamp(),
+      lastAction: {
+        actionTypeId,
+        date: today,
+        success: true,
+        narrativeText: "",
+        loot,
+      },
+    },
     logFields: {
-      tierName: tier.name,
-      success,
-      narrativeText: tier.narrativeText || "",
-      consequence: updates.lastAction.consequence,
+      success: true,
+      narrativeText: "",
+      lootCount: loot.length,
     },
   };
 }

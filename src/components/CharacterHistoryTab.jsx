@@ -25,7 +25,7 @@ export default function CharacterHistoryTab({ character }) {
     <ul>
       {history.map((entry) => (
         <li key={entry.id}>
-          {entry.date} — {entry.tierName} {entry.success ? "(succès)" : "(échec)"}
+          {entry.date} — {entry.success ? "(succès)" : "(échec)"}
         </li>
       ))}
     </ul>

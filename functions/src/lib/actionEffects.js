@@ -1,106 +1,17 @@
-const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { rollWeighted } = require("./rolls");
+const { Timestamp } = require("firebase-admin/firestore");
 const { HOUR_MS } = require("./actionLifecycle");
 const { resolveDurationHours } = require("./actionCatalog");
-const { applyWound } = require("./wounds");
 
-// A tier is a success unless it explicitly says otherwise - the same rule every action
-// applies, kept in one place so the generic path and per-action handlers can't drift apart.
-function isSuccess(tier) {
-  return tier.success !== false;
-}
-
-// Builds the `characters/{id}` patch a rolled tier implies: the `lastAction` record, plus the
-// stat mutations that follow from it (gold/inventory/talents/reputation/legendLevel on success,
-// alive/wound counters on failure). Handler-specific `lastAction` fields - a quest summary, drawn
-// loot... - are merged in through `lastActionExtra` rather than being special-cased here, so an
-// action with no handler of its own can reuse this untouched (see
-// docs/ISSUE-02-ACTION-FRAMEWORK.md).
-//
-// `character` is the fresh in-transaction read: a wound consequence needs the character's current
-// wound counters to decide whether it escalates to a worse severity or kills them outright (see
-// wounds.js), which a plain FieldValue.increment can't express.
-function applyTierEffects({
-  tier,
-  today,
-  actionTypeId,
-  character,
-  narrativeText = "",
-  talentGained = null,
-  lastActionExtra,
-}) {
-  const success = isSuccess(tier);
-  let consequence = tier.consequence || null;
-
-  const updates = {
-    lastActionDate: today,
-    lastActionAt: FieldValue.serverTimestamp(),
-  };
-
-  if (success) {
-    if (tier.goldGain) updates.gold = FieldValue.increment(tier.goldGain);
-    if (tier.itemGain) updates.inventory = FieldValue.arrayUnion(tier.itemGain);
-    if (talentGained) updates.talents = FieldValue.arrayUnion(talentGained);
-    if (tier.reputationGain) updates.reputation = FieldValue.increment(tier.reputationGain);
-    if (tier.legendary) updates.legendLevel = FieldValue.increment(1);
-  } else if (tier.consequence?.type === "death") {
-    updates.alive = false;
-  } else if (tier.consequence?.type === "wound") {
-    const severity = tier.consequence.severity || "light";
-    const result = applyWound(character, severity);
-    updates.woundsLight = result.woundsLight;
-    updates.woundsSevere = result.woundsSevere;
-    updates.woundsPermanent = result.woundsPermanent;
-    if (result.died) {
-      updates.alive = false;
-      consequence = { ...tier.consequence, fatal: true };
-    }
-  }
-
-  updates.lastAction = {
-    actionTypeId,
-    date: today,
-    tierName: tier.name,
-    success,
-    narrativeText,
-    goldGain: tier.goldGain || 0,
-    itemGain: tier.itemGain || null,
-    talentGain: talentGained,
-    reputationGain: tier.reputationGain || 0,
-    legendary: !!tier.legendary,
-    consequence,
-    ...lastActionExtra,
-  };
-
-  return updates;
-}
-
-// The default resolution path for an action type with no handler (or one naming a handler that
-// isn't registered): roll a weighted tier and apply exactly the gains it declares, its own
-// narrativeText used verbatim. This is what makes "add an action" mostly a content-authoring
-// task (docs/ISSUE-02-ACTION-FRAMEWORK.md Phase 3) - a handler exists only for mechanics this
-// can't express, such as drawing a quest or generating narrative text from a pool.
-function genericResolve({ actionType, actionTypeId, today, character }) {
-  const tier = rollWeighted(actionType.tiers);
-  const narrativeText = tier.narrativeText || "";
-
-  const updates = applyTierEffects({ tier, today, actionTypeId, character, narrativeText });
-
-  return {
-    updates,
-    logFields: {
-      tierName: tier.name,
-      success: isSuccess(tier),
-      narrativeText,
-      consequence: updates.lastAction.consequence,
-    },
-  };
-}
+// What's left here once the weighted-paliers system was retired (see "Abandoning the paliers
+// system" in docs/ISSUE-02-ACTION-FRAMEWORK.md): every handler now decides its own outcome,
+// gains, and consequences directly in code, and returns its own `updates`/`lastAction` shape from
+// `resolve()`. `stampLifecycle` is the one piece every handler still shares - the timing/labeling
+// envelope wrapped around whatever they produced.
 
 // Stamps onto a handler's character patch the lifecycle fields every action shares: when it
 // started, when it completes, how the frame should be colored, and whether the player has seen
-// the result yet. The dispatcher owns this rather than the handlers, so an action with no
-// handler of its own is timed identically to one that has.
+// the result yet. The dispatcher owns this rather than the handlers, so every handler is timed
+// identically no matter how differently it resolves.
 //
 // `completesAt` cannot be derived from FieldValue.serverTimestamp(): that is a write sentinel
 // with no readable value, so it cannot be offset by a duration. Both instants therefore come
@@ -129,4 +40,4 @@ function stampLifecycle(updates, { actionType, now = Timestamp.now(), durationHo
   };
 }
 
-module.exports = { applyTierEffects, isSuccess, genericResolve, stampLifecycle };
+module.exports = { stampLifecycle };

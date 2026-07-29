@@ -69,35 +69,24 @@ characters/{characterId}
 
 actionsLog/{logId}                 -- permanent history, independent of lastAction
   characterId, ownerUid, actionTypeId, date
-  tierName: string, success: boolean
+  success: boolean
   narrativeText: string
-  consequence: { type: "wound" | "death", name?, description, severity?, fatal? } | null
-                                    -- fatal: true when a "wound" consequence escalated into death
-                                    -- (see functions/src/lib/wounds.js), distinct from a tier
-                                    -- authored with consequence.type "death" directly
   quest: { id, name, difficulty, locationId, locationName } | undefined  -- "partir-en-quete" only, see below
   createdAt: server timestamp
+  -- plus whatever else the handler's own logFields choose to add (e.g. recolte's lootCount) - see
+  -- "The performAction Cloud Function" below
 
 worldData/actionTypes/items/{id}
   label: string                    -- e.g. "Partir en quête"
-  tiers: [{
-    name, weight, success, narrativeText,
-    cible: "groupe" | "individuel" | undefined,  -- opts this tier into procedural narrativeText
-                                                  -- generation (see below); when absent, narrativeText
-                                                  -- is used verbatim
-    goldGain, itemGain: { name, qty },    -- success only
-    talentGain: { talentId, quality, circumstance },  -- success only; talentId references worldData/talents/items,
-                                                       -- circumstance is French narrative text (see Talents below)
-    reputationGain: number,               -- success only
-    legendary: boolean,                   -- success only, bumps legendLevel
-    consequence: { type: "wound"|"death", name?, description, severity? }  -- failure only;
-                                           severity: "light"|"severe"|"permanent" (wound only,
-                                           defaults to "light") - see functions/src/lib/wounds.js
-  }]
-  -- weight is a relative weight; the acting handler sums all tiers' weights and rolls against that total
+  handlerId: string                -- must resolve to a registered entry in functions/src/index.js's
+                                    -- ACTION_HANDLERS - an action has no generic fallback any more,
+                                    -- see "The performAction Cloud Function" below
   questDifficultyWeights: [{ difficulty, weight }]  -- "partir-en-quete" only, optional; defaults to
                                              -- facile 55 / moyen 30 / difficile 10 / tres_difficile 4 / epique 1
                                              -- when absent, see "Quest drawing" below
+  -- there used to be a `tiers: [...]` field here (a per-action weighted roll deciding
+  -- success/failure, gold, wounds, death, narrativeText) - retired; each handler now decides its
+  -- own outcome and gains directly in code. A `tiers` array left over on an old document is inert.
 
 worldData/narrativeSubjects/items/{id}   -- procedural narrativeText generation, see below
   type: "groupe" | "individuel"
@@ -114,8 +103,10 @@ worldData/narrativeSubjects/items/{id}   -- procedural narrativeText generation,
                                           -- Function code (unrelated to the free-text `tags` above)
 
 worldData/verbPhrases/items/{id}     -- procedural narrativeText generation, see below
-  resultat: "victoire" | "echec" | "partielle"   -- only "victoire"/"echec" are produced today,
-                                                  -- since tiers only have a boolean success
+  resultat: "victoire" | "echec" | "partielle"   -- only "victoire" is produced today - quests
+                                                  -- always succeed (see "Quest drawing" below), so
+                                                  -- "echec"/"partielle" verb phrases are currently
+                                                  -- unused, but authoring them costs nothing
   cible: "groupe" | "individuel" | "les_deux"
   template: string                       -- French, contains a {sujet} placeholder,
                                           -- e.g. "avez triomphé de {sujet}"
@@ -235,7 +226,9 @@ Region is a player *choice*; background is *rolled* server-side specifically so 
 `performAction` (`functions/src/index.js`) is a thin dispatcher, not a monolithic roller — each `actionTypeId` has its own handler module under `functions/src/actions/` (today: `partirEnQuete.js`; future actions like marchander/s'entraîner/voyager/explorer/travailler get their own module rather than being squeezed into one generic tier-roller, since their mechanics have little in common). A handler exports:
 
 - `prepare({ db, character, actionType })` — async, runs **before** the transaction. Does any read-only setup specific to that action (e.g. drawing a quest, see below) and can `throw HttpsError` for a precondition that should block the action *without* consuming the daily lock (nothing has been written yet at this point).
-- `resolve({ tx, db, character, actionType, today, context })` — runs **inside** the transaction, after the once-per-day lock re-check. Returns `{ updates, logFields }`: `updates` is the full `characters/{id}` patch (`lastActionDate`, `lastActionAt`, `lastAction`, plus whatever gold/inventory/talents/reputation/legendLevel/alive/wound counter changes apply), `logFields` is the handler-specific subset merged into the `actionsLog` entry (the dispatcher adds the common `characterId`/`ownerUid`/`actionTypeId`/`date`/`createdAt` fields itself).
+- `resolve({ tx, db, character, actionType, today, context })` — runs **inside** the transaction, after the once-per-day lock re-check. Returns `{ updates, logFields }`: `updates` is the full `characters/{id}` patch (`lastActionDate`, `lastActionAt`, `lastAction`, plus whatever else the handler decides to write - gold/inventory/talents/reputation/legendLevel/alive/wound counters are all just fields a handler can choose to touch, not a shared mechanic every action goes through), `logFields` is the handler-specific subset merged into the `actionsLog` entry (the dispatcher adds the common `characterId`/`ownerUid`/`actionTypeId`/`date`/`createdAt` fields itself).
+
+There is no generic resolution path: an `actionTypeId` whose `handlerId` doesn't resolve to a registered handler is refused outright, the same way an unmet condition is (see "Abandoning the paliers system", [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md)).
 
 Given an `actionTypeId`, `performAction`:
 1. Rejects if the caller isn't authenticated, has no character with `alive == true`, or `actionTypeId` has no registered handler.
@@ -251,13 +244,13 @@ The transaction is what actually prevents a double-action race (e.g. two tabs cl
 
 Otherwise the quest is drawn **difficulty-first**: a difficulty is rolled against `actionType.questDifficultyWeights` (defaults to facile 55 / moyen 30 / difficile 10 / tres_difficile 4 / epique 1 when the field is absent), then a random quest whose `difficulties` includes that difficulty is picked from the region's catalog; if none matches, the difficulty is redrawn and the process repeats (capped at 50 attempts, after which it falls back to a uniform pick over the region's whole catalog — only reachable if the region's quests carry difficulties absent from the weight table). This makes harder quests rarer to encounter, not merely rarer to have been authored.
 
-Once a quest is drawn, if `quest.locationId` is set its `worldData/adventureZones/items` name is resolved once for display. Then `resolve` still rolls the usual `actionType.tiers` (success/failure, gold, wounds, death, talents — unchanged from before quests existed) but, when the tier has a `cible`, tries `generateResultText` restricted to **the quest's own pools** first — subjects limited to `quest.objectiveIds`, verb phrases limited to `quest.successPhraseIds` (on success) or `quest.failurePhraseIds` (on failure) — falling back to the full global `narrativeSubjects`/`verbPhrases` pools if the quest's own pool has no match for that outcome. The drawn quest (`id`, `name`, `difficulty` — the one actually rolled, not the quest's full `difficulties` list — `locationId`, `locationName`) is recorded on both `lastAction.quest` and the `actionsLog` entry.
+Once a quest is drawn, if `quest.locationId` is set its `worldData/adventureZones/items` name is resolved once for display. The quest then always concludes successfully — there is no more per-tier roll deciding gold, wounds, death, or reputation (see "Abandoning the paliers system", [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md)). What `resolve` still draws: a narration, via `generateResultText` tried against a randomly-ordered pair of target shapes (`cible: "individuel"` then `"groupe"`, or the reverse) — subjects limited to `quest.objectiveIds`, verb phrases limited to `quest.successPhraseIds` — falling back to the full global `narrativeSubjects`/`verbPhrases` pools for each shape before trying the other, and to a fixed sentence if neither matches anything; and loot, via `drawQuestLoot` (below). The drawn quest (`id`, `name`, `difficulty` — the one actually rolled, not the quest's full `difficulties` list — `locationId`, `locationName`) is recorded on both `lastAction.quest` and the `actionsLog` entry.
 
-Loot is deliberately not drawn — `worldData/quests/items` has no `lootTableId` yet (see [docs/TODO.md](TODO.md)).
+`drawQuestLoot` draws one loot table per item (count set by the quest's difficulty via `LOOT_COUNT_BY_DIFFICULTY`), among those sharing a tag with the quest or a randomly-picked objective and matching that objective's rarity, then a uniform item draw within that table; items with no matching table/objective are silently skipped (a content gap, not an error).
 
 ## The 24-hour reveal delay
 
-Design intent: submitting an action computes and commits the outcome immediately (so the anti-cheat properties above hold), but the *result* stays hidden behind an "En cours..." (in progress) status for 24 real hours, even for the player who triggered it — it's a narrative pacing choice, not a security one. `ActionPanel.jsx` computes `hoursSince(character.lastActionAt)` client-side and only renders `tierName`/`narrativeText`/gains/consequence once that crosses 24h; before that, nothing but the action's label and "En cours..." is shown. Because this gate is purely a display decision (the data is already sitting in the character doc), gating it client-side is an accepted tradeoff — a player could theoretically peek early via devtools, but there's nothing to exploit gameplay-wise by doing so.
+Design intent: submitting an action computes and commits the outcome immediately (so the anti-cheat properties above hold), but the *result* stays hidden behind an "En cours..." (in progress) status for 24 real hours, even for the player who triggered it — it's a narrative pacing choice, not a security one. `ActionPanel.jsx` computes `hoursSince(character.lastActionAt)` client-side and only renders `narrativeText`/gains once that crosses 24h; before that, nothing but the action's label and "En cours..." is shown. Because this gate is purely a display decision (the data is already sitting in the character doc), gating it client-side is an accepted tradeoff — a player could theoretically peek early via devtools, but there's nothing to exploit gameplay-wise by doing so.
 
 Note this is intentionally decoupled from the once-per-day *lock*, which remains based on the UTC calendar date (`lastActionDate`) as before — the two can drift apart by a few hours at the day boundary, which is fine.
 
@@ -267,7 +260,7 @@ There is no in-app UI for this (deliberately — it's a one-time, high-privilege
 
 ## Seeding world data
 
-`functions/scripts/seedWorldData.js` populates example regions (with nested backgrounds) and one actionType (`Partir en quête`, with a death tier, a wound tier, a plain success tier, and a legendary tier) — see the script for the exact shapes, or just use it as a one-time bootstrap and then manage everything through the creator dashboard's CRUD (see below) from that point on.
+`functions/scripts/seedWorldData.js` populates example regions (with nested backgrounds) and a bare `Partir en quête` actionType document — see the script for the exact shapes, or just use it as a one-time bootstrap and then manage everything through the creator dashboard's CRUD (see below) from that point on. It predates `handlerId`/`kindId` and isn't kept in step with them; the live `partir-en-quete` document is edited through `ActionsManager.jsx` instead.
 
 ## Creator dashboard (`CreatorDashboard.jsx`)
 
@@ -292,13 +285,13 @@ No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute
 
 ## Procedural quest-result text
 
-A tier can either carry a fixed `narrativeText` (used verbatim, as before) or opt into procedural generation by setting `cible: "groupe" | "individuel"`. When set, the action handler (e.g. `partirEnQuete.js`'s `resolve`) calls `generateResultText` (`functions/src/textGeneration.js`) with the tier's outcome (`"victoire"` or `"echec"`, from `tier.success`), `cible`, and whichever subject/verb-phrase pools it chooses to pass (see "Quest drawing" above for how `partirEnQuete.js` narrows these to the drawn quest's own pools first):
+A handler can call `generateResultText` (`functions/src/textGeneration.js`) to turn a target shape (`cible: "groupe" | "individuel"`) plus an outcome (`"victoire" | "echec" | "partielle"`) into a sentence, given whichever subject/verb-phrase pools it chooses to pass (see "Quest drawing" above for how `partirEnQuete.js` narrows these to the drawn quest's own pools first, tries both target shapes in a random order, and falls back to a fixed sentence if neither matches anything):
 
 1. Filters the given verb phrases to those matching the outcome and target (`cible: "les_deux"` matches either target), and picks one at random.
 2. Filters the given subjects to those of the matching `type`, further narrowed to subjects sharing at least one tag with the verb phrase's `tags` if it declares any, and picks one at random.
 3. Substitutes the picked verb phrase's `{sujet}` placeholder with the subject's `nom`, prefixed by the French elision of its `article` after "de" (`le` → `du`, `les` → `des`, `la` → `de la`, `l'` → `de l'`) — this contraction lives in `contractDe`, a single dedicated function, rather than being duplicated per verb phrase. The past participle in these templates doesn't agree with a complement introduced by "de", so no further grammatical-agreement logic is needed.
 
-If no verb phrase or no subject matches, `generateResultText` returns `null` and the tier's own `narrativeText` is used as a fallback — a tier can therefore opt into procedural generation without needing every outcome/target combination populated up front. The `resultat: "partielle"` value on verb phrases is accepted by the schema but never produced today, since tiers only have a boolean `success`, not a tri-state outcome.
+If no verb phrase or no subject matches for either target shape, `generateResultText` returns `null` for each attempt. The `resultat: "echec"`/`"partielle"` values are accepted by the schema but currently unproduced: `partirEnQuete.js` is the only caller today and only ever asks for `"victoire"`, since a quest always concludes successfully (see "Abandoning the paliers system", [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md)).
 
 ## Front-end structure
 
@@ -344,7 +337,7 @@ Current deployed project: `monkar-rpg` (Firebase, Blaze plan — required for Cl
 
 ## Alternatives considered
 
-**Skipping Cloud Functions entirely** (Firestore rules only, Spark/free plan, no billing needed): the daily lock still works reliably via `request.time` in rules. The random rolls (background at creation, tier at each action) would have to be computed client-side and merely shape-validated by rules, which a technically inclined player could fake via devtools. Not implemented, since the project already has Cloud Functions running, but worth remembering as a no-cost fallback if the Blaze plan ever becomes undesirable.
+**Skipping Cloud Functions entirely** (Firestore rules only, Spark/free plan, no billing needed): the daily lock still works reliably via `request.time` in rules. The random rolls (background at creation, each handler's own draw at every action) would have to be computed client-side and merely shape-validated by rules, which a technically inclined player could fake via devtools. Not implemented, since the project already has Cloud Functions running, but worth remembering as a no-cost fallback if the Blaze plan ever becomes undesirable.
 
 **Cloudflare Workers / Supabase Edge Functions**: would keep fully server-side rolls without needing Firebase's Blaze plan (their free tiers generally don't require a card, though policies change — verify at signup). Not implemented; would mean keeping Firebase Auth + Firestore as-is and only moving `createCharacter`/`performAction`'s logic to HTTP endpoints on that other platform, called from the client instead of `httpsCallable`.
 
@@ -352,4 +345,4 @@ Current deployed project: `monkar-rpg` (Firebase, Blaze plan — required for Cl
 
 - The creator dashboard has CRUD for regions/backgrounds/talents only (the data the game actually consumes today). `actionTypes` has no CRUD UI (removed — out of scope for now) and, like factions, gods, and creatures, has to be created by hand in the Firestore console.
 - `title`, `legendLevel` progression beyond the raw counter, `blessings`, `curses`, quest journal, world-knowledge lore, and messaging are all stubs — visually present (or, for messaging, not even that) but not wired to real game logic yet, by design (deferred until the underlying systems are designed).
-- Procedural `narrativeText` generation (see "Procedural quest-result text" above) only covers `"victoire"`/`"echec"` outcomes; tiers still need a hand-authored `narrativeText` fallback for when no subject/verb-phrase pair is populated for a given target. No visual theme/styling pass yet.
+- Procedural `narrativeText` generation (see "Procedural quest-result text" above) is only ever asked for the `"victoire"` outcome today, since quests always succeed. No visual theme/styling pass yet.

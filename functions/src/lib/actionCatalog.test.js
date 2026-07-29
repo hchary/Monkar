@@ -27,7 +27,6 @@ describe("normalizeActionType", () => {
   test("a pre-framework document normalizes to a working action", () => {
     const normalized = normalizeActionType({
       label: "Partir en quête",
-      tiers: [{ name: "Succès", weight: 10 }],
       questDifficultyWeights: [{ difficulty: "facile", weight: 55 }],
     });
 
@@ -46,7 +45,6 @@ describe("normalizeActionType", () => {
       unmetMessage: "",
     });
     assert.deepStrictEqual(normalized.result, { accentSource: "category", showLoot: false });
-    assert.deepStrictEqual(normalized.tiers, [{ name: "Succès", weight: 10 }]);
   });
 
   test("passes through fields it doesn't own", () => {
@@ -95,7 +93,6 @@ describe("normalizeActionType", () => {
       handlerId: "",
       availability: { conditions: "aucune", unmetBehaviour: "explode" },
       result: { accentSource: "arc-en-ciel", showLoot: "oui" },
-      tiers: "beaucoup",
     });
 
     assert.equal(normalized.order, 0);
@@ -104,7 +101,6 @@ describe("normalizeActionType", () => {
     assert.equal(normalized.availability.unmetBehaviour, "hide");
     assert.equal(normalized.result.accentSource, "category");
     assert.equal(normalized.result.showLoot, false);
-    assert.deepStrictEqual(normalized.tiers, []);
   });
 
   test("is idempotent - normalizing twice changes nothing", () => {

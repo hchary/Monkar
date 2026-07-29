@@ -1,13 +1,16 @@
 // The shared resolution pipeline behind performAction - docs/ISSUE-02-ACTION-FRAMEWORK.md §3.5.
 //
-// An action type with no handlerId (or one naming a handler that isn't registered) resolves
-// through the generic tier roller: this is the framework's central claim, that adding an action
-// is mostly a content-authoring task. A handler is the escape hatch for actions whose mechanics
-// don't fit that shape (drawing a quest, picking a trainer...).
+// There is no generic resolution path any more (the weighted-paliers roller that used to back it
+// was retired - see "Abandoning the paliers system" in that doc). Every action type must name a
+// handlerId resolving to a registered entry in functions/src/index.js's ACTION_HANDLERS; the
+// pipeline's only remaining job for resolution is calling that handler with the right inputs and
+// applying what it returns. An actionType with no usable handler is refused before the
+// transaction opens, the same way an unmet condition is - a content-authoring mistake, not a
+// server fault, and one that now costs the player nothing to hit.
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { genericResolve, stampLifecycle } = require("./actionEffects");
+const { stampLifecycle } = require("./actionEffects");
 const { isActionRunning } = require("./actionLifecycle");
 const { normalizeActionType, evaluateAvailability } = require("./actionCatalog");
 const { buildConditionContext } = require("./actionContext");
@@ -44,10 +47,13 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
   if (!availability.ok) throw new HttpsError("failed-precondition", availability.reason);
 
   const handler = (actionType.handlerId && actionHandlers[actionType.handlerId]) || null;
+  if (!handler) {
+    throw new HttpsError("failed-precondition", "Cette action n'a pas de gestionnaire configuré.");
+  }
 
   // Pre-transaction prep (e.g. drawing a quest) can throw a friendly precondition error -
   // deliberately outside the transaction so it never consumes the day's lock.
-  const context = handler?.prepare
+  const context = handler.prepare
     ? await handler.prepare({ db, character, actionType, actionTypeId, payload })
     : undefined;
 
@@ -63,19 +69,17 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
       throw new HttpsError("already-exists", "Action already in progress.");
     }
 
-    const { updates, logFields } = handler
-      ? await handler.resolve({
-          tx,
-          db,
-          character: freshCharacter,
-          characterRef,
-          actionType,
-          actionTypeId,
-          today,
-          context,
-          payload,
-        })
-      : genericResolve({ actionType, actionTypeId, today, character: freshCharacter });
+    const { updates, logFields } = await handler.resolve({
+      tx,
+      db,
+      character: freshCharacter,
+      characterRef,
+      actionType,
+      actionTypeId,
+      today,
+      context,
+      payload,
+    });
 
     tx.update(characterRef, stampLifecycle(updates, { actionType, now }));
 
