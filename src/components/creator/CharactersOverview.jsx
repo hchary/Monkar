@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, doc, query, updateDoc, where, onSnapshot } from "firebase/firestore";
+import { collection, deleteDoc, doc, query, updateDoc, where, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import MultiSelectModalField from "./MultiSelectModalField";
 import { matchesProfession } from "./ProfessionsManager";
@@ -37,6 +37,12 @@ function CharacterDetail({ character, onBack }) {
       ? knownProfessions.filter((k) => k.professionId !== professionId)
       : [...knownProfessions, { professionId, level: 1 }];
     await updateDoc(doc(db, "characters", character.id), { knownProfessions: nextKnown });
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Supprimer définitivement le personnage "${character.name}" ?`)) return;
+    await deleteDoc(doc(db, "characters", character.id));
+    onBack();
   }
 
   return (
@@ -85,6 +91,10 @@ function CharacterDetail({ character, onBack }) {
       ) : (
         <p className="empty-state">Aucune action enregistrée.</p>
       )}
+
+      <button type="button" className="danger" onClick={handleDelete}>
+        Supprimer le personnage
+      </button>
     </div>
   );
 }
