@@ -19,8 +19,11 @@ service cloud.firestore {
 
     match /characters/{characterId} {
       allow read: if isCreator() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
-      allow update: if isCreator() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      // create/update go through Cloud Functions only (createCharacter, acknowledgeOriginIntro,
+      // switchKnownProfession, performAction, acknowledgeAction, debugAdvanceTime, and every
+      // action handler) - the Admin SDK bypasses these rules, so a player's own character is no
+      // longer directly writable from the client.
+      allow create, update: if isCreator();
       allow delete: if isCreator();
     }
 

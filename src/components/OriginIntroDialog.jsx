@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../lib/firebase";
 
 // Welcomes the player on their first visit to a freshly created character's page, recapping the
 // origin randomly assigned at creation (functions/src/index.js createCharacter) and what it
@@ -18,7 +18,8 @@ export default function OriginIntroDialog({ character }) {
 
   async function handleClose() {
     dialogRef.current?.close();
-    await updateDoc(doc(db, "characters", character.id), { originIntroSeen: true });
+    const acknowledgeOriginIntro = httpsCallable(functions, "acknowledgeOriginIntro");
+    await acknowledgeOriginIntro();
   }
 
   return (
