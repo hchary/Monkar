@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import CharacterProfile from "./pages/CharacterProfile";
 import CreatorDashboard from "./pages/CreatorDashboard";
+import Xerotex from "./pages/Xerotex";
 
 function App() {
   return (
@@ -28,6 +29,14 @@ function App() {
             element={
               <ProtectedRoute requireCreator>
                 <CreatorDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/xerotex"
+            element={
+              <ProtectedRoute>
+                <Xerotex />
               </ProtectedRoute>
             }
           />

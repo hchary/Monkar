@@ -1,7 +1,12 @@
+import GrimoireButton from "./GrimoireButton";
+
 export default function CharacterBanner({ character }) {
   return (
     <div className="character-banner">
-      <h1>{character.name}</h1>
+      <div className="banner-top">
+        <h1>{character.name}</h1>
+        <GrimoireButton />
+      </div>
       {character.title && <p className="title">{character.title}</p>}
       <ul className="banner-stats">
         <li>Réputation : {character.reputation}</li>
