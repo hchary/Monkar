@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { matchesTalent } from "./TalentsManager";
+import { matchesActionType } from "./ActionsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
 
 // Matches a profession's name or description — for use as MultiSelectModalField's matchesFilter.
@@ -44,6 +45,7 @@ const emptyForm = {
   minReputation: "",
   trainerTypeIds: [],
   evolutionId: "",
+  actionIds: [],
 };
 
 const emptyFilters = { text: "" };
@@ -58,6 +60,10 @@ export default function ProfessionsManager() {
   const talents = useItems("talents");
   const sortedTalents = [...talents].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
   const trainerTypes = useItems("trainerTypes");
+  const actionTypes = useItems("actionTypes");
+  const sortedActionTypes = [...actionTypes]
+    .map((a) => ({ ...a, name: a.label }))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
   const selectableProfessions = professions
     .filter((profession) => profession.id !== editingId)
     .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
@@ -80,6 +86,7 @@ export default function ProfessionsManager() {
       minReputation: profession.minReputation ?? "",
       trainerTypeIds: profession.trainerTypeIds || [],
       evolutionId: profession.evolutionId || "",
+      actionIds: profession.actionIds || [],
     });
     setPanelOpen(true);
   }
@@ -105,6 +112,13 @@ export default function ProfessionsManager() {
     }));
   }
 
+  function toggleActionId(id) {
+    setForm((prev) => ({
+      ...prev,
+      actionIds: prev.actionIds.includes(id) ? prev.actionIds.filter((x) => x !== id) : [...prev.actionIds, id],
+    }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     const ref = editingId
@@ -119,6 +133,7 @@ export default function ProfessionsManager() {
       minReputation: Number(form.minReputation) || 0,
       trainerTypeIds: form.trainerTypeIds,
       evolutionId: form.evolutionId,
+      actionIds: form.actionIds,
     });
     resetForm();
   }
@@ -157,6 +172,12 @@ export default function ProfessionsManager() {
               {(profession.trainerTypeIds || [])
                 .map((id) => trainerTypes.find((t) => t.id === id)?.name || id)
                 .join(", ") || "aucun"}
+            </div>
+            <div>
+              Actions associées :{" "}
+              {(profession.actionIds || [])
+                .map((id) => actionTypes.find((a) => a.id === id)?.label || id)
+                .join(", ") || "aucune"}
             </div>
             {profession.evolutionId && (
               <div>
@@ -226,6 +247,17 @@ export default function ProfessionsManager() {
             options={trainerTypes}
             selectedIds={form.trainerTypeIds}
             onToggle={toggleTrainerTypeId}
+          />
+
+          <MultiSelectModalField
+            legend="Actions associées"
+            options={sortedActionTypes}
+            selectedIds={form.actionIds}
+            onToggle={toggleActionId}
+            createLink={`/creator?section=${encodeURIComponent("Actions")}`}
+            matchesFilter={matchesActionType}
+            filterPlaceholder="Filtrer par nom ou description..."
+            buttonLabel="Ajouter des actions"
           />
 
           <label>
