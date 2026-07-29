@@ -1,4 +1,9 @@
+// Nothing to draw from yields null rather than the `items[-1]` undefined the fallback used to
+// produce: callers then decide what an empty pool means, instead of dereferencing a value that
+// only looks like an item until they touch it (see actionEffects.js's rollTier).
 function rollWeighted(items) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+
   const totalWeight = items.reduce((sum, item) => sum + (item.weight || 0), 0);
   const roll = Math.random() * totalWeight;
   let cumulative = 0;

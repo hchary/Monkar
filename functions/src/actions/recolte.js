@@ -11,8 +11,7 @@
 // professions the character actually knows (active or previously held). A profession the
 // character never held contributes nothing to the sum.
 
-const { rollWeighted } = require("../lib/rolls");
-const { applyTierEffects, isSuccess } = require("../lib/actionEffects");
+const { applyTierEffects, isSuccess, rollTier } = require("../lib/actionEffects");
 const { harvestFromLootTable } = require("../lib/harvest");
 const { pickRandom } = require("../lib/loot");
 
@@ -71,7 +70,7 @@ function toLootEntries({ objectIds, objects, table }) {
 
 async function resolve({ character, actionType, actionTypeId, today, context }) {
   const { candidateTables, objects } = context;
-  const tier = rollWeighted(actionType.tiers);
+  const tier = rollTier(actionType);
   const success = isSuccess(tier);
 
   let loot = [];

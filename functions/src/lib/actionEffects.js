@@ -1,3 +1,4 @@
+const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { rollWeighted } = require("./rolls");
 const { HOUR_MS } = require("./actionLifecycle");
@@ -8,6 +9,24 @@ const { applyWound } = require("./wounds");
 // applies, kept in one place so the generic path and per-action handlers can't drift apart.
 function isSuccess(tier) {
   return tier.success !== false;
+}
+
+// Every path that resolves an action rolls its tier through here, so an action type with no
+// usable `tiers` fails the same way everywhere.
+//
+// A tier-less action is a content-authoring mistake, not a server fault: the creator UI
+// deliberately does not own the tiers editor (docs/ISSUE-02-ACTION-FRAMEWORK.md D14), so an action
+// created there has none until they are authored in Firestore by hand. Rolling one anyway used to
+// dereference rollWeighted's empty-pool result and reach the player as an opaque INTERNAL error;
+// a failed-precondition says what is actually wrong, in the game's own language. The throw happens
+// inside the pipeline's transaction, so a misconfigured action costs the player nothing - no
+// character patch, no log entry, no day consumed.
+function rollTier(actionType) {
+  const tier = rollWeighted(actionType?.tiers);
+  if (!tier) {
+    throw new HttpsError("failed-precondition", "Cette action n'a pas de paliers de résultat configurés.");
+  }
+  return tier;
 }
 
 // Builds the `characters/{id}` patch a rolled tier implies: the `lastAction` record, plus the
@@ -81,7 +100,7 @@ function applyTierEffects({
 // task (docs/ISSUE-02-ACTION-FRAMEWORK.md Phase 3) - a handler exists only for mechanics this
 // can't express, such as drawing a quest or generating narrative text from a pool.
 function genericResolve({ actionType, actionTypeId, today, character }) {
-  const tier = rollWeighted(actionType.tiers);
+  const tier = rollTier(actionType);
   const narrativeText = tier.narrativeText || "";
 
   const updates = applyTierEffects({ tier, today, actionTypeId, character, narrativeText });
@@ -129,4 +148,4 @@ function stampLifecycle(updates, { actionType, now = Timestamp.now(), durationHo
   };
 }
 
-module.exports = { applyTierEffects, isSuccess, genericResolve, stampLifecycle };
+module.exports = { applyTierEffects, isSuccess, rollTier, genericResolve, stampLifecycle };

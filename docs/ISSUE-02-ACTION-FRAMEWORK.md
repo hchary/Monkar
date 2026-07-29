@@ -803,10 +803,15 @@ behind that this session found and left alone rather than delete data it didn't 
   (`functions/src/lib/actionEffects.js:73`) surfaced to the client as an opaque `INTERNAL` error.
   Root cause: the action had no `tiers` (expected, since D14 keeps that editor out of the creator
   UI) and `rollWeighted(undefined)` returns `undefined`. Not a regression — the design has always
-  required tiers to be hand-authored in Firestore for now — but worth a note for whoever picks up
-  the deferred tier editor: `genericResolve` should probably reject with a friendly
-  `failed-precondition` ("cette action n'a pas de paliers configurés") instead of throwing, so a
-  content author's mistake doesn't read as a server bug.
+  required tiers to be hand-authored in Firestore for now.
+
+  *Fixed since:* the same crash was reported again from a creator-authored "Couper du bois"
+  Récolte action. `rollWeighted` now returns `null` for an empty pool, and every resolution path
+  rolls through `actionEffects.js`'s `rollTier`, which rejects with `failed-precondition`
+  ("Cette action n'a pas de paliers de résultat configurés.") — thrown inside the pipeline's
+  transaction, so a misconfigured action costs the player no day. A content author's mistake now
+  reads as a content message rather than a server bug. The deferred tier editor (§3.8, D14) is
+  still what actually removes the mistake.
 
 ### Phase 6 — Modifiers
 

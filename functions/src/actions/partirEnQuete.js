@@ -1,6 +1,6 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 const { rollWeighted, rarityFloor } = require("../lib/rolls");
-const { applyTierEffects, isSuccess } = require("../lib/actionEffects");
+const { applyTierEffects, isSuccess, rollTier } = require("../lib/actionEffects");
 const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 const { rollTalentEvolutions } = require("../lib/talentEvolution");
 const { generateResultText } = require("../textGeneration");
@@ -121,7 +121,7 @@ function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects
 async function resolve({ tx, db, character, actionType, today, context }) {
   const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
 
-  const tier = rollWeighted(actionType.tiers);
+  const tier = rollTier(actionType);
   const success = isSuccess(tier);
 
   let talentGained = null;

@@ -1,7 +1,7 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { applyTierEffects, isSuccess, genericResolve, stampLifecycle } = require("./actionEffects");
+const { applyTierEffects, isSuccess, rollTier, genericResolve, stampLifecycle } = require("./actionEffects");
 const { HOUR_MS } = require("./actionLifecycle");
 
 // FieldValue sentinels (increment/arrayUnion/serverTimestamp) are plain transform objects
@@ -15,6 +15,26 @@ describe("isSuccess", () => {
     assert.equal(isSuccess({ name: "Succès" }), true);
     assert.equal(isSuccess({ name: "Succès", success: true }), true);
     assert.equal(isSuccess({ name: "Échec", success: false }), false);
+  });
+});
+
+describe("rollTier", () => {
+  test("returns one of the authored tiers", () => {
+    const tiers = [{ name: "Succès", weight: 1 }];
+    assert.deepStrictEqual(rollTier({ tiers }), tiers[0]);
+  });
+
+  // An action created through the creator UI has no tiers until they are hand-authored (D14).
+  // Every one of these used to reach the player as an opaque INTERNAL error.
+  test("rejects an action type with nothing to roll, rather than throwing a TypeError", () => {
+    const expected = {
+      code: "failed-precondition",
+      message: "Cette action n'a pas de paliers de résultat configurés.",
+    };
+
+    for (const actionType of [{ tiers: [] }, { tiers: undefined }, {}, undefined]) {
+      assert.throws(() => rollTier(actionType), expected);
+    }
   });
 });
 
@@ -211,6 +231,12 @@ describe("genericResolve", () => {
     assert.equal(updates.woundsLight, 1);
     assert.equal(logFields.success, false);
     assert.deepStrictEqual(logFields.consequence, { type: "wound", name: "Foulure" });
+  });
+
+  test("an action type with no tiers is refused as a precondition failure", () => {
+    assert.throws(() => genericResolve({ actionType: { tiers: [] }, actionTypeId: "couper-du-bois", today: TODAY }), {
+      code: "failed-precondition",
+    });
   });
 });
 
