@@ -400,42 +400,50 @@ fieldset label {
 }
 
 .talent-card.rarity-commun,
-.instance-card.rarity-commun {
+.instance-card.rarity-commun,
+.instance-detail-content.rarity-commun {
   border-color: #fff;
 }
 
 .talent-card.rarity-peu_commun,
-.instance-card.rarity-peu_commun {
+.instance-card.rarity-peu_commun,
+.instance-detail-content.rarity-peu_commun {
   border-color: #2ecc71;
 }
 
 .talent-card.rarity-rare,
-.instance-card.rarity-rare {
+.instance-card.rarity-rare,
+.instance-detail-content.rarity-rare {
   border-color: #3498db;
 }
 
 .talent-card.rarity-tres_rare,
-.instance-card.rarity-tres_rare {
+.instance-card.rarity-tres_rare,
+.instance-detail-content.rarity-tres_rare {
   border-color: #9b59b6;
 }
 
 .talent-card.rarity-legendaire,
-.instance-card.rarity-legendaire {
+.instance-card.rarity-legendaire,
+.instance-detail-content.rarity-legendaire {
   border-color: #e67e22;
 }
 
 .talent-card.rarity-mythique,
-.instance-card.rarity-mythique {
+.instance-card.rarity-mythique,
+.instance-detail-content.rarity-mythique {
   border-color: #e74c3c;
 }
 
 .talent-card.rarity-divin,
-.instance-card.rarity-divin {
+.instance-card.rarity-divin,
+.instance-detail-content.rarity-divin {
   border-color: #fff;
 }
 
 .talent-card.rarity-unique,
-.instance-card.rarity-unique {
+.instance-card.rarity-unique,
+.instance-detail-content.rarity-unique {
   border-color: transparent;
   border-image: linear-gradient(90deg, #ff004c, #ff8a00, #ffe600, #00e676, #00b0ff, #7c4dff) 1;
 }
@@ -455,6 +463,43 @@ fieldset label {
   padding: 8px 12px;
   border: 2px solid var(--border);
   clip-path: var(--pixel-frame);
+}
+
+.inventory-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  max-width: 460px;
+}
+
+.inventory-tile {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.inventory-tile:hover,
+.inventory-tile:focus-visible {
+  box-shadow: 0 0 0 1px var(--text);
+}
+
+.inventory-tile-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 /* Action accent frame — colors whatever is showing the action's accent (the countdown while it
@@ -773,6 +818,35 @@ fieldset label {
 
 .action-loot-box .instance-list {
   max-height: none;
+}
+
+.instance-detail-dialog {
+  width: min(400px, 90vw);
+  padding: 0;
+  border: 1px solid var(--border);
+  clip-path: var(--pixel-frame);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.instance-detail-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.instance-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-left: 4px solid var(--border);
+}
+
+.instance-detail-content h4 {
+  margin: 0;
+}
+
+.instance-detail-content p {
+  margin: 0;
 }
 
 .climate-banner-footer {
