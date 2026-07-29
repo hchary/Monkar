@@ -17,7 +17,6 @@ export default function ProfessionTab({ character }) {
   const professions = useItems("professions");
   const actionTypes = useItems("actionTypes");
   const dialogRef = useRef(null);
-  const [debugProfessionId, setDebugProfessionId] = useState("");
 
   const profession = professions.find((p) => p.id === character.professionId);
   const knownProfessions = character.knownProfessions || [];
@@ -30,15 +29,6 @@ export default function ProfessionTab({ character }) {
     }
     await updateDoc(doc(db, "characters", character.id), withProfessionChange(character, professionId, level));
     dialogRef.current?.close();
-  }
-
-  // Character-to-profession assignment isn't implemented yet (docs/TODO.md "Profession (métier)
-  // creation" — deliberately out of scope), so this is the only way to give a test character a
-  // first profession until that mechanic exists.
-  async function handleDebugAssign() {
-    if (!debugProfessionId) return;
-    await updateDoc(doc(db, "characters", character.id), withProfessionChange(character, debugProfessionId, 1));
-    setDebugProfessionId("");
   }
 
   return (
@@ -72,27 +62,6 @@ export default function ProfessionTab({ character }) {
       <button type="button" className="link-button" onClick={() => dialogRef.current?.showModal()}>
         Métiers connus
       </button>
-
-      {!character.professionId && (
-        <div>
-          {/* TODO: remove this test-only tool once a real profession-assignment mechanic exists */}
-          <select
-            className="debug-button"
-            value={debugProfessionId}
-            onChange={(e) => setDebugProfessionId(e.target.value)}
-          >
-            <option value="">[TEST] Attribuer un métier...</option>
-            {professions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="debug-button" onClick={handleDebugAssign} disabled={!debugProfessionId}>
-            [TEST] Attribuer
-          </button>
-        </div>
-      )}
 
       <dialog
         ref={dialogRef}
