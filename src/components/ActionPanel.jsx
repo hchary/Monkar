@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Timestamp, collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
 import { normalizeActionType } from "../lib/actionCatalog";
-import { HOUR_MS, actionCompletesAtMillis, actionState, toMillis } from "../lib/actionLifecycle";
+import { actionState } from "../lib/actionLifecycle";
 import ActionBrowser from "./actions/ActionBrowser";
 import ActionCountdown from "./actions/ActionCountdown";
 import ActionResultDialog from "./actions/ActionResultDialog";
@@ -65,17 +65,11 @@ export default function ActionPanel({ character }) {
 
   // Backdates the running action by 24h so it completes immediately, rather than clearing the
   // lock outright - the countdown and the dialog both read completesAt now, so wiping it would
-  // leave the panel with nothing to show.
+  // leave the panel with nothing to show. See functions/src/index.js's debugAdvanceTime for why
+  // this is a callable rather than a direct write.
   async function handleDebugAdvanceTime() {
-    const completesAt = actionCompletesAtMillis(character);
-    if (completesAt == null) return;
-
-    const shift = 24 * HOUR_MS;
-    const startedAt = toMillis(lastAction?.startedAt ?? character.lastActionAt);
-    const patch = { "lastAction.completesAt": Timestamp.fromMillis(completesAt - shift) };
-    if (startedAt != null) patch["lastAction.startedAt"] = Timestamp.fromMillis(startedAt - shift);
-
-    await updateDoc(doc(db, "characters", character.id), patch);
+    const debugAdvanceTime = httpsCallable(functions, "debugAdvanceTime");
+    await debugAdvanceTime();
   }
 
   const actionType = actionTypes.find((a) => a.id === lastAction?.actionTypeId);

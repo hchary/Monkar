@@ -1,8 +1,10 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { runActionPipeline } = require("./lib/actionPipeline");
-const { isActionRunning, isActionAcknowledged } = require("./lib/actionLifecycle");
+const { isActionRunning, isActionAcknowledged, actionCompletesAtMillis, toMillis, HOUR_MS } = require("./lib/actionLifecycle");
+const { withProfessionChange, knownLevel } = require("./lib/professions");
+const { DEFAULTS: CHARACTER_DEFAULTS } = require("./schema/character");
 const partirEnQuete = require("./actions/partirEnQuete");
 const recolte = require("./actions/recolte");
 const artisanat = require("./actions/artisanat");
@@ -12,6 +14,19 @@ const db = getFirestore();
 
 function todayUTC() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// Every callable that acts on "the caller's own character" (rather than one named by id) resolves
+// it the same way: the one living character owned by this uid, same query runActionPipeline uses.
+async function getOwnCharacterSnap(uid) {
+  const charSnap = await db
+    .collection("characters")
+    .where("ownerUid", "==", uid)
+    .where("alive", "==", true)
+    .limit(1)
+    .get();
+  if (charSnap.empty) throw new HttpsError("failed-precondition", "No living character found for this user.");
+  return charSnap.docs[0];
 }
 
 // A handler is the escape hatch for an action whose mechanics don't fit the generic tier
@@ -88,9 +103,9 @@ exports.createCharacter = onCall(async (request) => {
 
   const characterRef = db.collection("characters").doc();
   await characterRef.set({
+    ...CHARACTER_DEFAULTS,
     ownerUid: uid,
     name,
-    age: 18,
     region: { id: regionId, name: region.name },
     origin: {
       id: origin.id,
@@ -101,23 +116,9 @@ exports.createCharacter = onCall(async (request) => {
       talents: talentsGranted.map((t) => ({ id: t.id, name: t.name })),
       items: itemsGranted.map((item) => ({ id: item.id, name: item.name })),
     },
-    originIntroSeen: false,
-    title: "",
     profession: origin.profession || "",
     reputation: origin.reputationStart || 0,
-    legendLevel: null,
-    alive: true,
-    gold: 0,
-    inventory: [],
     talents: talentsGranted,
-    blessings: [],
-    curses: [],
-    woundsLight: 0,
-    woundsSevere: 0,
-    woundsPermanent: 0,
-    lastActionDate: null,
-    lastActionAt: null,
-    lastAction: null,
     createdAt: FieldValue.serverTimestamp(),
   });
 
@@ -169,14 +170,7 @@ exports.acknowledgeAction = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Login required.");
 
-  const charSnap = await db
-    .collection("characters")
-    .where("ownerUid", "==", uid)
-    .where("alive", "==", true)
-    .limit(1)
-    .get();
-  if (charSnap.empty) throw new HttpsError("failed-precondition", "No living character found for this user.");
-  const characterRef = charSnap.docs[0].ref;
+  const characterRef = (await getOwnCharacterSnap(uid)).ref;
 
   await db.runTransaction(async (tx) => {
     const characterDoc = await tx.get(characterRef);
@@ -201,6 +195,68 @@ exports.acknowledgeAction = onCall(async (request) => {
 
     tx.update(characterRef, { "lastAction.acknowledged": true });
   });
+
+  return { ok: true };
+});
+
+// Dismisses the origin intro dialog once, permanently - moved server-side alongside every other
+// characters write once firestore.rules stopped letting a player update: their own doc directly.
+exports.acknowledgeOriginIntro = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required.");
+
+  const characterRef = (await getOwnCharacterSnap(uid)).ref;
+  await characterRef.update({ originIntroSeen: true });
+
+  return { ok: true };
+});
+
+// Switches the active profession to one the character already knows (or has known before),
+// upserting the previously-active one into knownProfessions first (see
+// functions/src/lib/professions.js's withProfessionChange). `level` is deliberately not a
+// parameter here: it is looked up from the character's own data, since this endpoint only ever
+// switches between professions already held, never grants progress in one it doesn't.
+exports.switchKnownProfession = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required.");
+
+  const { professionId } = request.data;
+  if (!professionId) throw new HttpsError("invalid-argument", "professionId is required.");
+
+  const characterSnap = await getOwnCharacterSnap(uid);
+  const character = characterSnap.data();
+
+  if (professionId === character.professionId) return { ok: true };
+
+  const level = knownLevel(character, professionId);
+  if (level == null) throw new HttpsError("failed-precondition", "This character has never held that profession.");
+
+  await characterSnap.ref.update(withProfessionChange(character, professionId, level));
+
+  return { ok: true };
+});
+
+// TEST-ONLY: backdates the caller's own running action by 24h so it completes immediately,
+// rather than clearing the lock outright (the countdown and result dialog both read completesAt).
+// Was a direct client updateDoc before firestore.rules locked characters writes to isCreator()
+// only; kept as a callable so the dev workflow it supports still works.
+// TODO: remove before the game goes live to real players.
+exports.debugAdvanceTime = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required.");
+
+  const characterSnap = await getOwnCharacterSnap(uid);
+  const character = characterSnap.data();
+
+  const completesAt = actionCompletesAtMillis(character);
+  if (completesAt == null) return { ok: true };
+
+  const shift = 24 * HOUR_MS;
+  const startedAt = toMillis(character.lastAction?.startedAt ?? character.lastActionAt);
+  const patch = { "lastAction.completesAt": Timestamp.fromMillis(completesAt - shift) };
+  if (startedAt != null) patch["lastAction.startedAt"] = Timestamp.fromMillis(startedAt - shift);
+
+  await characterSnap.ref.update(patch);
 
   return { ok: true };
 });

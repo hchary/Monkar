@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { withProfessionChange } from "../lib/professions";
+import { collection, onSnapshot } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "../lib/firebase";
 import { normalizeActionType } from "../lib/actionCatalog";
 import { CRAFTING_ACTION_KIND_ID, actionKindInheritsFrom } from "../lib/actionKinds";
 import CraftingTab from "./CraftingTab";
@@ -39,12 +39,11 @@ export default function ProfessionTab({ character }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [craftActions]);
 
-  async function selectKnownProfession(professionId, level) {
-    if (professionId === character.professionId) {
-      dialogRef.current?.close();
-      return;
+  async function selectKnownProfession(professionId) {
+    if (professionId !== character.professionId) {
+      const switchKnownProfession = httpsCallable(functions, "switchKnownProfession");
+      await switchKnownProfession({ professionId });
     }
-    await updateDoc(doc(db, "characters", character.id), withProfessionChange(character, professionId, level));
     dialogRef.current?.close();
   }
 
@@ -125,7 +124,7 @@ export default function ProfessionTab({ character }) {
                   <button
                     type="button"
                     className={k.professionId === character.professionId ? "selected" : ""}
-                    onClick={() => selectKnownProfession(k.professionId, k.level)}
+                    onClick={() => selectKnownProfession(k.professionId)}
                   >
                     {professions.find((p) => p.id === k.professionId)?.name || k.professionId} — Niv {k.level}
                   </button>
