@@ -3,6 +3,8 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { RARITIES } from "./creator/TalentsManager";
 import { OBJECT_TYPES } from "./creator/ObjectsManager";
+import MultiSelectModalField from "./creator/MultiSelectModalField";
+import { matchesTag } from "./creator/TagsManager";
 import InstanceTile, { CONDITIONS, formatDate } from "./Instance";
 
 function useItems(collectionName) {
@@ -13,21 +15,6 @@ function useItems(collectionName) {
     });
   }, [collectionName]);
   return items;
-}
-
-function MultiSelectField({ legend, options, selectedIds, onToggle }) {
-  return (
-    <fieldset>
-      <legend>{legend}</legend>
-      {options.length === 0 && <p>Aucun élément créé pour l'instant.</p>}
-      {options.map((option) => (
-        <label key={option.id}>
-          <input type="checkbox" checked={selectedIds.includes(option.id)} onChange={() => onToggle(option.id)} />
-          {option.name}
-        </label>
-      ))}
-    </fieldset>
-  );
 }
 
 const emptyFilters = { rarities: [], types: [], tagIds: [] };
@@ -86,6 +73,27 @@ export default function InventoryTab({ character }) {
     setDetail(null);
   }
 
+  // The objects actually held by the character, deduplicated by objectId — used to restrict
+  // filter options to values that could plausibly match something in the inventory, instead of
+  // showing every rarity/type/tag that exists in the whole game.
+  const ownedObjects = Object.values(
+    instances.reduce((acc, instance) => {
+      const object = objects.find((o) => o.id === instance.objectId);
+      if (object) acc[object.id] = object;
+      return acc;
+    }, {})
+  );
+
+  const availableRarities = RARITIES.filter((r) => ownedObjects.some((o) => (o.rarity || "commun") === r.value)).map(
+    (r) => ({ id: r.value, name: r.label })
+  );
+  const availableTypes = OBJECT_TYPES.filter((t) => ownedObjects.some((o) => o.type === t.value)).map((t) => ({
+    id: t.value,
+    name: t.label,
+  }));
+  const ownedTagIds = new Set(ownedObjects.flatMap((o) => o.tagIds || []));
+  const availableTags = tags.filter((tag) => ownedTagIds.has(tag.id));
+
   const filteredInstances = instances
     .map((instance) => ({ instance, object: objects.find((o) => o.id === instance.objectId) }))
     .filter(({ object }) => {
@@ -113,19 +121,29 @@ export default function InventoryTab({ character }) {
 
       <fieldset>
         <legend>Filtres</legend>
-        <MultiSelectField
+        <MultiSelectModalField
           legend="Raretés"
-          options={RARITIES.map((r) => ({ id: r.value, name: r.label }))}
+          options={availableRarities}
           selectedIds={filters.rarities}
           onToggle={toggleFilterRarity}
+          buttonLabel="Raretés"
         />
-        <MultiSelectField
+        <MultiSelectModalField
           legend="Types"
-          options={OBJECT_TYPES.map((t) => ({ id: t.value, name: t.label }))}
+          options={availableTypes}
           selectedIds={filters.types}
           onToggle={toggleFilterType}
+          buttonLabel="Types"
         />
-        <MultiSelectField legend="Tags" options={tags} selectedIds={filters.tagIds} onToggle={toggleFilterTag} />
+        <MultiSelectModalField
+          legend="Tags"
+          options={availableTags}
+          selectedIds={filters.tagIds}
+          onToggle={toggleFilterTag}
+          matchesFilter={matchesTag}
+          filterPlaceholder="Filtrer par nom..."
+          buttonLabel="Tags"
+        />
         <button type="button" onClick={() => setFilters(emptyFilters)}>
           Réinitialiser les filtres
         </button>
