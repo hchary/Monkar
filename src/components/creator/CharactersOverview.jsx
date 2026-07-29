@@ -1,9 +1,24 @@
 import { useEffect, useState } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, doc, query, updateDoc, where, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import MultiSelectModalField from "./MultiSelectModalField";
+import { matchesProfession } from "./ProfessionsManager";
+
+function useItems(collectionName) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", collectionName, "items"), (snap) => {
+      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, [collectionName]);
+  return items;
+}
 
 function CharacterDetail({ character, onBack }) {
   const [history, setHistory] = useState([]);
+  const professions = useItems("professions");
+  const sortedProfessions = [...professions].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+  const knownProfessions = character.knownProfessions || [];
 
   useEffect(() => {
     const q = query(collection(db, "actionsLog"), where("characterId", "==", character.id));
@@ -13,6 +28,16 @@ function CharacterDetail({ character, onBack }) {
       setHistory(entries);
     });
   }, [character.id]);
+
+  // The creator hand-assigns a métier straight into knownProfessions - the same list
+  // ProfessionTab.jsx's "Métiers connus" popup reads - without touching the character's active
+  // professionId/professionLevel, which stays whatever the player last picked there.
+  async function toggleKnownProfession(professionId) {
+    const nextKnown = knownProfessions.some((k) => k.professionId === professionId)
+      ? knownProfessions.filter((k) => k.professionId !== professionId)
+      : [...knownProfessions, { professionId, level: 1 }];
+    await updateDoc(doc(db, "characters", character.id), { knownProfessions: nextKnown });
+  }
 
   return (
     <div className="character-detail">
@@ -32,6 +57,20 @@ function CharacterDetail({ character, onBack }) {
         <li>Niveau de légende : {character.legendLevel ?? "(aucun)"}</li>
         <li>Or : {character.gold}</li>
       </ul>
+
+      <fieldset>
+        <legend>Métiers</legend>
+        <MultiSelectModalField
+          legend="Métiers connus"
+          options={sortedProfessions}
+          selectedIds={knownProfessions.map((k) => k.professionId)}
+          onToggle={toggleKnownProfession}
+          createLink={`/creator?section=${encodeURIComponent("Métiers")}`}
+          matchesFilter={matchesProfession}
+          filterPlaceholder="Filtrer par nom ou description..."
+          buttonLabel="Ajouter des métiers"
+        />
+      </fieldset>
 
       <h4>Historique complet</h4>
       {history.length > 0 ? (
