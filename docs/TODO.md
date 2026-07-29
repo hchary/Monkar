@@ -225,22 +225,22 @@ A table de butin (loot table) is a named, tagged pool of `worldData/objects/item
 - **Tags**: multi-select against `worldData/tags/items`, same mechanism already used by quests, quest objectives, and objects.
 - **Rarity**: reuses the 8-tier rarity enum shared with talents and objects — a single value per table (not per entry).
 - **Objects**: multi-select against `worldData/objects/items`, via `MultiSelectModalField.jsx`.
+- **Pondération (weighting)**: `Uniforme` (default) or `Manuelle`. In `Manuelle` mode, each selected object gets a per-item weight (1-100) entered as a percentage; the save button is disabled until every selected object has a weight in that range and the weights sum to exactly 100. Switching an object off the table also drops its stored weight.
 
 **Loot table list page**: filtered list (rarity, tags, free-text search over name, with a reset button) plus a collapsible "Nouvelle table de tirage" form below — same list-then-create layout as [Object creation](#object-creation), except list actions ("Modifier"/"Tirer") only appear on hover instead of always being visible, to keep the row uncluttered; deleting a table is done from the edit form instead of the list.
 
-**Drawing**: clicking "Tirer" on a table in the list rolls `drawLootTableItemId(table)` (`src/lib/lootTables.js`) — a uniform random pick over the table's `itemIds` — and shows the result in a popup. The drawn object's name links to `/creator?section=Objets&objectId={id}`, which `ObjectsManager.jsx` reads to auto-open that object's edit form. The draw function is a standalone, side-effect-free export specifically so other parts of the app (e.g. a future quest resolution flow) can reuse the same mechanic instead of reimplementing it.
+**Drawing**: clicking "Tirer" on a table in the list rolls `drawLootTableItemId(table)` (`src/lib/lootTables.js`, mirrored server-side in `functions/src/lib/loot.js`) — a uniform random pick over the table's `itemIds`, or a weighted pick using `itemWeights` when `weightMode` is `manuelle` (falling back to uniform if the weights happen to sum to 0) — and shows the result in a popup. The drawn object's name links to `/creator?section=Objets&objectId={id}`, which `ObjectsManager.jsx` reads to auto-open that object's edit form. The draw function is a standalone, side-effect-free export specifically so other parts of the app (e.g. a future quest resolution flow) can reuse the same mechanic instead of reimplementing it.
 
 **Data model implications**:
 ```
 worldData/lootTables/items/{id}
   name: string
-  rarity: string      -- one of the 8-tier rarity enum shared with talents
-  tagIds: string[]    -- worldData/tags/items ids
-  itemIds: string[]   -- worldData/objects/items ids
+  rarity: string           -- one of the 8-tier rarity enum shared with talents
+  tagIds: string[]          -- worldData/tags/items ids
+  itemIds: string[]         -- worldData/objects/items ids
+  weightMode: string        -- "uniforme" (default) or "manuelle"
+  itemWeights: object       -- { [itemId]: number }, percentages summing to 100 — only meaningful when weightMode is "manuelle"
 ```
-
-**Still open (deliberately deferred)**:
-- **Weighted entries**: the draw is uniform across all objects in a table; per-entry weighting (like `RegionsManager.jsx`'s backgrounds) isn't supported.
 
 Quest integration is implemented — see [Quest loot draw](#quest-loot-draw).
 
