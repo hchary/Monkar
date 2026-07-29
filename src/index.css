@@ -127,6 +127,17 @@ button.selected {
   color: var(--bg);
 }
 
+button.danger {
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #c0392b;
+  color: var(--text);
+  border-color: #c0392b;
+}
+
 .character-banner {
   text-align: center;
   padding-bottom: 16px;
