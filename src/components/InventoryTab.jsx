@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { RARITIES } from "./creator/TalentsManager";
 import { OBJECT_TYPES } from "./creator/ObjectsManager";
-import InstanceCard from "./Instance";
+import InstanceTile, { CONDITIONS, formatDate } from "./Instance";
 
 function useItems(collectionName) {
   const [items, setItems] = useState([]);
@@ -35,6 +35,8 @@ const emptyFilters = { rarities: [], types: [], tagIds: [] };
 export default function InventoryTab({ character }) {
   const [instances, setInstances] = useState([]);
   const [filters, setFilters] = useState(emptyFilters);
+  const [detail, setDetail] = useState(null);
+  const dialogRef = useRef(null);
   const objects = useItems("objects");
   const tags = useItems("tags");
 
@@ -74,6 +76,16 @@ export default function InventoryTab({ character }) {
     }));
   }
 
+  function openDetail(payload) {
+    setDetail(payload);
+    dialogRef.current?.showModal();
+  }
+
+  function closeDetail() {
+    dialogRef.current?.close();
+    setDetail(null);
+  }
+
   const filteredInstances = instances
     .map((instance) => ({ instance, object: objects.find((o) => o.id === instance.objectId) }))
     .filter(({ object }) => {
@@ -109,14 +121,46 @@ export default function InventoryTab({ character }) {
       </fieldset>
 
       {filteredInstances.length > 0 ? (
-        <ul className="instance-list">
+        <ul className="inventory-grid">
           {filteredInstances.map(({ instance, object }) => (
-            <InstanceCard key={instance.id} instance={instance} object={object} tags={tags} />
+            <InstanceTile key={instance.id} instance={instance} object={object} onSelect={openDetail} />
           ))}
         </ul>
       ) : (
         <p className="empty-state">Ton inventaire est vide.</p>
       )}
+
+      <dialog
+        ref={dialogRef}
+        className="instance-detail-dialog"
+        onClick={(e) => {
+          if (e.target === dialogRef.current) closeDetail();
+        }}
+        onClose={() => setDetail(null)}
+      >
+        {detail && (
+          <div className={`instance-detail-content rarity-${detail.object.rarity}`}>
+            <h4>{detail.object.name}</h4>
+            <p>
+              {RARITIES.find((r) => r.value === detail.object.rarity)?.label || detail.object.rarity} —{" "}
+              {OBJECT_TYPES.find((t) => t.value === detail.object.type)?.label || detail.object.type}
+            </p>
+            <p>État : {CONDITIONS.find((c) => c.value === detail.instance.condition)?.label || detail.instance.condition}</p>
+            <p>Obtenu le {formatDate(detail.instance.acquisitionDate)}</p>
+            {(detail.instance.description || detail.object.description) && (
+              <p>{detail.instance.description || detail.object.description}</p>
+            )}
+            <p>
+              Tags :{" "}
+              {(detail.object.tagIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") ||
+                "aucun"}
+            </p>
+            <button type="button" onClick={closeDetail}>
+              Fermer
+            </button>
+          </div>
+        )}
+      </dialog>
     </div>
   );
 }
