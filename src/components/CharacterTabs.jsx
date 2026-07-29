@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import InventoryTab from "./InventoryTab";
+import ProfessionTab from "./ProfessionTab";
 
 const TABS = [
   "Inventaire",
   "Talents",
-  "Bénédictions",
+  "Métier",
   "Malédictions",
   "Blessures",
   "Journal des quêtes",
@@ -75,16 +76,7 @@ export default function CharacterTabs({ character }) {
             <EmptyState text="Aucun talent acquis pour l'instant." />
           ))}
 
-        {activeTab === "Bénédictions" &&
-          (character.blessings?.length > 0 ? (
-            <ul>
-              {character.blessings.map((b, i) => (
-                <li key={i}>{b}</li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState text="Aucune bénédiction pour l'instant." />
-          ))}
+        {activeTab === "Métier" && <ProfessionTab character={character} />}
 
         {activeTab === "Malédictions" &&
           (character.curses?.length > 0 ? (

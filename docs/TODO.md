@@ -479,9 +479,9 @@ this migration.
 
 ## Profession (métier) creation
 
-Status: **implemented** (catalog and creator UI). `worldData/professions/items` via
-`ProfessionsManager.jsx`, registered as the "Métiers" tab in `CreatorDashboard.jsx`, under the
-"Personnages" group alongside Talents and Objets.
+Status: **implemented** (catalog, creator UI, and character link — see "Character link" below).
+`worldData/professions/items` via `ProfessionsManager.jsx`, registered as the "Métiers" tab in
+`CreatorDashboard.jsx`, under the "Personnages" group alongside Talents and Objets.
 
 A profession is characterized by:
 
@@ -521,11 +521,38 @@ worldData/professions/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- This catalog isn't wired to `character.profession` (today a flat denormalized string set at
-  character creation, matched by the `profession` action condition in `actionConditions.js`) —
-  whether assigning a character to a `worldData/professions/items` entry replaces or complements
-  that existing string field is undecided.
-- No consumer reads `baseIncome`, `minReputation`, `evolutionId`, or `actionIds` yet — this entry
-  covers only the catalog and creator UI, not any gameplay mechanic (income payout, reputation-gated
-  profession change, evolution trigger, or restricting an action's visibility to a profession's
-  `actionIds`).
+- No consumer reads `minReputation` or `evolutionId` yet — reputation-gated profession change and
+  the evolution trigger are not implemented, nor is restricting an action's visibility to a
+  profession's `actionIds`.
+- How a character is first assigned a profession (via a quest, a trainer, at character creation,
+  etc.) is not implemented — see "Character link" below for what exists today.
+
+### Character link
+
+Status: **implemented**, except initial assignment (see "Still open" above).
+
+A character has at most one active profession plus a mastery level (`professionLevel`, an integer
+1-5, starting at 1 whenever a profession is (re)assigned), and a history of every profession it has
+ever held (`knownProfessions`), each with its own remembered level.
+
+Displayed in the character sheet's "Métier" tab (renamed from "Bénédictions", which it replaces —
+`CharacterTabs.jsx`), via `ProfessionTab.jsx`: profession name and level, income (`baseIncome *
+professionLevel`, in "pièces de cuivre"), description, and associated actions (resolved from
+`actionIds` against `worldData/actionTypes/items`). A "Métiers connus" control opens a popup listing
+`knownProfessions`; picking one swaps it in as the active profession, first upserting the previously
+active profession's current level back into `knownProfessions` so no progress is lost
+(`src/lib/professions.js`'s `withProfessionChange`).
+
+**Data model implications**:
+```
+characters/{id}
+  professionId: string | null       -- worldData/professions/items id, the active profession
+  professionLevel: number | null    -- 1-5 mastery level, only meaningful when professionId is set
+  knownProfessions: { professionId: string, level: number }[]
+                                     -- every profession ever held, with its last known level
+```
+
+Deliberately left untouched: `character.profession` (the legacy free-text string copied from the
+rolled background) and the `profession` action condition in `actionConditions.js` still key off that
+string, not off `professionId` — reconciling the two remains part of the undecided initial-assignment
+mechanic above.
