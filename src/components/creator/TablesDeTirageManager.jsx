@@ -42,7 +42,23 @@ function MultiSelectField({ legend, options, selectedIds, onToggle }) {
 }
 
 const emptyFilters = { rarities: [], tagIds: [], text: "" };
-const emptyForm = { name: "", rarity: "commun", tagIds: [], itemIds: [] };
+const emptyForm = { name: "", rarity: "commun", tagIds: [], itemIds: [], weightMode: "uniforme", itemWeights: {} };
+
+// Sum of the manual weights for a form's currently-selected items (non-numeric entries count as 0).
+function manualWeightsSum(form) {
+  return form.itemIds.reduce((sum, id) => sum + (Number(form.itemWeights[id]) || 0), 0);
+}
+
+// Manual weighting can only be saved once every selected item has a weight between 1 and 100
+// and the weights sum to exactly 100 — uniform mode and an empty item list are always valid.
+function isManualWeightsValid(form) {
+  if (form.weightMode !== "manuelle" || form.itemIds.length === 0) return true;
+  const allInRange = form.itemIds.every((id) => {
+    const w = Number(form.itemWeights[id]);
+    return Number.isFinite(w) && w >= 1 && w <= 100;
+  });
+  return allInRange && manualWeightsSum(form) === 100;
+}
 
 export default function TablesDeTirageManager() {
   const [tables, setTables] = useState([]);
@@ -93,6 +109,8 @@ export default function TablesDeTirageManager() {
       rarity: table.rarity || "commun",
       tagIds: table.tagIds || [],
       itemIds: table.itemIds || [],
+      weightMode: table.weightMode || "uniforme",
+      itemWeights: table.itemWeights || {},
     });
     setPanelOpen(true);
   }
@@ -110,14 +128,23 @@ export default function TablesDeTirageManager() {
   }
 
   function toggleItemId(id) {
-    setForm((prev) => ({
-      ...prev,
-      itemIds: prev.itemIds.includes(id) ? prev.itemIds.filter((x) => x !== id) : [...prev.itemIds, id],
-    }));
+    setForm((prev) => {
+      const wasSelected = prev.itemIds.includes(id);
+      const itemIds = wasSelected ? prev.itemIds.filter((x) => x !== id) : [...prev.itemIds, id];
+      const itemWeights = { ...prev.itemWeights };
+      if (wasSelected) delete itemWeights[id];
+      return { ...prev, itemIds, itemWeights };
+    });
+  }
+
+  function setItemWeight(id, value) {
+    setForm((prev) => ({ ...prev, itemWeights: { ...prev.itemWeights, [id]: value } }));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!isManualWeightsValid(form)) return;
+
     const ref = editingId
       ? doc(db, "worldData", "lootTables", "items", editingId)
       : doc(collection(db, "worldData", "lootTables", "items"));
@@ -127,6 +154,11 @@ export default function TablesDeTirageManager() {
       rarity: form.rarity,
       tagIds: form.tagIds,
       itemIds: form.itemIds,
+      weightMode: form.weightMode,
+      itemWeights:
+        form.weightMode === "manuelle"
+          ? Object.fromEntries(form.itemIds.map((id) => [id, Number(form.itemWeights[id])]))
+          : {},
     });
     resetForm();
   }
@@ -178,7 +210,10 @@ export default function TablesDeTirageManager() {
                 Tags :{" "}
                 {(table.tagIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") || "aucun"}
               </div>
-              <div>{(table.itemIds || []).length} objet(s)</div>
+              <div>
+                {(table.itemIds || []).length} objet(s) — pondération{" "}
+                {table.weightMode === "manuelle" ? "manuelle" : "uniforme"}
+              </div>
             </div>
             <div className="loot-table-actions">
               <button type="button" onClick={() => startEdit(table)}>
@@ -235,8 +270,42 @@ export default function TablesDeTirageManager() {
             buttonLabel="Ajouter objets"
           />
 
+          <label>
+            Pondération
+            <select value={form.weightMode} onChange={(e) => setForm({ ...form, weightMode: e.target.value })}>
+              <option value="uniforme">Uniforme</option>
+              <option value="manuelle">Manuelle</option>
+            </select>
+          </label>
+
+          {form.weightMode === "manuelle" && (
+            <fieldset>
+              <legend>Poids par objet (%)</legend>
+              {form.itemIds.length === 0 && <p className="empty-state">Sélectionnez des objets pour définir leurs poids.</p>}
+              {form.itemIds.map((id) => (
+                <label key={id}>
+                  {objects.find((o) => o.id === id)?.name || id}
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={form.itemWeights[id] ?? ""}
+                    onChange={(e) => setItemWeight(id, e.target.value)}
+                  />
+                </label>
+              ))}
+              {form.itemIds.length > 0 && (
+                <p className={manualWeightsSum(form) === 100 ? undefined : "error"}>
+                  Somme des poids : {manualWeightsSum(form)} / 100
+                </p>
+              )}
+            </fieldset>
+          )}
+
           <div>
-            <button type="submit">{editingId ? "Enregistrer" : "Créer la table"}</button>
+            <button type="submit" disabled={!isManualWeightsValid(form)}>
+              {editingId ? "Enregistrer" : "Créer la table"}
+            </button>
             {editingId && (
               <button type="button" onClick={resetForm}>
                 Annuler
