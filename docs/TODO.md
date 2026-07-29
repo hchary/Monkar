@@ -677,3 +677,32 @@ worldData/actionTypes/items/{id}  -- only meaningful when kindId inherits from "
 `handler.prepare`/`handler.resolve` (previously only available to `genericResolve`) - needed
 because, unlike `partirEnQuete.js`, `recolte.js` has no single hardcoded action document id to
 stamp onto `lastAction.actionTypeId`.
+
+## Known recipes tab (Xerotex)
+
+Status: **implemented** (display only — no code path grants a recipe to a character yet).
+
+The Xerotex page gains a "Recettes" tab listing the recipes a character knows, filterable and
+sortable by rarity, category, tags, ingredients, and results — the same filter/sort logic already
+used by the creator's Recettes page (`RecettesManager.jsx`), exported from that file and reused
+rather than duplicated (`matchesRecette`, `tagNames`, `objectEntryLabel`, `SORT_FIELDS`,
+`compareRecettes`).
+
+- **Mechanic 1**: the "Recettes" tab is reachable from the Xerotex page's tab bar.
+- **Mechanic 2**: the tab shows the character's known recipes (name, rarity, categories, tags,
+  ingredients, results), filterable by rarity/category/tag and free-text name search, sortable by
+  any of those fields plus ingredient/result count.
+- **Interaction**: `XerotexRecipesTab.jsx` (new, sibling to `InventoryTab.jsx`), rendered from
+  `Xerotex.jsx` alongside its existing tabs. Read-only — no edit/delete, unlike the creator's list.
+  An empty `knownRecipes` shows the same `EmptyState` pattern used by every other stub tab.
+
+**Data model implications**:
+```
+characters/{characterId}
+  knownRecipes: string[]   -- worldData/recettes/items ids the character knows
+```
+
+**Still open (deliberately deferred)**: no mechanic grants `knownRecipes` yet - there is no
+crafting or recipe-teaching action to populate it. Recipes remain catalog-only
+(`worldData/recettes/items`, still not consumed by any Cloud Function either) until such an action
+is designed.

@@ -52,6 +52,9 @@ characters/{characterId}
   blessings: [string]              -- not yet granted by any code path (stub)
   curses: [string]                 -- not yet granted by any code path (stub)
   wounds: [{ name, description, date }]
+  knownRecipes: [string]           -- worldData/recettes/items ids; shown read-only in the Xerotex
+                                    -- page's "Recettes" tab (XerotexRecipesTab.jsx). Not yet granted
+                                    -- by any code path (stub) — see docs/TODO.md
   lastActionDate: string | null    -- "YYYY-MM-DD" UTC, the once-per-day lock
   lastActionAt: Timestamp | null   -- precise instant, used for the 24h reveal delay
   lastAction: { ... } | null       -- full result of the last action, see performAction below
