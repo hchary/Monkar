@@ -4,11 +4,11 @@ function isPositiveInteger(value) {
   return Number.isInteger(value) && value > 0;
 }
 
-// The core mechanic behind any harvest-type action (not implemented yet - see
+// The core mechanic behind a Récolte action (functions/src/actions/recolte.js - see
 // docs/TODO.md): draw baseQuantity*modifier items uniformly at random from a single loot
 // table, one draw at a time via drawLootTableItemId so duplicates are just repeated ids
-// in the returned array. A harvest action's resolve() would call this and turn the
-// result into Instance documents, the same way partirEnQuete.js's commit() does.
+// in the returned array. recolte.js's resolve() calls this and turns the result into
+// Instance documents on commit(), the same way partirEnQuete.js does for quest loot.
 function harvestFromLootTable({ lootTable, baseQuantity, modifier = 1 }) {
   if (!isPositiveInteger(baseQuantity)) {
     throw new Error("baseQuantity must be a positive integer");

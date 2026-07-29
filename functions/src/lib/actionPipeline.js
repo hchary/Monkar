@@ -47,7 +47,7 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today 
 
   // Pre-transaction prep (e.g. drawing a quest) can throw a friendly precondition error -
   // deliberately outside the transaction so it never consumes the day's lock.
-  const context = handler?.prepare ? await handler.prepare({ db, character, actionType }) : undefined;
+  const context = handler?.prepare ? await handler.prepare({ db, character, actionType, actionTypeId }) : undefined;
 
   await db.runTransaction(async (tx) => {
     const characterDoc = await tx.get(characterRef);
@@ -62,7 +62,7 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today 
     }
 
     const { updates, logFields } = handler
-      ? await handler.resolve({ tx, db, character: freshCharacter, actionType, today, context })
+      ? await handler.resolve({ tx, db, character: freshCharacter, actionType, actionTypeId, today, context })
       : genericResolve({ actionType, actionTypeId, today });
 
     tx.update(characterRef, stampLifecycle(updates, { actionType, now }));

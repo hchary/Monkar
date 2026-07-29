@@ -136,7 +136,13 @@ describe("normalizeActionType - kinds", () => {
   });
 
   test("a kind this build doesn't know keeps whatever category it was filed under", () => {
-    const normalized = normalizeActionType({ kindId: "recolte", categoryId: "metier" });
+    const normalized = normalizeActionType({ kindId: "transport", categoryId: "metier" });
+    assert.equal(normalized.kindId, "transport");
+    assert.equal(normalized.categoryId, "metier");
+  });
+
+  test("a Métier subtype's category is derived as Métier, not left as whatever was authored", () => {
+    const normalized = normalizeActionType({ kindId: "recolte", categoryId: "aventure" });
     assert.equal(normalized.kindId, "recolte");
     assert.equal(normalized.categoryId, "metier");
   });

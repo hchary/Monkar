@@ -612,10 +612,68 @@ worldData/actionTypes/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- No concrete Métier subtype exists yet (Artisanat, Récolte, Transport, Recherche). Adding one is
-  an entry in `ACTION_KINDS` plus, if it needs bespoke mechanics, a handler in `ACTION_HANDLERS`.
-  `functions/src/lib/harvest.js` is already written and tested for the Récolte case but is not
-  registered as a handler.
+- No concrete Métier subtype exists yet beyond Récolte (Artisanat, Transport, Recherche). Adding
+  one is an entry in `ACTION_KINDS` plus, if it needs bespoke mechanics, a handler in
+  `ACTION_HANDLERS` - see [Action de récolte](#action-de-récolte) for how Récolte did it.
 - A kind cannot declare which handlers or which extra form fields belong to it; the handler select
-  still offers every registered handler regardless of kind. Worth revisiting when the first
+  still offers every registered handler regardless of kind. Worth revisiting when the next
   subtype needs its own fields.
+
+## Action de récolte
+
+Status: **implemented**.
+
+A **Récolte action** (`worldData/actionTypes/items/{id}.kindId: "recolte"`, `HARVEST_ACTION_KIND_ID`
+in `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`) is a Métier subtype - it inherits
+the profession gate for free by being filed under Métier in the kind tree, exactly as the
+[Action kinds and Métier actions](#action-kinds-and-métier-actions) entry anticipated. It is
+characterized by everything a Métier action already carries (name, description, associated
+professions, handler, tiers, conditions, …) plus two fields meaningful only for this kind:
+
+- **Tags de butin** (`lootTagIds: string[]`, `worldData/tags/items` ids): a *different* tag
+  vocabulary from action tags (not implemented yet - see
+  [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) for the only tag
+  concept that exists today). Used only to pick which loot table this harvest draws from.
+- **Rareté** (`rarity`, the 8-tier enum shared with talents/objects/loot tables): combined with
+  `lootTagIds`, narrows `worldData/lootTables/items` down to the candidate pool for this action.
+
+**Mechanic** (`functions/src/actions/recolte.js`, registered under the shared `"recolte"`
+handlerId - one handler for every Récolte action, keyed by `handlerId` like every other handler,
+not by a per-action document id): on a successful tier (rolled exactly like any other action's
+`tiers`), a random loot table is picked among those whose `tagIds` overlaps the action's
+`lootTagIds` and whose `rarity` matches the action's `rarity`; `harvestFromLootTable`
+(`functions/src/lib/harvest.js`) then draws `baseQuantity` items from it, one uniform draw at a
+time (repeats are just repeated ids, same convention as everywhere else loot is drawn).
+`baseQuantity` is the sum of the character's mastery level across every profession the action is
+associated with (`professionIds`) - but **only for professions the character actually knows**
+(its active `professionId`/`professionLevel`, or an entry in `knownProfessions`); a profession
+listed on the action that the character never held contributes 0, it doesn't block the harvest.
+No matching table, or a `baseQuantity` of 0, yields no loot rather than an error - a content gap,
+not a failure, same convention as quest loot's per-item skip.
+
+Loot is deferred exactly like quest loot: `resolve()` freezes the drawn items onto
+`lastAction.loot` (reusing the same entry shape - `objectId`, `name`, `rarity`, `type`, `tagIds`,
+`tableId`, `tableName`, `description` - so `ActionOutcome.jsx`'s "Butin obtenu" box needs no
+Récolte-specific branch), and `commit()` turns each entry into its own `instances/{id}` document
+once the player acknowledges the result (`acknowledgeAction`) - a harvest of quantity 5 from a
+one-item table produces 5 separate Instance documents, not one stacked count (the client already
+groups identical inventory items with a count badge, see
+[Object creation](#object-creation)'s "Instance" note).
+
+**Interaction**: no new UI. The creator's "Nouvelle action" form shows "Tags de butin"/"Rareté"
+whenever the selected type inherits from Récolte, right where "Métiers associés" already appears
+for any Métier action (`ActionsManager.jsx`); a character sees and starts a Récolte action exactly
+like any other Métier action, through the existing `ActionBrowser`/`hasProfession` gate - no
+mechanic 2 work was needed beyond that gate already being generic.
+
+**Data model implications**:
+```
+worldData/actionTypes/items/{id}  -- only meaningful when kindId inherits from "recolte"
+  lootTagIds: string[]   -- worldData/tags/items ids, distinct from any future action-tags field
+  rarity: string          -- one of the 8-tier rarity enum shared with talents/objects/loot tables
+```
+
+`functions/src/lib/actionPipeline.js`'s `runActionPipeline` now also passes `actionTypeId` into
+`handler.prepare`/`handler.resolve` (previously only available to `genericResolve`) - needed
+because, unlike `partirEnQuete.js`, `recolte.js` has no single hardcoded action document id to
+stamp onto `lastAction.actionTypeId`.

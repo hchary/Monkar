@@ -5,6 +5,7 @@ const { rollWeighted } = require("./lib/rolls");
 const { runActionPipeline } = require("./lib/actionPipeline");
 const { isActionRunning, isActionAcknowledged } = require("./lib/actionLifecycle");
 const partirEnQuete = require("./actions/partirEnQuete");
+const recolte = require("./actions/recolte");
 
 initializeApp();
 const db = getFirestore();
@@ -20,6 +21,7 @@ function todayUTC() {
 // (docs/ISSUE-02-ACTION-FRAMEWORK.md D13).
 const ACTION_HANDLERS = {
   partirEnQuete,
+  recolte,
 };
 
 exports.createCharacter = onCall(async (request) => {
