@@ -350,7 +350,13 @@ export default function RegionsManager() {
         ))}
       </ul>
 
-      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+      <details
+        className="collapsible-group"
+        open={panelOpen}
+        onToggle={(e) => {
+          if (e.target === e.currentTarget) setPanelOpen(e.target.open);
+        }}
+      >
         <summary>{editingId ? "Modifier la région" : "Nouvelle région"}</summary>
         <form onSubmit={handleSubmit}>
         <input placeholder="Nom de la région" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />

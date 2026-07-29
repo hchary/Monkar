@@ -70,7 +70,13 @@ export default function TrainerTypesManager() {
         ))}
       </ul>
 
-      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+      <details
+        className="collapsible-group"
+        open={panelOpen}
+        onToggle={(e) => {
+          if (e.target === e.currentTarget) setPanelOpen(e.target.open);
+        }}
+      >
         <summary>{editingId ? "Modifier le type d'entraîneur" : "Nouveau type d'entraîneur"}</summary>
         <form onSubmit={handleSubmit}>
           <input placeholder="Nom" value={name} onChange={(e) => setName(e.target.value)} required />

@@ -73,7 +73,13 @@ export default function FactionsManager() {
         ))}
       </ul>
 
-      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+      <details
+        className="collapsible-group"
+        open={panelOpen}
+        onToggle={(e) => {
+          if (e.target === e.currentTarget) setPanelOpen(e.target.open);
+        }}
+      >
         <summary>{editingId ? "Modifier la faction" : "Nouvelle faction"}</summary>
         <form onSubmit={handleSubmit}>
           <input placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />

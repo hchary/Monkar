@@ -255,7 +255,13 @@ function VerbPhrasesManager() {
         ))}
       </ul>
 
-      <details className="collapsible-group" open={panelOpen} onToggle={(e) => setPanelOpen(e.target.open)}>
+      <details
+        className="collapsible-group"
+        open={panelOpen}
+        onToggle={(e) => {
+          if (e.target === e.currentTarget) setPanelOpen(e.target.open);
+        }}
+      >
         <summary>{editingId ? "Modifier la phrase-verbe" : "Nouvelle phrase-verbe"}</summary>
         <form onSubmit={handleSubmit}>
           <label>
