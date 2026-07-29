@@ -1019,6 +1019,42 @@ fieldset label {
   margin: 0;
 }
 
+.origin-intro-dialog {
+  width: min(480px, 90vw);
+  padding: 0;
+  border: 1px solid var(--border);
+  clip-path: var(--pixel-frame);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.origin-intro-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.origin-intro-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.origin-intro-content h3 {
+  margin: 0;
+}
+
+.origin-intro-content p {
+  margin: 0;
+}
+
+.origin-section-label {
+  font-weight: bold;
+}
+
+.origin-farewell {
+  font-style: italic;
+}
+
 .climate-banner-footer {
   position: fixed;
   left: 50%;

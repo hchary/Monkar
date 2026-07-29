@@ -7,6 +7,7 @@ import CharacterBanner from "../components/CharacterBanner";
 import CharacterTabs from "../components/CharacterTabs";
 import ActionPanel from "../components/ActionPanel";
 import ClimateBanner from "../components/ClimateBanner";
+import OriginIntroDialog from "../components/OriginIntroDialog";
 
 export default function CharacterProfile() {
   const { character, checked } = useOwnCharacter();
@@ -33,6 +34,7 @@ export default function CharacterProfile() {
 
   return (
     <div className="character-page">
+      <OriginIntroDialog character={character} />
       <CharacterBanner character={character} />
       <div className="character-layout">
         <CharacterTabs character={character} />
