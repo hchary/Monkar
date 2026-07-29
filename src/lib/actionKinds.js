@@ -25,6 +25,7 @@ export const ACTION_KINDS = [
   { value: "metier", label: "Métier", parentId: null },
   { value: "social", label: "Social", parentId: null },
   { value: "recolte", label: "Récolte", parentId: "metier" },
+  { value: "artisanat", label: "Artisanat", parentId: "metier" },
 ];
 
 // The kind whose descendants are reserved to characters practising one of the action's
@@ -37,6 +38,12 @@ export const PROFESSION_ACTION_KIND_ID = "metier";
 // UI (which shows the "Tags de butin"/"Rareté" fields) and the server handler ask the same
 // question.
 export const HARVEST_ACTION_KIND_ID = "recolte";
+
+// The kind whose descendants resolve a recette (worldData/recettes/items) instead of a rolled
+// tier: consuming its ingredients and producing its results. Same convention as
+// HARVEST_ACTION_KIND_ID - both the creator UI (which shows the "Catégories de recettes" field)
+// and the "artisanat" handler ask the same question.
+export const CRAFTING_ACTION_KIND_ID = "artisanat";
 
 export function findActionKind(kindId) {
   return ACTION_KINDS.find((kind) => kind.value === kindId) || null;

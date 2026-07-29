@@ -612,9 +612,10 @@ worldData/actionTypes/items/{id}
 ```
 
 **Still open (deliberately deferred)**:
-- No concrete Métier subtype exists yet beyond Récolte (Artisanat, Transport, Recherche). Adding
-  one is an entry in `ACTION_KINDS` plus, if it needs bespoke mechanics, a handler in
-  `ACTION_HANDLERS` - see [Action de récolte](#action-de-récolte) for how Récolte did it.
+- No concrete Métier subtype exists yet beyond Récolte and Artisanat (Transport, Recherche...).
+  Adding one is an entry in `ACTION_KINDS` plus, if it needs bespoke mechanics, a handler in
+  `ACTION_HANDLERS` - see [Action de récolte](#action-de-récolte) and
+  [Action d'artisanat](#action-dartisanat) for how those two did it.
 - A kind cannot declare which handlers or which extra form fields belong to it; the handler select
   still offers every registered handler regardless of kind. Worth revisiting when the next
   subtype needs its own fields.
@@ -678,6 +679,73 @@ worldData/actionTypes/items/{id}  -- only meaningful when kindId inherits from "
 because, unlike `partirEnQuete.js`, `recolte.js` has no single hardcoded action document id to
 stamp onto `lastAction.actionTypeId`.
 
+## Action d'artisanat
+
+Status: **implemented**.
+
+An **Artisanat action** (`worldData/actionTypes/items/{id}.kindId: "artisanat"`,
+`CRAFTING_ACTION_KIND_ID` in `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`) is a
+Métier subtype, exactly like Récolte - it inherits the profession gate for free by being filed
+under Métier in the kind tree. It carries one field meaningful only for this kind:
+
+- **Catégories de recettes** (`recipeCategoryIds: string[]`, `worldData/tags/items` ids - the same
+  catalog a recette's own `categoryIds` draws from): a recette qualifies for this action when its
+  `categoryIds` overlaps this list.
+
+**Mechanic** (`functions/src/actions/artisanat.js`, registered under the shared `"artisanat"`
+handlerId): unlike Récolte or a quest, there's no rolled tier - crafting always succeeds once its
+ingredients are confirmed present. `prepare()` validates the client-picked `recetteId` (present on
+`character.knownRecipes`, and matching the action's `recipeCategoryIds`) and throws a friendly
+precondition error otherwise, without consuming the daily lock. `resolve()` then re-checks
+ingredient quantities against `instances` (`hasIngredients`, `functions/src/lib/crafting.js`) as
+the authority and, if met, **consumes them immediately** (`tx.delete`, in the same transaction that
+starts the action) - a player sees the ingredients leave their inventory the moment they click
+"Commencer", not 24h later. The recette's results (`craftResults`, same module) are frozen onto
+`lastAction.craftResults` and only turned into `instances/{id}` documents in `commit()`, once the
+player acknowledges the result pop-up - the one difference from the crafting mechanic's original
+single-shot sketch (`functions/src/actions/artisanat.js`'s previous `craft()`, which consumed and
+produced in one immediate call rather than splitting across the action's lifecycle).
+
+**Interaction**: no generic `ActionBrowser` entry - an Artisanat action instead surfaces as its own
+sub-tab inside the character sheet's "Métier" tab (`ProfessionTab.jsx`; a sub-tab bar - "Description"
+plus one tab per enabled Artisanat action tied to the active profession - only appears once such an
+action exists). `CraftingTab.jsx` lists the character's `knownRecipes` restricted to the action's
+`recipeCategoryIds`, alphabetically sorted and filterable by a free-text search (reusing
+`RecettesManager.jsx`'s exported `matchesRecette`/`objectEntryLabel`), scrollable vertically.
+Hovering a recette shows its ingredients/results via the shared `[data-tooltip]` CSS convention;
+clicking selects it, showing the same detail below with a "Commencer" button, disabled with no
+recette selected, while submitting, or while another action is already running. Starting it calls
+`performAction({ actionTypeId, recetteId })` - the same callable every action goes through, just
+carrying one extra field. The result pop-up (`ActionResultDialog.jsx`) special-cases
+`lastAction.handlerId === "artisanat"`: no Succès/Échec line (crafting can't fail once it starts),
+header reads "`{action label}: {recette name}`", results are listed under "Résultat", and the
+acknowledge button reads "Terminer" instead of "Fermer" - everywhere else in the dialog this is
+generic and shared with every other action.
+
+**Data model implications**:
+```
+worldData/actionTypes/items/{id}  -- only meaningful when kindId inherits from "artisanat"
+  recipeCategoryIds: string[]   -- worldData/tags/items ids, same catalog as a recette's categoryIds
+
+characters/{id}
+  lastAction: {
+    recetteId: string        -- artisanat only, worldData/recettes/items id
+    recetteName: string      -- denormalized at resolve time
+    craftResults: [{ objectId, name, rarity, description }]   -- one entry per unit produced,
+                                                                --   same convention as récolte's loot
+  }
+```
+
+`functions/src/lib/actionPipeline.js`'s `runActionPipeline` now also accepts a `payload` object,
+passed through to `handler.prepare`/`handler.resolve` alongside a `characterRef` (previously only
+available to `commit`) - needed because, unlike every other handler so far, `resolve()` here must
+itself query and delete `instances` documents, which requires the character's id before `commit()`
+ever runs.
+
+**Still open (deliberately deferred)**: nothing grants `knownRecipes` yet (see
+[Known recipes tab (Xerotex)](#known-recipes-tab-xerotex)), so until some other mechanic populates
+it, `CraftingTab.jsx` has nothing to list for any character.
+
 ## Known recipes tab (Xerotex)
 
 Status: **implemented** (display only — no code path grants a recipe to a character yet).
@@ -702,7 +770,7 @@ characters/{characterId}
   knownRecipes: string[]   -- worldData/recettes/items ids the character knows
 ```
 
-**Still open (deliberately deferred)**: no mechanic grants `knownRecipes` yet - there is no
-crafting or recipe-teaching action to populate it. Recipes remain catalog-only
-(`worldData/recettes/items`, still not consumed by any Cloud Function either) until such an action
-is designed.
+**Still open (deliberately deferred)**: no mechanic grants `knownRecipes` yet - there is now a
+crafting action that *consumes* it ([Action d'artisanat](#action-dartisanat)), but nothing that
+*grants* it (a training action, a discovery, a starting background...), so every character's
+`knownRecipes` stays empty until one is designed.

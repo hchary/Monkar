@@ -1011,6 +1011,48 @@ fieldset label {
   margin-bottom: 4px;
 }
 
+.crafting-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recipe-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.recipe-list button {
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  clip-path: var(--pixel-frame);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.recipe-list button.selected {
+  background: var(--border);
+}
+
+.recipe-detail {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.craft-result-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
 .link-button {
   background: none;
   border: none;

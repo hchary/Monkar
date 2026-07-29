@@ -4,6 +4,7 @@ const {
   ACTION_KINDS,
   PROFESSION_ACTION_KIND_ID,
   HARVEST_ACTION_KIND_ID,
+  CRAFTING_ACTION_KIND_ID,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,
@@ -36,6 +37,11 @@ describe("the registry itself", () => {
   test("the harvest kind is one of them, nested under the profession kind", () => {
     assert.ok(findActionKind(HARVEST_ACTION_KIND_ID));
     assert.equal(findActionKind(HARVEST_ACTION_KIND_ID).parentId, PROFESSION_ACTION_KIND_ID);
+  });
+
+  test("the crafting kind is one of them, nested under the profession kind", () => {
+    assert.ok(findActionKind(CRAFTING_ACTION_KIND_ID));
+    assert.equal(findActionKind(CRAFTING_ACTION_KIND_ID).parentId, PROFESSION_ACTION_KIND_ID);
   });
 
   test("every kind resolves to a root category", () => {
@@ -113,9 +119,12 @@ describe("actionKindsInTreeOrder", () => {
     assert.equal(flattened.length, ACTION_KINDS.length);
     assert.deepStrictEqual(
       flattened.map((kind) => kind.value),
-      ["aventure", "intermede", "metier", "recolte", "social"]
+      ["aventure", "intermede", "metier", "recolte", "artisanat", "social"]
     );
-    assert.equal(flattened.find((kind) => kind.value === "recolte").depth, 1);
-    assert.ok(flattened.filter((kind) => kind.value !== "recolte").every((kind) => kind.depth === 0));
+    const subtypes = ["recolte", "artisanat"];
+    for (const value of subtypes) {
+      assert.equal(flattened.find((kind) => kind.value === value).depth, 1);
+    }
+    assert.ok(flattened.filter((kind) => !subtypes.includes(kind.value)).every((kind) => kind.depth === 0));
   });
 });

@@ -6,6 +6,7 @@ const { runActionPipeline } = require("./lib/actionPipeline");
 const { isActionRunning, isActionAcknowledged } = require("./lib/actionLifecycle");
 const partirEnQuete = require("./actions/partirEnQuete");
 const recolte = require("./actions/recolte");
+const artisanat = require("./actions/artisanat");
 
 initializeApp();
 const db = getFirestore();
@@ -22,6 +23,7 @@ function todayUTC() {
 const ACTION_HANDLERS = {
   partirEnQuete,
   recolte,
+  artisanat,
 };
 
 exports.createCharacter = onCall(async (request) => {
@@ -83,10 +85,17 @@ exports.performAction = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Login required.");
 
-  const { actionTypeId } = request.data;
+  const { actionTypeId, recetteId } = request.data;
   if (!actionTypeId) throw new HttpsError("invalid-argument", "actionTypeId is required.");
 
-  await runActionPipeline({ db, uid, actionTypeId, actionHandlers: ACTION_HANDLERS, today: todayUTC() });
+  await runActionPipeline({
+    db,
+    uid,
+    actionTypeId,
+    actionHandlers: ACTION_HANDLERS,
+    today: todayUTC(),
+    payload: { recetteId },
+  });
 
   return { ok: true };
 });

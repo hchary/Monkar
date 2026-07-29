@@ -5,6 +5,7 @@ import {
   ACTION_KINDS,
   PROFESSION_ACTION_KIND_ID,
   HARVEST_ACTION_KIND_ID,
+  CRAFTING_ACTION_KIND_ID,
   actionKindInheritsFrom,
   actionKindLabel,
   actionKindsInTreeOrder,
@@ -26,7 +27,7 @@ import MultiSelectModalField from "./MultiSelectModalField";
 // null/unregistered - kept in step with functions/src/index.js's ACTION_HANDLERS by hand, since
 // the creator UI can't see the server's registry. The closest thing to compile-time safety a
 // Firestore-authored catalog can have (F2).
-const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte"];
+const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte", "artisanat"];
 
 // Matches an action's label or description - for use as MultiSelectModalField's matchesFilter,
 // and as this manager's own free-text search.
@@ -192,6 +193,7 @@ const emptyForm = {
   showLoot: false,
   lootTagIds: [],
   rarity: RARITIES[0].value,
+  recipeCategoryIds: [],
 };
 
 export default function ActionsManager() {
@@ -258,6 +260,7 @@ export default function ActionsManager() {
       showLoot: result.showLoot === true,
       lootTagIds: actionType.lootTagIds || [],
       rarity: actionType.rarity || RARITIES[0].value,
+      recipeCategoryIds: actionType.recipeCategoryIds || [],
     });
     setPanelOpen(true);
   }
@@ -296,6 +299,8 @@ export default function ActionsManager() {
   // Only the Récolte branch carries loot tags/rarity - same convention as isProfessionAction:
   // switching an action out of Récolte drops them rather than leaving stale, unused fields.
   const isHarvestAction = actionKindInheritsFrom(form.kindId, HARVEST_ACTION_KIND_ID);
+  // Only the Artisanat branch carries recipe categories - same convention as isHarvestAction.
+  const isCraftingAction = actionKindInheritsFrom(form.kindId, CRAFTING_ACTION_KIND_ID);
 
   function toggleProfessionId(id) {
     setForm((prev) => ({
@@ -310,6 +315,15 @@ export default function ActionsManager() {
     setForm((prev) => ({
       ...prev,
       lootTagIds: prev.lootTagIds.includes(id) ? prev.lootTagIds.filter((x) => x !== id) : [...prev.lootTagIds, id],
+    }));
+  }
+
+  function toggleRecipeCategoryId(id) {
+    setForm((prev) => ({
+      ...prev,
+      recipeCategoryIds: prev.recipeCategoryIds.includes(id)
+        ? prev.recipeCategoryIds.filter((x) => x !== id)
+        : [...prev.recipeCategoryIds, id],
     }));
   }
 
@@ -351,6 +365,7 @@ export default function ActionsManager() {
         },
         lootTagIds: isHarvestAction ? form.lootTagIds : [],
         rarity: isHarvestAction ? form.rarity : null,
+        recipeCategoryIds: isCraftingAction ? form.recipeCategoryIds : [],
       },
       { merge: true }
     );
@@ -408,6 +423,7 @@ export default function ActionsManager() {
           const kindId = resolveKindId(actionType);
           const isMetier = actionKindInheritsFrom(kindId, PROFESSION_ACTION_KIND_ID);
           const isHarvest = actionKindInheritsFrom(kindId, HARVEST_ACTION_KIND_ID);
+          const isCrafting = actionKindInheritsFrom(kindId, CRAFTING_ACTION_KIND_ID);
           return (
             <li key={actionType.id}>
               <strong>{actionType.label}</strong>
@@ -427,6 +443,13 @@ export default function ActionsManager() {
                   {(actionType.lootTagIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") ||
                     "aucun"}
                   {" — "}Rareté : {RARITIES.find((r) => r.value === actionType.rarity)?.label || "non définie"}
+                </div>
+              )}
+              {isCrafting && (
+                <div>
+                  Catégories de recettes :{" "}
+                  {(actionType.recipeCategoryIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") ||
+                    <span className="error">aucune — l'action ne pourra fabriquer aucune recette</span>}
                 </div>
               )}
               <div>
@@ -530,6 +553,30 @@ export default function ActionsManager() {
                 quantité de base récoltée est la somme des niveaux de maîtrise des métiers associés que le personnage
                 connaît.
               </p>
+            </>
+          )}
+
+          {isCraftingAction && (
+            <>
+              <MultiSelectModalField
+                legend="Catégories de recettes"
+                options={sortedTags}
+                selectedIds={form.recipeCategoryIds}
+                onToggle={toggleRecipeCategoryId}
+                createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+                matchesFilter={matchesTag}
+                filterPlaceholder="Filtrer par nom..."
+                buttonLabel="Ajouter des catégories de recettes"
+              />
+              <p>
+                Sur la fiche de personnage, cette action affiche les recettes connues dont l'une des catégories
+                figure ici, filtrables et sélectionnables pour être fabriquées.
+              </p>
+              {form.recipeCategoryIds.length === 0 && (
+                <p className="error">
+                  Sans catégorie de recettes, cette action ne pourra fabriquer aucune recette.
+                </p>
+              )}
             </>
           )}
 
