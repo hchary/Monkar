@@ -5,14 +5,17 @@ export default function GatherResult({ lastAction, error, onClose, closing }) {
       <h3>{lastAction.label}</h3>
 
       <p className="craft-result-label">Récolté :</p>
-      <ul className="instance-list">
-        {(lastAction.gatherResults || []).map((item, index) => (
-          <li key={index} className={`instance-card rarity-${item.rarity}`}>
-            {item.name}
-            {item.quantity > 1 && ` ×${item.quantity}`}
-          </li>
-        ))}
-      </ul>
+      {lastAction.loot?.length > 0 ? (
+        <ul className="instance-list">
+          {lastAction.loot.map((item, index) => (
+            <li key={index} className={`instance-card rarity-${item.rarity}`}>
+              {item.name}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>Rien de récolté cette fois.</p>
+      )}
 
       {error && <p className="error">{error}</p>}
 
