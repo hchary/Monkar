@@ -53,8 +53,10 @@ characters/{characterId}
   curses: [string]                 -- not yet granted by any code path (stub)
   wounds: [{ name, description, date }]
   knownRecipes: [string]           -- worldData/recettes/items ids; shown read-only in the Xerotex
-                                    -- page's "Recettes" tab (XerotexRecipesTab.jsx). Not yet granted
-                                    -- by any code path (stub) — see docs/TODO.md
+                                    -- page's "Recettes" tab (XerotexRecipesTab.jsx), and gates which
+                                    -- recettes an Artisanat action's crafting tab offers
+                                    -- (CraftingTab.jsx). Not yet granted by any code path (stub) —
+                                    -- see docs/TODO.md
   lastActionDate: string | null    -- "YYYY-MM-DD" UTC, the once-per-day lock
   lastActionAt: Timestamp | null   -- precise instant, used for the 24h reveal delay
   lastAction: { ... } | null       -- full result of the last action, see performAction below
@@ -188,7 +190,8 @@ worldData/recettes/items/{id}      -- crafting recipe catalog: ingredients consu
   tagIds: [string]                 -- worldData/tags/items ids
   ingredients: [{ objectId, qty }] -- objectId: worldData/objects/items id, qty: number
   results: [{ objectId, qty }]     -- objectId: worldData/objects/items id, qty: number
-  -- not yet consumed by any Cloud Function (no crafting action resolves recettes yet), see docs/TODO.md
+  -- consumed by an Artisanat action's "artisanat" handler (functions/src/actions/artisanat.js) —
+  -- see docs/TODO.md "Action d'artisanat"
 
 worldData/factions/{id}            -- not yet consumed by the app, reserved for
 worldData/gods/{id}                   the creator dashboard (Phase 3)

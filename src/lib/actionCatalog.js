@@ -39,6 +39,15 @@ export function resolveProfessionIds(actionType) {
   return Array.isArray(actionType?.professionIds) ? actionType.professionIds.filter((id) => typeof id === "string") : [];
 }
 
+// worldData/tags/items ids restricting which recettes this Artisanat action can craft (a recette
+// qualifies when its own categoryIds overlaps this list) - only meaningful for kinds inheriting
+// CRAFTING_ACTION_KIND_ID, same convention as resolveProfessionIds/lootTagIds.
+export function resolveRecipeCategoryIds(actionType) {
+  return Array.isArray(actionType?.recipeCategoryIds)
+    ? actionType.recipeCategoryIds.filter((id) => typeof id === "string")
+    : [];
+}
+
 // The conditions actually evaluated for an action: the authored ones, plus - for anything
 // inheriting from Métier - the profession gate implied by its "Métiers associés" field. That gate
 // is not an authored row: it is what being a Métier action *means* ("disponible uniquement pour
@@ -64,6 +73,7 @@ export function normalizeActionType(actionType) {
     kindId: resolveKindId(actionType),
     categoryId: resolveCategoryId(actionType),
     professionIds: resolveProfessionIds(actionType),
+    recipeCategoryIds: resolveRecipeCategoryIds(actionType),
     description: actionType?.description || "",
     order: Number.isFinite(Number(actionType?.order)) ? Number(actionType.order) : 0,
     // Absent means enabled: an action authored before this field existed must keep working.

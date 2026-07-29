@@ -12,7 +12,7 @@ const { isActionRunning } = require("./actionLifecycle");
 const { normalizeActionType, evaluateAvailability } = require("./actionCatalog");
 const { buildConditionContext } = require("./actionContext");
 
-async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today }) {
+async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today, payload = {} }) {
   const charSnap = await db
     .collection("characters")
     .where("ownerUid", "==", uid)
@@ -47,7 +47,9 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today 
 
   // Pre-transaction prep (e.g. drawing a quest) can throw a friendly precondition error -
   // deliberately outside the transaction so it never consumes the day's lock.
-  const context = handler?.prepare ? await handler.prepare({ db, character, actionType, actionTypeId }) : undefined;
+  const context = handler?.prepare
+    ? await handler.prepare({ db, character, actionType, actionTypeId, payload })
+    : undefined;
 
   await db.runTransaction(async (tx) => {
     const characterDoc = await tx.get(characterRef);
@@ -62,7 +64,17 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today 
     }
 
     const { updates, logFields } = handler
-      ? await handler.resolve({ tx, db, character: freshCharacter, actionType, actionTypeId, today, context })
+      ? await handler.resolve({
+          tx,
+          db,
+          character: freshCharacter,
+          characterRef,
+          actionType,
+          actionTypeId,
+          today,
+          context,
+          payload,
+        })
       : genericResolve({ actionType, actionTypeId, today });
 
     tx.update(characterRef, stampLifecycle(updates, { actionType, now }));
