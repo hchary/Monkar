@@ -1,7 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
-const { rollWeighted } = require("./lib/rolls");
 const { runActionPipeline } = require("./lib/actionPipeline");
 const { isActionRunning, isActionAcknowledged } = require("./lib/actionLifecycle");
 const partirEnQuete = require("./actions/partirEnQuete");
@@ -48,9 +47,44 @@ exports.createCharacter = onCall(async (request) => {
   if (!regionSnap.exists) throw new HttpsError("not-found", "Unknown region.");
   const region = regionSnap.data();
 
-  const backgroundsSnap = await regionRef.collection("backgrounds").get();
-  if (backgroundsSnap.empty) throw new HttpsError("failed-precondition", "This region has no backgrounds configured.");
-  const background = rollWeighted(backgroundsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  const originsSnap = await db.collection("worldData").doc("origins").collection("items").get();
+  // Valid = restricted to (among others) this region, or unrestricted (no regionIds at all).
+  const validOrigins = originsSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((o) => !o.regionIds?.length || o.regionIds.includes(regionId));
+  if (validOrigins.length === 0) {
+    throw new HttpsError("failed-precondition", "This region has no valid origins configured.");
+  }
+  const origin = validOrigins[Math.floor(Math.random() * validOrigins.length)];
+
+  const today = todayUTC();
+
+  const talentIds = origin.talentIds || [];
+  const talentSnaps = talentIds.length
+    ? await db.getAll(...talentIds.map((id) => db.collection("worldData").doc("talents").collection("items").doc(id)))
+    : [];
+  const talentsGranted = talentSnaps
+    .filter((snap) => snap.exists)
+    .map((snap) => {
+      const talent = snap.data();
+      return {
+        id: snap.id,
+        name: talent.name,
+        quality: 1,
+        trainable: !!talent.trainable,
+        rarity: talent.rarity || "commun",
+        effect: talent.effect || "",
+        tagIds: talent.tagIds || [],
+        lastChangeDate: today,
+        lastChangeCircumstance: `Origine : ${origin.name}`,
+      };
+    });
+
+  const itemIds = origin.startingItemIds || [];
+  const itemSnaps = itemIds.length
+    ? await db.getAll(...itemIds.map((id) => db.collection("worldData").doc("objects").collection("items").doc(id)))
+    : [];
+  const itemsGranted = itemSnaps.filter((snap) => snap.exists).map((snap) => ({ id: snap.id, ...snap.data() }));
 
   const characterRef = db.collection("characters").doc();
   await characterRef.set({
@@ -58,15 +92,24 @@ exports.createCharacter = onCall(async (request) => {
     name,
     age: 18,
     region: { id: regionId, name: region.name },
-    background: { id: background.id, name: background.name, profession: background.profession || "" },
+    origin: {
+      id: origin.id,
+      name: origin.name,
+      description: origin.description || "",
+      profession: origin.profession || "",
+      reputationStart: origin.reputationStart || 0,
+      talents: talentsGranted.map((t) => ({ id: t.id, name: t.name })),
+      items: itemsGranted.map((item) => ({ id: item.id, name: item.name })),
+    },
+    originIntroSeen: false,
     title: "",
-    profession: background.profession || "",
-    reputation: background.reputationStart || 0,
+    profession: origin.profession || "",
+    reputation: origin.reputationStart || 0,
     legendLevel: null,
     alive: true,
-    gold: background.startingGold || 0,
-    inventory: background.startingItems || [],
-    talents: [],
+    gold: 0,
+    inventory: [],
+    talents: talentsGranted,
     blessings: [],
     curses: [],
     woundsLight: 0,
@@ -77,6 +120,17 @@ exports.createCharacter = onCall(async (request) => {
     lastAction: null,
     createdAt: FieldValue.serverTimestamp(),
   });
+
+  for (const item of itemsGranted) {
+    await db.collection("instances").doc().set({
+      objectId: item.id,
+      characterId: characterRef.id,
+      ownerUid: uid,
+      acquisitionDate: today,
+      condition: "neuf",
+      description: item.description || "",
+    });
+  }
 
   await db.collection("users").doc(uid).set({ role: "player", characterId: characterRef.id }, { merge: true });
 

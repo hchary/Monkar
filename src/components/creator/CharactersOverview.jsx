@@ -50,7 +50,7 @@ function CharacterDetail({ character, onBack }) {
       <ul>
         <li>Propriétaire (uid) : {character.ownerUid}</li>
         <li>Région : {character.region?.name}</li>
-        <li>Background : {character.background?.name}</li>
+        <li>Origine : {character.origin?.name || character.background?.name}</li>
         <li>Métier : {character.profession}</li>
         <li>Titre : {character.title || "(aucun)"}</li>
         <li>Réputation : {character.reputation}</li>
@@ -111,7 +111,8 @@ export default function CharactersOverview() {
         {characters.map((character) => (
           <li key={character.id}>
             <button type="button" onClick={() => setSelected(character)}>
-              {character.name} {!character.alive && "(mort)"} — {character.region?.name || "?"}, {character.background?.name || "?"}
+              {character.name} {!character.alive && "(mort)"} — {character.region?.name || "?"},{" "}
+              {character.origin?.name || character.background?.name || "?"}
             </button>
           </li>
         ))}
