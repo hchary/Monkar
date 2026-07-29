@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
-import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, writeBatch, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { ACTION_CATEGORIES, actionCategoryLabel } from "../../lib/actionCategories";
+import {
+  ACTION_KINDS,
+  PROFESSION_ACTION_KIND_ID,
+  actionKindInheritsFrom,
+  actionKindLabel,
+  actionKindsInTreeOrder,
+} from "../../lib/actionKinds";
 import { CONDITION_TYPES } from "../../lib/actionConditions";
+import { resolveKindId } from "../../lib/actionCatalog";
 import { DEFAULT_DURATION_HOURS } from "../../lib/actionLifecycle";
+import { actionTypeRef, syncActionProfessions, unlinkDeletedAction } from "../../lib/professionActions";
 import { matchesTalent } from "./TalentsManager";
 import { matchesTag } from "./TagsManager";
 import { matchesRegion } from "./RegionsManager";
+// ProfessionsManager imports matchesActionType back from here. The cycle is safe and stays safe as
+// long as both sides only export hoisted function declarations called at render time, never
+// values read while the module is evaluating.
+import { matchesProfession } from "./ProfessionsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
 
 // A handler is the escape hatch functions/src/lib/actionPipeline.js falls back from when it's
@@ -161,12 +173,13 @@ function ConditionRow({ condition, index, onTypeChange, onFieldChange, onRemove,
   );
 }
 
-const emptyFilters = { categoryIds: [], enabledFilter: "all", text: "" };
+const emptyFilters = { kindIds: [], enabledFilter: "all", text: "" };
 
 const emptyForm = {
   label: "",
-  categoryId: ACTION_CATEGORIES[0].value,
+  kindId: ACTION_KINDS[0].value,
   description: "",
+  professionIds: [],
   order: 0,
   enabled: true,
   handlerId: "",
@@ -190,6 +203,8 @@ export default function ActionsManager() {
   const tags = useItems("tags");
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
   const regions = useItems("regions");
+  const professions = useItems("professions");
+  const sortedProfessions = [...professions].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "actionTypes", "items"), (snap) => {
@@ -197,20 +212,21 @@ export default function ActionsManager() {
     });
   }, []);
 
+  // Filtering by a kind includes everything beneath it, so picking "Métier" also lists the future
+  // Artisanat/Récolte actions rather than only the ones typed as Métier itself.
   const filteredActionTypes = actionTypes.filter((actionType) => {
-    if (filters.categoryIds.length > 0 && !filters.categoryIds.includes(actionType.categoryId)) return false;
+    const kindId = resolveKindId(actionType);
+    if (filters.kindIds.length > 0 && !filters.kindIds.some((id) => actionKindInheritsFrom(kindId, id))) return false;
     if (filters.enabledFilter === "enabled" && actionType.enabled === false) return false;
     if (filters.enabledFilter === "disabled" && actionType.enabled !== false) return false;
     if (!matchesActionType(actionType, filters.text)) return false;
     return true;
   });
 
-  function toggleFilterCategory(value) {
+  function toggleFilterKind(value) {
     setFilters((prev) => ({
       ...prev,
-      categoryIds: prev.categoryIds.includes(value)
-        ? prev.categoryIds.filter((c) => c !== value)
-        : [...prev.categoryIds, value],
+      kindIds: prev.kindIds.includes(value) ? prev.kindIds.filter((k) => k !== value) : [...prev.kindIds, value],
     }));
   }
 
@@ -220,8 +236,11 @@ export default function ActionsManager() {
     const result = actionType.result || {};
     setForm({
       label: actionType.label || "",
-      categoryId: actionType.categoryId || ACTION_CATEGORIES[0].value,
+      // A document authored before kinds existed reads its categoryId as its kind, exactly as
+      // normalizeActionType does - editing it then saves the kindId it always implied.
+      kindId: resolveKindId(actionType) || ACTION_KINDS[0].value,
       description: actionType.description || "",
+      professionIds: actionType.professionIds || [],
       order: Number.isFinite(Number(actionType.order)) ? Number(actionType.order) : 0,
       enabled: actionType.enabled !== false,
       handlerId: actionType.handlerId || "",
@@ -265,21 +284,42 @@ export default function ActionsManager() {
   }
 
   const handlerIsUnknown = !!form.handlerId && !KNOWN_HANDLER_IDS.includes(form.handlerId);
+  // Only the Métier branch of the tree carries a profession link; every other kind hides the
+  // picker and saves an empty list, so switching an action out of Métier drops its links.
+  const isProfessionAction = actionKindInheritsFrom(form.kindId, PROFESSION_ACTION_KIND_ID);
+
+  function toggleProfessionId(id) {
+    setForm((prev) => ({
+      ...prev,
+      professionIds: prev.professionIds.includes(id)
+        ? prev.professionIds.filter((x) => x !== id)
+        : [...prev.professionIds, id],
+    }));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const ref = editingId
-      ? doc(db, "worldData", "actionTypes", "items", editingId)
-      : doc(collection(db, "worldData", "actionTypes", "items"));
+    const ref = editingId ? actionTypeRef(editingId) : doc(collection(db, "worldData", "actionTypes", "items"));
+    const professionIds = isProfessionAction ? form.professionIds : [];
+    const previousProfessionIds = editingId
+      ? actionTypes.find((a) => a.id === editingId)?.professionIds || []
+      : [];
+
+    // The action and the professions it points at are written together: the link is stored on
+    // both ends (see src/lib/professionActions.js), so a half-committed save would leave the two
+    // disagreeing about which métiers may run this action.
+    const batch = writeBatch(db);
 
     // tiers and questDifficultyWeights are out of scope here (§3.8, D14) and are left exactly as
     // they are in Firestore - merge:true only touches the fields this form actually owns.
-    await setDoc(
+    // categoryId is no longer written at all: it is derived from kindId at read time.
+    batch.set(
       ref,
       {
         label: form.label,
-        categoryId: form.categoryId,
+        kindId: form.kindId,
         description: form.description,
+        professionIds,
         order: Number(form.order) || 0,
         enabled: form.enabled,
         handlerId: form.handlerId || null,
@@ -296,7 +336,18 @@ export default function ActionsManager() {
       },
       { merge: true }
     );
+    syncActionProfessions(batch, ref.id, previousProfessionIds, professionIds);
+
+    await batch.commit();
     resetForm();
+  }
+
+  async function handleDelete(actionType) {
+    const batch = writeBatch(db);
+    batch.delete(actionTypeRef(actionType.id));
+    unlinkDeletedAction(batch, actionType.id, professions);
+    await batch.commit();
+    if (editingId === actionType.id) resetForm();
   }
 
   return (
@@ -306,10 +357,10 @@ export default function ActionsManager() {
       <fieldset>
         <legend>Filtres</legend>
         <MultiSelectField
-          legend="Catégories"
-          options={ACTION_CATEGORIES.map((c) => ({ id: c.value, name: c.label }))}
-          selectedIds={filters.categoryIds}
-          onToggle={toggleFilterCategory}
+          legend="Types d'action"
+          options={actionKindsInTreeOrder().map((k) => ({ id: k.value, name: `${"— ".repeat(k.depth)}${k.label}` }))}
+          selectedIds={filters.kindIds}
+          onToggle={toggleFilterKind}
         />
         <label>
           État
@@ -336,12 +387,21 @@ export default function ActionsManager() {
         {filteredActionTypes.length === 0 && <li className="empty-state">Aucune action.</li>}
         {filteredActionTypes.map((actionType) => {
           const unknownHandler = actionType.handlerId && !KNOWN_HANDLER_IDS.includes(actionType.handlerId);
+          const kindId = resolveKindId(actionType);
+          const isMetier = actionKindInheritsFrom(kindId, PROFESSION_ACTION_KIND_ID);
           return (
             <li key={actionType.id}>
               <strong>{actionType.label}</strong>
-              {actionType.enabled === false && " (désactivée)"} —{" "}
-              {actionCategoryLabel(actionType.categoryId) || "sans catégorie"}
+              {actionType.enabled === false && " (désactivée)"} — {actionKindLabel(kindId) || "sans type"}
               <div>{actionType.description}</div>
+              {isMetier && (
+                <div>
+                  Métiers associés :{" "}
+                  {(actionType.professionIds || [])
+                    .map((id) => professions.find((p) => p.id === id)?.name || id)
+                    .join(", ") || <span className="error">aucun — l'action n'est accessible à personne</span>}
+                </div>
+              )}
               <div>
                 Gestionnaire : {actionType.handlerId || "générique"}
                 {unknownHandler && <span className="error"> — gestionnaire inconnu</span>}
@@ -351,7 +411,7 @@ export default function ActionsManager() {
               <button type="button" onClick={() => startEdit(actionType)}>
                 Modifier
               </button>
-              <button type="button" onClick={() => deleteDoc(doc(db, "worldData", "actionTypes", "items", actionType.id))}>
+              <button type="button" onClick={() => handleDelete(actionType)}>
                 Supprimer
               </button>
             </li>
@@ -371,21 +431,50 @@ export default function ActionsManager() {
           <input placeholder="Nom" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} required />
 
           <label>
-            Catégorie
-            <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} required>
-              {ACTION_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
+            Type d'action
+            <select value={form.kindId} onChange={(e) => setForm({ ...form, kindId: e.target.value })} required>
+              {actionKindsInTreeOrder().map((kind) => (
+                <option key={kind.value} value={kind.value}>
+                  {"— ".repeat(kind.depth)}
+                  {kind.label}
                 </option>
               ))}
             </select>
           </label>
+          <p>
+            L'action hérite de ce type : sa catégorie dans le panneau de jeu en découle, ainsi que les champs
+            ci-dessous.
+          </p>
 
           <textarea
             placeholder="Description (affichée sur l'onglet de l'action)"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
+
+          {isProfessionAction && (
+            <>
+              <MultiSelectModalField
+                legend="Métiers associés"
+                options={sortedProfessions}
+                selectedIds={form.professionIds}
+                onToggle={toggleProfessionId}
+                createLink={`/creator?section=${encodeURIComponent("Métiers")}`}
+                matchesFilter={matchesProfession}
+                filterPlaceholder="Filtrer par nom ou description..."
+                buttonLabel="Ajouter des métiers"
+              />
+              <p>
+                Seuls les personnages exerçant l'un de ces métiers verront cette action. L'enregistrer l'ajoute aussi
+                aux actions associées de chacun d'eux.
+              </p>
+              {form.professionIds.length === 0 && (
+                <p className="error">
+                  Sans métier associé, cette action ne sera accessible à aucun personnage.
+                </p>
+              )}
+            </>
+          )}
 
           <label>
             Ordre d'affichage

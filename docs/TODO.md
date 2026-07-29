@@ -501,7 +501,9 @@ A profession is characterized by:
   but single-valued here rather than a list.
 - **Actions associées**: multi-select against `worldData/actionTypes/items`, same
   `MultiSelectModalField` + `matchesActionType` mechanism already exported by `ActionsManager.jsx`
-  (option labels come from each action type's `label` field, not `name`).
+  (option labels come from each action type's `label` field, not `name`). Restricted to actions of
+  kind Métier, and kept in step with the action's own `professionIds` — see
+  [Action kinds and Métier actions](#action-kinds-and-métier-actions).
 
 **Interaction**: new "Métiers" tab in the creator dashboard, under the "Personnages" group.
 
@@ -520,8 +522,7 @@ worldData/professions/items/{id}
 
 **Still open (deliberately deferred)**:
 - No consumer reads `minReputation` or `evolutionId` yet — reputation-gated profession change and
-  the evolution trigger are not implemented, nor is restricting an action's visibility to a
-  profession's `actionIds`.
+  the evolution trigger are not implemented.
 - How a character is first assigned a profession (via a quest, a trainer, at character creation,
   etc.) is not implemented — see "Character link" below for what exists today.
 
@@ -554,4 +555,67 @@ characters/{id}
 Deliberately left untouched: `character.profession` (the legacy free-text string copied from the
 rolled background) and the `profession` action condition in `actionConditions.js` still key off that
 string, not off `professionId` — reconciling the two remains part of the undecided initial-assignment
-mechanic above.
+mechanic above. The newer `hasProfession` condition, which gates Métier actions, does read
+`professionId`; both predicates coexist.
+
+## Action kinds and Métier actions
+
+Status: **implemented**.
+
+An action type is now an instance of a *kind* — the "class" it inherits from — rather than a free
+document filed under a category. `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`
+(mirrored pair, same convention as `actionConditions`/`actionCatalog`/`actionLifecycle`) holds the
+tree:
+
+- Four roots, one per category: **Aventure**, **Intermède**, **Métier**, **Social**. "Partir en
+  quête" is an action of kind Aventure.
+- A kind's **category is its root ancestor**, so `categoryId` stops being authored and becomes
+  derived. The four categories and the four root kinds are the same four values, which is what
+  makes that work; `ACTION_CATEGORIES` is now derived from the roots instead of restated.
+- `parentId` exists for the subtypes the Métier branch will grow (Artisanat, Récolte, Transport,
+  Recherche…). Each will inherit Métier's profession gate by being under it, with no new code.
+- Every kind is selectable by an action: "abstract" describes the modelling, not a rule the code
+  enforces, so there is no flag for it.
+
+A **Métier action** is an action whose kind inherits from `metier`. It carries `professionIds`,
+and is available only to a character *practising* one of those professions:
+
+- The gate is **not an authored condition row**. `resolveConditions` (`actionCatalog.js`) injects
+  `{ type: "hasProfession", professionIds }` for anything under Métier, so "which métiers may run
+  this" is edited in exactly one field and cannot be forgotten or contradicted in the condition
+  editor. `hasProfession` is therefore absent from `CONDITION_TYPES`.
+- It matches `character.professionId` — the *active* profession. A profession the character used
+  to hold (`knownProfessions`) does not open the action.
+- It fails closed like every other malformed condition: a Métier action with no profession
+  selected is available to nobody, and both creator screens say so inline.
+- Enforced server-side by the same mirrored evaluator the client uses for display
+  (`runActionPipeline` step 3), so the client's answer stays UX and the server's stays authority.
+
+**The link is stored on both ends and synchronized both ways** (`src/lib/professionActions.js`):
+saving an action writes its `professionIds` *and* `arrayUnion`/`arrayRemove`s itself into each
+profession's `actionIds`, in one `writeBatch`; saving a profession does the mirror image. Deleting
+either end drops the reference from the other, so no dangling id survives the delete. Both ends are
+written because both are read without a join — the availability gate reads the action's side, the
+character sheet's Métier tab reads the profession's. There is no Cloud Function in front of
+`worldData` (it is creator-write per `firestore.rules`), so this runs in the creator's browser; a
+concurrent delete fails the whole batch rather than half-committing.
+
+**Data model implications**:
+```
+worldData/actionTypes/items/{id}
+  kindId: string           -- NEW, src/lib/actionKinds.js value; defaults at read time to the
+                           --   document's old categoryId, so no migration is needed
+  categoryId: string       -- no longer written; derived from kindId's root ancestor. Existing
+                           --   documents keep theirs and it still reads correctly.
+  professionIds: string[]  -- NEW, worldData/professions/items ids; only meaningful for kinds
+                           --   inheriting from "metier", cleared when the kind moves elsewhere
+```
+
+**Still open (deliberately deferred)**:
+- No concrete Métier subtype exists yet (Artisanat, Récolte, Transport, Recherche). Adding one is
+  an entry in `ACTION_KINDS` plus, if it needs bespoke mechanics, a handler in `ACTION_HANDLERS`.
+  `functions/src/lib/harvest.js` is already written and tested for the Récolte case but is not
+  registered as a handler.
+- A kind cannot declare which handlers or which extra form fields belong to it; the handler select
+  still offers every registered handler regardless of kind. Worth revisiting when the first
+  subtype needs its own fields.

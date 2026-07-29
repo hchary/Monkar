@@ -1,0 +1,74 @@
+// The action kind tree - the "class hierarchy" an action type is an instance of.
+//
+// Mirrored verbatim (bodies identical, only the export syntax differs) from
+// functions/src/lib/actionKinds.js, so the creator UI, the player UI and the Cloud Functions all
+// derive a kind's category and its ancestry from the exact same table. functions/ is CommonJS
+// with no build step shared with the Vite app, so a duplicated pure module is the established
+// answer here - same convention as actionConditions.js / actionLifecycle.js. The functions copy
+// is the one covered by tests (actionKinds.test.js); keep this one in step when editing.
+//
+// A kind is what "Partir en quête est une action héritant de l'action abstraite Aventure" means
+// in data: the action document carries kindId, the kind carries the behaviour shared by every
+// action beneath it. Today the tree is four roots deep by one; the point of the parentId edge is
+// that Métier will grow children (Artisanat, Récolte, Transport, Recherche…), each inheriting
+// Métier's profession gate without restating it.
+//
+// Small fixed enums live in JS rather than Firestore here (docs/ISSUE-02-ACTION-FRAMEWORK.md D6),
+// same as DIFFICULTIES / RARITIES / OBJECT_TYPES. Labels are French - creator-facing UI text.
+//
+// Every kind is selectable by an action: "abstract" describes the modelling (a kind is a class,
+// never an action), not a rule the code enforces, so there is no flag for it.
+
+export const ACTION_KINDS = [
+  { value: "aventure", label: "Aventure", parentId: null },
+  { value: "intermede", label: "Intermède", parentId: null },
+  { value: "metier", label: "Métier", parentId: null },
+  { value: "social", label: "Social", parentId: null },
+];
+
+// The kind whose descendants are reserved to characters practising one of the action's
+// professions. Named rather than inlined because both the catalog (which injects the implicit
+// condition) and the creator UI (which shows the "Métiers associés" picker) ask the same question.
+export const PROFESSION_ACTION_KIND_ID = "metier";
+
+export function findActionKind(kindId) {
+  return ACTION_KINDS.find((kind) => kind.value === kindId) || null;
+}
+
+// The chain from this kind up to its root, nearest first: ["recolte", "metier"]. An unknown kind
+// yields [] - callers then fail closed or fall back, never guess. The iteration is bounded by the
+// table's own length so a mis-authored parentId cycle can't hang the render loop.
+export function actionKindAncestry(kindId) {
+  const chain = [];
+  let current = findActionKind(kindId);
+  while (current && chain.length <= ACTION_KINDS.length) {
+    chain.push(current.value);
+    current = current.parentId ? findActionKind(current.parentId) : null;
+  }
+  return chain;
+}
+
+// Inheritance, including the reflexive case: a Métier action is itself "of kind Métier".
+export function actionKindInheritsFrom(kindId, ancestorKindId) {
+  return actionKindAncestry(kindId).includes(ancestorKindId);
+}
+
+// A kind's category is its root ancestor, which is why the four roots share the four category
+// ids: categoryId stops being authored and becomes derived (see actionCatalog.js).
+export function actionKindCategoryId(kindId) {
+  const chain = actionKindAncestry(kindId);
+  return chain.length > 0 ? chain[chain.length - 1] : null;
+}
+
+export function actionKindLabel(kindId) {
+  return findActionKind(kindId)?.label || "";
+}
+
+// Depth-first order with each kind's depth, for rendering the tree as an indented flat list
+// (a <select> can't nest, and the creator UI needs the hierarchy to be readable).
+export function actionKindsInTreeOrder(parentId = null, depth = 0) {
+  return ACTION_KINDS.filter((kind) => kind.parentId === parentId).flatMap((kind) => [
+    { ...kind, depth },
+    ...actionKindsInTreeOrder(kind.value, depth + 1),
+  ]);
+}

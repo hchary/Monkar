@@ -227,6 +227,13 @@ working untouched; it only needs `categoryId: "aventure"`, `handlerId: "partirEn
 `result.accentSource: "difficulty"` set to gain the new behaviour, which the creator UI
 (§3.8) can do by hand.
 
+**Superseded since:** `categoryId` is no longer authored. An action now carries a `kindId` naming
+its place in the action kind tree (`src/lib/actionKinds.js`), and its category is that kind's root
+ancestor — the four categories being exactly the four root kinds is what makes the substitution
+free. `kindId` itself defaults at read time to the document's old `categoryId`, so the paragraph
+above still describes what a pre-kinds document does. Actions under the Métier kind also carry
+`professionIds`. See "Action kinds and Métier actions" in [docs/TODO.md](TODO.md).
+
 `handlerId` is deliberately **not** the document id: keying `ACTION_HANDLERS` by `handlerId`
 lets two action documents share one handler (e.g. two differently-tuned quest actions) and lets
 an action be renamed without touching code.
@@ -863,6 +870,11 @@ None blocking — each has a working default, listed for the record:
 - **Profession conditions** match `character.profession` as a string until a profession catalog
   exists (F10). When it does, `{ type: "profession", values: [...] }` becomes an id match and
   authored content needs a one-off rewrite — small, and unavoidable either way.
+  **Resolved differently since:** the profession catalog arrived and a *second* predicate,
+  `hasProfession`, was added for it, matching `character.professionId`. The string-matching
+  `profession` predicate was left alone rather than rewritten, so no authored content had to
+  change. `hasProfession` is injected from a Métier action's `professionIds` rather than authored
+  — see "Action kinds and Métier actions" in [docs/TODO.md](TODO.md).
 - **Reputation *levels*.** R4 mentions "niveau de réputation"; `character.reputation` is a raw
   number, so the condition is `minReputation`. If named tiers are introduced later, a
   `reputationLevel` condition type is additive.
