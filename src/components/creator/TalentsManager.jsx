@@ -364,6 +364,11 @@ export default function TalentsManager() {
             filterPlaceholder="Filtrer par nom..."
             buttonLabel="Ajouter tags"
           />
+          <p>
+            Ces tags décident quelles quêtes peuvent faire progresser le talent, et quelles phrases-verbes le
+            récit de quête peut employer quand il progresse. Le nom du tag doit être orthographié exactement
+            comme dans le champ « Tags » des phrases-verbes (onglet « Génération de texte »).
+          </p>
 
           <MultiSelectModalField
             legend="Talents ancêtres"

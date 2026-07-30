@@ -1,9 +1,9 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
-const { rollWeighted } = require("../lib/rolls");
+const { rollWeighted, RARITY_ORDER } = require("../lib/rolls");
 const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 const { rollTalentEvolutions } = require("../lib/talentEvolution");
-const { generateResultText } = require("../textGeneration");
+const { generateNarrative, slotOf, SLOT_ORDER } = require("../textGeneration");
 
 const ACTION_TYPE_ID = "partir-en-quete";
 
@@ -66,20 +66,25 @@ async function prepare({ db, character, actionType }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
+  // The tags catalog is read here, once, rather than per tag id inside the transaction - the
+  // narration resolves the quest's and the progressed talent's `tagIds` to tag *names* to match
+  // them against verb phrases, see narrateQuestSuccess below.
+  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap, tagsSnap] = await Promise.all([
     db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
     db.collection("worldData").doc("verbPhrases").collection("items").get(),
     db.collection("worldData").doc("lootTables").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
     db.collection("worldData").doc("talents").collection("items").get(),
+    db.collection("worldData").doc("tags").collection("items").get(),
   ]);
   const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const tags = tagsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
+  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags };
 }
 
 // Draws the quest's loot: one loot table per item, picked among those sharing at least one
@@ -125,46 +130,91 @@ function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects
 // own draw, made here rather than read off a per-tier Firestore field.
 const NARRATION_CIBLES = ["individuel", "groupe"];
 const DEFAULT_NARRATIVE_TEXT = "Vous revenez de votre quête.";
+const DEFAULT_ACCOMPLISHMENT_CLAUSE = "vous revenez de votre quête";
 
-// Tries a randomly-ordered target shape (a lone foe vs a group) against the quest's own
-// objective/phrase pools first, then the global pools, before trying the other shape - the same
-// two-level fallback the old per-tier `cible` used to drive, just no longer needing a tier to pick
-// a target from. Falls back to a fixed sentence only if nothing in the catalog matches either
-// shape (a content gap, not an error).
-function narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPhrases }) {
+// Talents and quests reference the shared worldData/tags catalog by id, while narrativeSubjects and
+// verbPhrases carry their own free-text `tags` strings (see docs/ARCHITECTURE.md's dual-tag note).
+// The generator matches strings, so ids are resolved to names here instead of migrating either side
+// - which means a tag only bridges the two worlds when both spell it identically, see
+// docs/NARRATIVE-GENERATION.md.
+function resolveTagNames(tagIds, tagsByIdName) {
+  return (tagIds || []).map((id) => tagsByIdName.get(id)).filter(Boolean);
+}
+
+// The talent flourish names a single talent, so the most notable change wins - the rarest one, the
+// same ordering the result popup already uses for its "Amélioration de talent" list.
+function pickNarratedEvolution(evolutions) {
+  return (
+    [...evolutions].sort((a, b) => RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity))[0] || null
+  );
+}
+
+// A quest's successPhraseIds are the sentences its author judged to fit it; the global catalog is
+// the fallback. Resolved per slot rather than over the whole pool, so linking one climax phrase to a
+// quest doesn't also deprive that quest of every opening line and talent flourish.
+function preferQuestPhrasesPerSlot({ questVerbPhrases, verbPhrases }) {
+  return SLOT_ORDER.flatMap((slot) => {
+    const own = questVerbPhrases.filter((v) => slotOf(v) === slot);
+    return own.length > 0 ? own : verbPhrases.filter((v) => slotOf(v) === slot);
+  });
+}
+
+// Everything the generator needs to know about this resolution, gathered in one pure function so
+// the narrative-poc demo harness and the unit tests build the exact same context the live action
+// does. Only the talent that actually progressed feeds `talentTags`, not the character's whole
+// sheet: matching against every talent they own would let a swordsman's quest borrow the fire
+// imagery of a Pyromancie they never used, which is the wrong-flavor failure the subset rule exists
+// to prevent.
+function buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions, tagsByIdName }) {
+  const narratedEvolution = pickNarratedEvolution(talentEvolutions || []);
+  const narratedTalent = narratedEvolution
+    ? (nextTalents || []).find((t) => t.id === narratedEvolution.talentId) ||
+      (talents || []).find((t) => t.id === narratedEvolution.talentId)
+    : null;
+
+  return {
+    talentTags: resolveTagNames(narratedTalent?.tagIds, tagsByIdName),
+    questTags: resolveTagNames(quest.tagIds, tagsByIdName),
+    talentChange: narratedEvolution?.kind || null,
+    talentName: narratedEvolution?.name || null,
+    locationName,
+    questName: quest.name,
+  };
+}
+
+// Tries a randomly-ordered target shape (a lone foe vs a group) against the quest's own objectives
+// first, then the global subject pool, before trying the other shape - the same two-level fallback
+// the old per-tier `cible` used to drive, just no longer needing a tier to pick a target from.
+// Returns null if nothing in the catalog matches either shape (a content gap, not an error).
+function narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPhrases, context }) {
   const cibles = Math.random() < 0.5 ? NARRATION_CIBLES : [...NARRATION_CIBLES].reverse();
   const questVerbPhrases = verbPhrases.filter((v) => (quest.successPhraseIds || []).includes(v.id));
+  const pool = preferQuestPhrasesPerSlot({ questVerbPhrases, verbPhrases });
 
   for (const cible of cibles) {
-    const fromQuest = generateResultText({ resultat: "victoire", cible, subjects: questObjectives, verbPhrases: questVerbPhrases });
-    if (fromQuest) return fromQuest;
-
-    const fromGlobal = generateResultText({ resultat: "victoire", cible, subjects: narrativeSubjects, verbPhrases });
-    if (fromGlobal) return fromGlobal;
+    for (const subjects of [questObjectives, narrativeSubjects]) {
+      const narrative = generateNarrative({ resultat: "victoire", cible, subjects, verbPhrases: pool, context });
+      if (narrative) return narrative;
+    }
   }
 
-  return DEFAULT_NARRATIVE_TEXT;
+  return null;
 }
 
 async function resolve({ character, today, context }) {
-  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
+  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags } = context;
 
   const questObjectives = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
-  const narrativeText = narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPhrases });
-
-  const loot = drawQuestLoot({
-    quest,
-    difficulty: quest.difficulty,
-    questObjectives,
-    lootTables,
-    objects,
-    accomplishmentMessage: narrativeText,
-  });
+  const tagsByIdName = new Map((tags || []).map((tag) => [tag.id, tag.name]));
 
   // Every quest has a chance to evolve or unlock a talent sharing a tag with it, gated on a
   // single objective drawn for this occurrence (same draw mechanism as loot's per-item objective,
   // but rolled once for the whole talent pass rather than per talent) - see docs/TODO.md
   // "Amélioration de talent".
+  //
+  // Rolled *before* the narration, unlike previously: the narration's closing sentence names the
+  // talent that progressed and is matched against that talent's own tags, so it can't be written
+  // until the roll has decided which talent - if any - changed.
   const { talents: nextTalents, evolutions: talentEvolutions } = rollTalentEvolutions({
     characterTalents: character.talents || [],
     catalogTalents: talents,
@@ -173,6 +223,27 @@ async function resolve({ character, today, context }) {
     difficulty: quest.difficulty,
     today,
     circumstance: `lors de la quête « ${quest.name} »`,
+  });
+
+  const narrative = narrateQuestSuccess({
+    quest,
+    questObjectives,
+    narrativeSubjects,
+    verbPhrases,
+    context: buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions, tagsByIdName }),
+  });
+
+  const narrativeText = narrative?.text || DEFAULT_NARRATIVE_TEXT;
+
+  const loot = drawQuestLoot({
+    quest,
+    difficulty: quest.difficulty,
+    questObjectives,
+    lootTables,
+    objects,
+    // The climax clause, not the whole paragraph: this is embedded mid-sentence in each item's
+    // description ("[Obtenue lorsque ...]"), which a three-sentence narrative would read badly in.
+    accomplishmentMessage: narrative?.clause || DEFAULT_ACCOMPLISHMENT_CLAUSE,
   });
 
   const questSummary = {
@@ -228,4 +299,4 @@ async function commit({ tx, db, characterRef, lastAction, uid, today }) {
   }
 }
 
-module.exports = { prepare, resolve, commit };
+module.exports = { prepare, resolve, commit, buildNarrativeContext, narrateQuestSuccess, preferQuestPhrasesPerSlot };
