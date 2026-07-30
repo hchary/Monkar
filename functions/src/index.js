@@ -101,6 +101,14 @@ exports.createCharacter = onCall(async (request) => {
     : [];
   const itemsGranted = itemSnaps.filter((snap) => snap.exists).map((snap) => ({ id: snap.id, ...snap.data() }));
 
+  // origin.profession is a worldData/professions/items id (OriginsManager's "Métier associé"
+  // picker), not a display name - resolve it here so it's granted the same way as talents/items
+  // (id + name snapshot) instead of leaking the raw id into origin.profession/character.profession.
+  const professionSnap = origin.profession
+    ? await db.collection("worldData").doc("professions").collection("items").doc(origin.profession).get()
+    : null;
+  const professionGranted = professionSnap?.exists ? { id: professionSnap.id, name: professionSnap.data().name } : null;
+
   const characterRef = db.collection("characters").doc();
   await characterRef.set({
     ...CHARACTER_DEFAULTS,
@@ -111,12 +119,21 @@ exports.createCharacter = onCall(async (request) => {
       id: origin.id,
       name: origin.name,
       description: origin.description || "",
-      profession: origin.profession || "",
+      profession: professionGranted,
       reputationStart: origin.reputationStart || 0,
       talents: talentsGranted.map((t) => ({ id: t.id, name: t.name })),
       items: itemsGranted.map((item) => ({ id: item.id, name: item.name })),
     },
-    profession: origin.profession || "",
+    profession: professionGranted?.name || "",
+    // The profession granted by the origin becomes the character's active profession from the
+    // start, mirroring what switchKnownProfession does on a later switch (functions/src/lib/
+    // professions.js's withProfessionChange) - level 1, and already present in knownProfessions
+    // so a later switch away and back doesn't need special-casing.
+    ...(professionGranted && {
+      professionId: professionGranted.id,
+      professionLevel: 1,
+      knownProfessions: [{ professionId: professionGranted.id, level: 1 }],
+    }),
     reputation: origin.reputationStart || 0,
     talents: talentsGranted,
     createdAt: FieldValue.serverTimestamp(),

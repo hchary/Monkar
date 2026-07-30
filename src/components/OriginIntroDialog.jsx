@@ -39,7 +39,7 @@ export default function OriginIntroDialog({ character }) {
           </div>
         )}
 
-        {origin.profession && <p>Métier : {origin.profession}</p>}
+        {origin.profession && <p>Métier : {origin.profession.name}</p>}
 
         <p>Réputation de départ : {origin.reputationStart ?? 0}</p>
 

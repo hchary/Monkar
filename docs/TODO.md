@@ -538,12 +538,13 @@ worldData/professions/items/{id}
 **Still open (deliberately deferred)**:
 - No consumer reads `minReputation` or `evolutionId` yet — reputation-gated profession change and
   the evolution trigger are not implemented.
-- How a character is first assigned a profession (via a quest, a trainer, at character creation,
-  etc.) is not implemented — see "Character link" below for what exists today.
+- How a character is first assigned a profession via a quest or a trainer is not implemented.
+  Assignment at character creation, from the drawn origin's linked profession, is now handled by
+  `createCharacter` (functions/src/index.js) — see "Character link" below.
 
 ### Character link
 
-Status: **implemented**, except initial assignment (see "Still open" above).
+Status: **implemented**, except quest/trainer initial assignment (see "Still open" above).
 
 A character has at most one active profession plus a mastery level (`professionLevel`, an integer
 1-5, starting at 1 whenever a profession is (re)assigned), and a history of every profession it has
