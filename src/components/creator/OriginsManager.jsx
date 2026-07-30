@@ -133,7 +133,7 @@ export default function OriginsManager() {
                 ? origin.talentIds.map((id) => talents.find((t) => t.id === id)?.name || id).join(", ")
                 : "aucun"}
             </div>
-            <div>Métier : {origin.profession || "aucun"}</div>
+            <div>Métier : {origin.profession ? professions.find((p) => p.id === origin.profession)?.name || origin.profession : "aucun"}</div>
             <div>Réputation de départ : {origin.reputationStart ?? 0}</div>
             <div>
               Équipement de départ :{" "}
