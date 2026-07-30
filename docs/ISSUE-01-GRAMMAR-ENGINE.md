@@ -1,6 +1,25 @@
 # Issue 01 — Multi-slot narrative grammar engine
 
-Status: **not implemented** (feature specification only).
+Status: **implemented**, with deviations. Shipped in `functions/src/textGeneration.js` and
+`functions/src/actions/partirEnQuete.js`.
+
+**Read this document as a historical plan, not as a description of the code.** Two caveats:
+
+1. Parts of it were written against the per-action `tiers` data model, which was retired before this
+   was built (`docs/ISSUE-02-ACTION-FRAMEWORK.md`, "Abandoning the paliers system"). Every mention of
+   `tier.narrativeText`, `tier.talentGain`, or a per-tier success condition below refers to something
+   that no longer exists.
+2. Six further gaps surfaced while implementing it, four of which would have shipped visibly wrong
+   text (a paragraph naming two different enemies; a fire flourish on a talent the character never
+   used; "progress" wording on a freshly unlocked talent; a three-sentence paragraph embedded
+   mid-sentence in loot descriptions). Its "Open questions" section is also answered — both of the
+   answers it leaned toward turned out to be wrong.
+
+The accurate description of what shipped is
+[docs/ARCHITECTURE.md](ARCHITECTURE.md)'s "Procedural quest-result text" section, with authoring
+guidance in [docs/NARRATIVE-GENERATION.md](NARRATIVE-GENERATION.md). The plan-versus-reality diff is
+[narrative-poc/report.md](../narrative-poc/report.md) § 4. The original spec is kept below unedited,
+so the decisions it got right and wrong stay auditable.
 
 Origin: [`narrative-poc/`](../narrative-poc/) (see `narrative-poc/report.md` for the full
 feasibility analysis). That analysis concluded a tag-scored, multi-slot template grammar is

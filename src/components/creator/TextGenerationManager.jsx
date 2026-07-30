@@ -4,7 +4,33 @@ import { db } from "../../lib/firebase";
 import NarrativeSubjectList from "./NarrativeSubjectList";
 
 const emptySubjectForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tags: "" };
-const emptyVerbPhraseForm = { resultat: "victoire", cible: "groupe", template: "", tags: "" };
+const emptyVerbPhraseForm = {
+  resultat: "victoire",
+  cible: "groupe",
+  slot: "climax",
+  talentChange: "les_deux",
+  template: "",
+  tags: "",
+};
+
+// The role a phrase plays in the generated paragraph — see docs/NARRATIVE-GENERATION.md. "climax" is
+// the default both here and when reading Firestore, so every phrase authored before slots existed
+// stays valid action content without a migration.
+export const NARRATIVE_SLOTS = [
+  { value: "opening", label: "Ouverture (mise en place)" },
+  { value: "climax", label: "Action (obligatoire)" },
+  { value: "talentGrowth", label: "Progression de talent" },
+];
+
+const TALENT_CHANGES = [
+  { value: "les_deux", label: "Les deux" },
+  { value: "evolution", label: "Amélioration d'un talent connu" },
+  { value: "unlock", label: "Déblocage d'un nouveau talent" },
+];
+
+export function slotLabel(slot) {
+  return NARRATIVE_SLOTS.find((s) => s.value === (slot || "climax"))?.label || slot;
+}
 
 function parseTags(tags) {
   return tags
@@ -13,13 +39,14 @@ function parseTags(tags) {
     .filter(Boolean);
 }
 
-// Matches a verb phrase's template text, cible, or tags — for use as MultiSelectModalField's matchesFilter.
+// Matches a verb phrase's template text, slot, cible, or tags — for use as MultiSelectModalField's matchesFilter.
 export function matchesVerbPhrase(option, query) {
   const q = query.toLowerCase();
   if (!q) return true;
   return (
     (option.name || "").toLowerCase().includes(q) ||
     (option.cible || "").toLowerCase().includes(q) ||
+    slotLabel(option.slot).toLowerCase().includes(q) ||
     (option.tags || []).some((tag) => tag.toLowerCase().includes(q))
   );
 }
@@ -163,7 +190,7 @@ function SubjectsManager() {
   );
 }
 
-const emptyVerbPhraseFilters = { resultat: "", text: "" };
+const emptyVerbPhraseFilters = { resultat: "", slot: "", text: "" };
 
 function VerbPhrasesManager() {
   const [verbPhrases, setVerbPhrases] = useState([]);
@@ -180,7 +207,11 @@ function VerbPhrasesManager() {
 
   const filteredVerbPhrases = verbPhrases.filter((verbPhrase) => {
     if (filters.resultat && verbPhrase.resultat !== filters.resultat) return false;
-    return matchesVerbPhrase({ name: verbPhrase.template, cible: verbPhrase.cible, tags: verbPhrase.tags }, filters.text);
+    if (filters.slot && (verbPhrase.slot || "climax") !== filters.slot) return false;
+    return matchesVerbPhrase(
+      { name: verbPhrase.template, cible: verbPhrase.cible, slot: verbPhrase.slot, tags: verbPhrase.tags },
+      filters.text
+    );
   });
 
   function startEdit(verbPhrase) {
@@ -188,6 +219,8 @@ function VerbPhrasesManager() {
     setForm({
       resultat: verbPhrase.resultat || "victoire",
       cible: verbPhrase.cible || "groupe",
+      slot: verbPhrase.slot || "climax",
+      talentChange: verbPhrase.talentChange || "les_deux",
       template: verbPhrase.template || "",
       tags: (verbPhrase.tags || []).join(", "),
     });
@@ -199,6 +232,14 @@ function VerbPhrasesManager() {
     setForm(emptyVerbPhraseForm);
   }
 
+  // A cible restricts which target shape a phrase can be drawn for. The action sentence nearly
+  // always needs one, since it substitutes {sujet}; the other slots usually don't, and leaving them
+  // on a single shape would silently hide them half the time — so switching slot moves the default,
+  // which the author can still narrow when their sentence agrees with the enemy's number.
+  function changeSlot(slot) {
+    setForm((prev) => ({ ...prev, slot, cible: slot === "climax" ? "groupe" : "les_deux" }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     const ref = editingId
@@ -208,8 +249,10 @@ function VerbPhrasesManager() {
     const tags = parseTags(form.tags);
     await setDoc(ref, {
       resultat: form.resultat,
+      slot: form.slot,
       cible: form.cible,
       template: form.template,
+      ...(form.slot === "talentGrowth" ? { talentChange: form.talentChange } : {}),
       ...(tags.length > 0 ? { tags } : {}),
     });
     resetForm();
@@ -218,6 +261,13 @@ function VerbPhrasesManager() {
   return (
     <div className="creator-section">
       <h3>Phrases-verbes</h3>
+      <p>
+        Chaque récit de quête assemble une phrase par emplacement, toujours dans l'ordre ouverture → action →
+        progression de talent. Seule l'action est obligatoire. Écrivez les phrases sans majuscule initiale et
+        sans point final : le jeu s'en charge, et réutilise la phrase d'action au milieu des descriptions de
+        butin. Placeholders disponibles : <code>{"{sujet}"}</code> (la cible), <code>{"{lieu}"}</code>,{" "}
+        <code>{"{quete}"}</code>, <code>{"{talent}"}</code> (progression de talent uniquement).
+      </p>
 
       <fieldset>
         <legend>Filtres</legend>
@@ -230,8 +280,19 @@ function VerbPhrasesManager() {
             <option value="partielle">Partielle</option>
           </select>
         </label>
+        <label>
+          Emplacement
+          <select value={filters.slot} onChange={(e) => setFilters({ ...filters, slot: e.target.value })}>
+            <option value="">Tous</option>
+            {NARRATIVE_SLOTS.map((slot) => (
+              <option key={slot.value} value={slot.value}>
+                {slot.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <input
-          placeholder="Rechercher par texte, cible ou tag..."
+          placeholder="Rechercher par texte, emplacement, cible ou tag..."
           value={filters.text}
           onChange={(e) => setFilters({ ...filters, text: e.target.value })}
         />
@@ -243,7 +304,8 @@ function VerbPhrasesManager() {
       <ul className="creator-list">
         {filteredVerbPhrases.map((verbPhrase) => (
           <li key={verbPhrase.id}>
-            <strong>{verbPhrase.template}</strong> ({verbPhrase.resultat}, {verbPhrase.cible})
+            <strong>{verbPhrase.template}</strong> ({verbPhrase.resultat}, {slotLabel(verbPhrase.slot)},{" "}
+            {verbPhrase.cible})
             {verbPhrase.tags?.length > 0 && ` — tags : ${verbPhrase.tags.join(", ")}`}
             <button type="button" onClick={() => startEdit(verbPhrase)}>
               Modifier
@@ -273,6 +335,16 @@ function VerbPhrasesManager() {
             </select>
           </label>
           <label>
+            Emplacement
+            <select value={form.slot} onChange={(e) => changeSlot(e.target.value)}>
+              {NARRATIVE_SLOTS.map((slot) => (
+                <option key={slot.value} value={slot.value}>
+                  {slot.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Cible
             <select value={form.cible} onChange={(e) => setForm({ ...form, cible: e.target.value })}>
               <option value="groupe">Groupe</option>
@@ -280,17 +352,35 @@ function VerbPhrasesManager() {
               <option value="les_deux">Les deux</option>
             </select>
           </label>
+          {form.slot === "talentGrowth" && (
+            <label>
+              Type de progression
+              <select value={form.talentChange} onChange={(e) => setForm({ ...form, talentChange: e.target.value })}>
+                {TALENT_CHANGES.map((change) => (
+                  <option key={change.value} value={change.value}>
+                    {change.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <input
-            placeholder='Modèle (ex: "avez triomphé de {sujet}")'
+            placeholder='Modèle (ex: "vous avez triomphé de {sujet}")'
             value={form.template}
             onChange={(e) => setForm({ ...form, template: e.target.value })}
             required
           />
           <input
-            placeholder="Tags requis chez le sujet (optionnel, séparés par des virgules)"
+            placeholder="Tags requis (optionnel, séparés par des virgules)"
             value={form.tags}
             onChange={(e) => setForm({ ...form, tags: e.target.value })}
           />
+          <p>
+            La phrase n'est retenue que si <em>tous</em> ses tags sont présents dans le contexte de la quête
+            (tags de la cible, tags de la quête, tags du talent qui a progressé) ; sans tag, elle sert de
+            secours générique. Les tags saisis ici sont du texte libre : ils doivent être orthographiés
+            exactement comme les tags du catalogue « Tags » utilisés par les quêtes et les talents.
+          </p>
           <div>
             <button type="submit">{editingId ? "Enregistrer" : "Créer la phrase-verbe"}</button>
             {editingId && (

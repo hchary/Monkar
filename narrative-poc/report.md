@@ -1,9 +1,20 @@
 # Procedural narrative generation — feasibility analysis
 
 Status of the underlying TODO entry (`docs/TODO.md` § "Procedural narrative generation"):
-**analysed, not implemented** — this report is the analysis. Companion code: `narrative-poc/` in
-this repository (see `README.md` to run it). The implementation plan derived from recommendation
-1 below lives in `docs/ISSUE-01-GRAMMAR-ENGINE.md`.
+**implemented** — recommendation 1 below has shipped, in `functions/src/textGeneration.js`. This
+report is the analysis that led there; § 4 is the quality review of the recommended solution and
+the record of what had to change to make it real. Companion code: `narrative-poc/` in this
+repository (see `README.md` to run it), whose demo harness now drives the production engine
+directly. Generated output: [`DEMO.md`](DEMO.md). Creator-facing guide:
+[`docs/NARRATIVE-GENERATION.md`](../docs/NARRATIVE-GENERATION.md).
+
+Sections 0–3 are unchanged from the original analysis, so the reasoning that produced the decision
+stays auditable against what was actually built. Where implementation contradicted the plan, § 4
+says so explicitly rather than editing the plan to look correct in hindsight. One consequence of
+leaving them untouched: §§ 1–3 refer to `narrative-poc/src/grammarEngine.js`, the POC's own engine.
+It has been **deleted** — keeping a second implementation around to drift out of step with the real
+one would be worse than the broken reference. Everything it did now lives in
+`functions/src/textGeneration.js`, and this folder's demo harness calls that instead.
 
 ## 0. Starting point: this isn't greenfield
 
@@ -207,6 +218,142 @@ by hand doesn't scale.
   (`DIFFICULTIES`/tier weighting already makes epic/mythique outcomes infrequent). This bounds
   LLM cost to the moments where the quality gap in §1 is most visible, without taking on
   full-time LLM latency/cost/dependency risk for every quest roll.
+
+## 4. Quality review of the recommended solution
+
+Written while implementing recommendation 1. The conclusion of §§ 1–3 survived review — a tag-scored
+multi-slot grammar is the right shape, and no LLM is needed — but the plan in
+`docs/ISSUE-01-GRAMMAR-ENGINE.md` had **one stale premise and six substantive gaps**, four of which
+would have shipped visibly wrong text. They are listed here because most of them are properties of
+*any* tag-driven narrative system, not quirks of this codebase.
+
+### 4.1 The plan was written against a data model that no longer exists
+
+`docs/ISSUE-01-GRAMMAR-ENGINE.md` repeatedly specifies behavior in terms of `tier.narrativeText`,
+`tier.talentGain.talentId`, and a `success && tier.talentGain?.talentId` condition. **None of those
+exist any more**: the per-action `tiers` roll was retired (see `docs/ISSUE-02-ACTION-FRAMEWORK.md`,
+"Abandoning the paliers system"). A quest now always succeeds, the fallback sentence is a module
+constant in `partirEnQuete.js`, and talents progress through `rollTalentEvolutions`, which returns a
+**list** of changes — zero, one, or several per quest — each tagged `"evolution"` or `"unlock"`.
+Anything derived from the plan's talent-gain wording had to be re-derived from the live code. Worth
+noting as a process point: a spec that sat unimplemented across an architectural change silently
+became a set of instructions that compile against nothing.
+
+### 4.2 Choosing a subject per slot breaks the paragraph (would have shipped wrong)
+
+The plan says to compose "one call per slot." The single-sentence generator picks its subject
+*inside* that call, so calling it three times picks three independent subjects — and a paragraph
+that opens on bandits, climaxes on undead, and reads as nonsense. The POC hid this by holding one
+enemy in a hand-built context object; production has no such object.
+
+Nor is the obvious fix — pick a subject first, then match fragments — correct: it throws away the
+information authored tags carry, so a sentence written for "feu × mort-vivant" would only ever fire
+on the days the random subject draw happened to land on an undead enemy.
+
+**What shipped:** the action sentence and its subject are scored as a **pair**, over the full
+(subject × fragment) cross product, and the winning pair's tags are the context the other slots then
+match against. The most specific authored sentence wins *and* pulls in a subject it fits, and every
+sentence in the paragraph is about the same enemy. This is the one structural change to the plan.
+
+### 4.3 A boolean `talentGained` is too weak to narrate a talent (would have shipped wrong)
+
+The plan gates the flourish slot on a boolean and adds a `requiresTalentGain` field on fragments.
+Three problems, all visible to a player:
+
+- **Wrong talent's flavor.** If the context carries the character's talent tags generally, a
+  swordsman who owns an unused Pyromancie gets fire imagery in a quest fought with a blade. Only the
+  talent that *actually progressed* may feed `talentTags` — which also makes the narration causally
+  consistent with the "Amélioration de talent" box shown in the same popup.
+- **"Progress" text on a brand-new talent.** "Vous sentez votre Pyromancie progresser" is wrong when
+  the talent was just discovered. Shipped with an explicit `talentChange` field
+  (`evolution` / `unlock` / `les_deux`) on flourish fragments, selected against the kind that
+  actually occurred.
+- **Several talents at once.** `rollTalentEvolutions` can return more than one. Shipped: the rarest
+  change is narrated, matching the ordering the result popup already uses.
+
+`requiresTalentGain` was dropped as redundant — the slot is only queried when something changed, so
+the field could only ever be `true`.
+
+### 4.4 One text has to serve two grammatical roles (would have shipped wrong)
+
+The generated text is not only displayed: `drawQuestLoot` embeds it mid-sentence in every item's
+description, as `[Obtenue lorsque …]`. That is why existing phrases are authored as uncapitalized,
+unpunctuated clauses — and it means a three-sentence paragraph cannot simply replace the old single
+sentence. Nobody had noticed, because with one sentence the two roles coincided.
+
+**What shipped:** `generateNarrative` returns both — `text`, presented as capitalized, properly
+terminated sentences for display, and `clause`, the action sentence alone left as authored, for
+embedding. Capitalization and terminal punctuation moved into the engine, so authors write clauses
+and never have to guess which role their sentence will play. As a side effect the standalone display
+is now correctly capitalized, which it was not before.
+
+### 4.5 An ordering dependency the plan does not mention
+
+Because the flourish names the talent that progressed and matches on its tags, **the talent roll has
+to happen before the narration**. `resolve()` did the opposite (narrate, loot, then talents), and the
+loot draw consumes the narration. Shipped order: talents → narration → loot.
+
+### 4.6 `cible` on the new slots: the plan's open question, answered both ways wrong
+
+The plan leaves this open and leans "cible-agnostic for the new slots." Both extremes are wrong:
+
+- Requiring a `cible` silently hides half the content, because the creator form defaults to
+  `"groupe"` — an opening authored without a thought about target shape would never appear on days an
+  individual enemy was drawn.
+- Ignoring `cible` breaks agreement the moment an opening mentions `{sujet}`: "les loups approchaient"
+  cannot be reused for a lone wolf.
+
+**What shipped:** `cible` is honored on *every* slot, and the creator form moves the *default* to
+`"les_deux"` when the slot isn't the action sentence. Permissive by default, narrowable when the
+sentence actually agrees with the enemy's number.
+
+### 4.7 Placeholders had no safety rule
+
+The POC used `{lieu}`, `{talent}`, `{lieuCap}`; the plan's engine section only mentions `{sujet}`.
+Left unspecified, a fragment using `{lieu}` on a quest with no location renders the literal string
+`{lieu}` to the player. **What shipped:** a fragment requiring a value the current resolution cannot
+supply is *ineligible* rather than rendered raw, and the supported set is fixed and documented
+(`{sujet}`, `{lieu}`, `{quete}`, `{talent}`). `{lieuCap}` was dropped — the engine capitalizes
+sentence-initially, so it had no remaining purpose.
+
+Note this makes the deferred "Location tags" TODO less blocking than the plan implies: a fragment can
+already *name* the location, it just can't yet be *selected* by location flavor.
+
+### 4.8 Per-slot quest-pool preference
+
+The plan says the quest-own-pool-first behavior is "unchanged, just applied per slot." Applying it to
+the whole pool instead would mean a quest that links a single action phrase loses every opening and
+flourish — linking one sentence would make the narration *worse*. Shipped per slot, as specified;
+flagged here because the naive reading is a one-line mistake with a non-obvious consequence.
+
+### 4.9 A pre-existing bug the demo surfaced
+
+Subjects declared with the elided article `l'` rendered as `l' ours des cavernes` — a stray space, in
+every sentence, since before this feature. Found by reading the demo output, not by testing. Fixed in
+`contractDe`/`fillSubjectPlaceholder` with a regression test. Cheap lesson: generating and *reading*
+a page of real output found a live bug that a passing test suite had not.
+
+### 4.10 What is still open (deliberately not built)
+
+- **Specificity is measured by tag count.** A fragment tagged `["hostile", "groupe"]` outranks one
+  tagged `["mort-vivant"]`, though the latter is far more specific. An explicit `priority` field, or
+  weighting tags by how rare they are in the catalog, would fix it. Not built: no live content
+  exhibits the problem yet, and guessing at the right weighting before seeing real content is how
+  you get a knob nobody understands.
+- **No anti-repetition memory.** Two consecutive days can produce the identical paragraph. The
+  cheapest fix is excluding the previous resolution's fragment ids from the draw, which needs a field
+  on `lastAction`. Worth doing once there is enough content for repetition to be noticeable rather
+  than inevitable.
+- **The tag vocabulary bridge is still spelling-based.** A talent tagged `feu` only meets a verb
+  phrase tagged `feu` if both are spelled identically, and `TagsManager.jsx`'s delete cleanup strips
+  `tagIds` from quests and talents but cannot touch free-text `tags` on verb phrases — so deleting a
+  tag can leave orphaned narrative content that silently stops matching. Mitigated by help text in
+  the creator UI; the real fix is the tag-unification TODO.
+- **No creator preview.** The highest-value follow-up by some distance: a "generate 10 samples for
+  this quest" button in the dashboard would turn every content gap in § 4.10 and § 1 from an
+  invisible problem into a visible one. The demo harness in this folder is that tool, minus a UI.
+- **Failure-side narration is authored but unreachable**, since quests always succeed. The engine
+  filters on `resultat` uniformly, so `echec` content will work the day a handler asks for it.
 
 ## Recommendation
 

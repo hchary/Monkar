@@ -328,10 +328,18 @@ characters/{id}.lastAction
 
 ## Procedural narrative generation
 
-Status: **analysed, not implemented** — the feasibility study asked for by this entry is done
-(`narrative-poc/report.md`, runnable proof-of-concept in `narrative-poc/`), and the resulting
-implementation plan is spun out into
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md). No production code written yet.
+Status: **implemented**. The feasibility study asked for by this entry is done
+(`narrative-poc/report.md`), and the multi-slot tag-scored grammar it recommended has shipped in
+`functions/src/textGeneration.js`, wired into quest resolution in
+`functions/src/actions/partirEnQuete.js`. See:
+
+- [docs/NARRATIVE-GENERATION.md](NARRATIVE-GENERATION.md) — how it works and how to author for it
+- [narrative-poc/DEMO.md](../narrative-poc/DEMO.md) — a page of real generated output
+- [narrative-poc/report.md](../narrative-poc/report.md) § 4 — quality review of the solution, the
+  seven gaps found in the plan while building it, and what is deliberately still open
+- [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) — the original implementation plan,
+  kept for the record; parts of it were written against the retired `tiers` data model
+- [docs/TEST-SCENARIO-NARRATIVE.md](TEST-SCENARIO-NARRATIVE.md) — manual post-deploy test scenario
 
 Today most player-facing text is hand-authored: quest objectives, verb phrases, and per-tier
 `narrativeText`. The goal is to generate coherent narration from the tags, names and
@@ -366,10 +374,17 @@ match against at all) and
 [Tag system unification (tagIds vs free-text tags)](#tag-system-unification-tagids-vs-free-text-tags)
 (the generator matches free-text `tags`, while talents/quests store `tagIds`).
 
-**Data model implications**: none from the analysis itself — see
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) for the concrete changes the
-recommended implementation needs (a `slot` field on `worldData/verbPhrases/items`, plus new read
-paths for talent/quest `tagIds`; no migration or backfill required).
+**Data model implications**: two additive optional fields on `worldData/verbPhrases/items`, plus new
+read paths for talent/quest `tagIds`. No migration or backfill: a document without `slot` reads as
+action content and behaves exactly as before.
+```
+worldData/verbPhrases/items/{id}
+  slot: "opening" | "climax" | "talentGrowth"        -- optional, defaults to "climax"
+  talentChange: "evolution" | "unlock" | "les_deux"  -- optional, "talentGrowth" only, defaults to "les_deux"
+```
+The one behavior change to existing content: tag matching went from "shares at least one tag" to "all
+tags satisfied", so a multi-tagged phrase is harder to draw than it was. See
+[narrative-poc/report.md](../narrative-poc/report.md) § 2.1 for why the looser rule had to go.
 
 ## Location tags
 

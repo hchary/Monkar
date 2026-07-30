@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { OBJECTIVE_TAG, matchesQuestObjective } from "./QuestObjectivesManager";
-import { matchesVerbPhrase } from "./TextGenerationManager";
+import { matchesVerbPhrase, slotLabel } from "./TextGenerationManager";
 import { matchesRegion } from "./RegionsManager";
 import { matchesTag } from "./TagsManager";
 import { capitalizeSubject } from "./NarrativeSubjectList";
@@ -297,22 +297,22 @@ export default function QuestsManager() {
 
           <MultiSelectModalField
             legend="Phrases de réussite"
-            options={successPhrases.map((vp) => ({ ...vp, name: vp.template }))}
+            options={successPhrases.map((vp) => ({ ...vp, name: `${vp.template} — ${slotLabel(vp.slot)}` }))}
             selectedIds={form.successPhraseIds}
             onToggle={(id) => toggleIn("successPhraseIds", id)}
             createLink={`/creator?section=${encodeURIComponent("Génération de texte")}`}
             matchesFilter={matchesVerbPhrase}
-            filterPlaceholder="Filtrer par texte, cible ou tag..."
+            filterPlaceholder="Filtrer par texte, emplacement, cible ou tag..."
           />
 
           <MultiSelectModalField
             legend="Phrases d'échec"
-            options={failurePhrases.map((vp) => ({ ...vp, name: vp.template }))}
+            options={failurePhrases.map((vp) => ({ ...vp, name: `${vp.template} — ${slotLabel(vp.slot)}` }))}
             selectedIds={form.failurePhraseIds}
             onToggle={(id) => toggleIn("failurePhraseIds", id)}
             createLink={`/creator?section=${encodeURIComponent("Génération de texte")}`}
             matchesFilter={matchesVerbPhrase}
-            filterPlaceholder="Filtrer par texte, cible ou tag..."
+            filterPlaceholder="Filtrer par texte, emplacement, cible ou tag..."
           />
 
           <MultiSelectModalField
