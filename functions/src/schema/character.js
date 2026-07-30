@@ -13,7 +13,9 @@ const FIELDS = {
   origin: {
     type: "map",
     description:
-      "{ id, name, description, profession, reputationStart, talents, items } snapshot of the origin drawn at creation.",
+      "{ id, name, description, profession, reputationStart, talents, items } snapshot of the origin drawn at " +
+      "creation. profession is { id, name } | null, resolved from worldData/professions/items - not the raw " +
+      "professionId stored on the origin document.",
   },
   originIntroSeen: { type: "boolean", description: "Whether the player has dismissed the origin intro dialog." },
   title: { type: "string", description: "Character's earned title, if any." },
