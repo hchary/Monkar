@@ -9,9 +9,9 @@
 // (see functions/src/textGeneration.js). Renaming a tag does not update those strings.
 //
 // The document id is the Firestore key, never a field.
-
-const FIELDS = {
-  name: { type: "string", description: "Tag display name. The only field a tag has." },
-};
-
-module.exports = { FIELDS };
+//
+// The field contract itself lives in shared/schema/tag.ts so the client creator and this file can
+// never drift; this file re-exports it under the location/name this project's schema convention
+// expects, carrying the collection-level documentation above.
+export { TagDocumentSchema } from "../../../shared/schema/tag";
+export type { TagDocument } from "../../../shared/schema/tag";

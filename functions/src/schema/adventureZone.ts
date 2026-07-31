@@ -5,14 +5,9 @@
 // the whole document with setDoc.
 //
 // The document id is the Firestore key, never a field.
-
-const FIELDS = {
-  name: { type: "string", description: "Location display name, substituted for {lieu} in verb-phrase templates." },
-  description: { type: "string", description: "Free-text flavour copy." },
-};
-
-const DEFAULTS = {
-  description: "",
-};
-
-module.exports = { FIELDS, DEFAULTS };
+//
+// The field contract itself lives in shared/schema/adventureZone.ts so the client creator and this
+// file can never drift; this file re-exports it under the location/name this project's schema
+// convention expects, carrying the collection-level documentation above.
+export { AdventureZoneDocumentSchema, DEFAULTS } from "../../../shared/schema/adventureZone";
+export type { AdventureZoneDocument } from "../../../shared/schema/adventureZone";
