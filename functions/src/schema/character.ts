@@ -11,23 +11,9 @@
 // Firestore Timestamp or a FieldValue.serverTimestamp() sentinel - both server-only types from
 // firebase-admin/firestore - so they're declared here instead, refining the shared `z.unknown()`
 // placeholders to the real, validated type.
-import { z } from "zod";
-import { Timestamp, FieldValue } from "firebase-admin/firestore";
+import type { z } from "zod";
 import { CharacterDocumentSchema as SharedCharacterDocumentSchema, DEFAULTS } from "../../../shared/schema/character";
-
-type FirestoreTimestampLike = Timestamp | FieldValue;
-
-function isFirestoreTimestampLike(value: unknown): value is FirestoreTimestampLike {
-  return value instanceof Timestamp || value instanceof FieldValue;
-}
-
-const FirestoreTimestampOrSentinel = z
-  .custom<FirestoreTimestampLike>(isFirestoreTimestampLike, {
-    message: "must be a Firestore Timestamp or a serverTimestamp() sentinel",
-  })
-  .describe(
-    "Firestore server timestamp; may be FieldValue.serverTimestamp() at write time, a Timestamp once read back."
-  );
+import { FirestoreTimestampOrSentinel } from "./_firestoreTypes";
 
 export const CharacterDocumentSchema = SharedCharacterDocumentSchema.extend({
   lastActionAt: FirestoreTimestampOrSentinel.nullable().default(null),
