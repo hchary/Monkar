@@ -78,7 +78,7 @@ actionsLog/{logId}                 -- permanent history, independent of lastActi
 
 worldData/actionTypes/items/{id}
   label: string                    -- e.g. "Partir en quête"
-  handlerId: string                -- must resolve to a registered entry in functions/src/index.js's
+  handlerId: string                -- must resolve to a registered entry in functions/src/index.ts's
                                     -- ACTION_HANDLERS - an action has no generic fallback any more,
                                     -- see "The performAction Cloud Function" below
   questDifficultyWeights: [{ difficulty, weight }]  -- "partir-en-quete" only, optional; defaults to
@@ -227,7 +227,7 @@ The creator role itself is a **custom claim** on the Firebase Auth ID token (`re
 
 ## The `createCharacter` Cloud Function
 
-Callable, `functions/src/index.js`. Given `{ regionId, name }`:
+Callable, `functions/src/index.ts`. Given `{ regionId, name }`:
 1. Rejects if the caller isn't authenticated, or already has a character with `alive == true` (one living character per account).
 2. Loads the chosen region, rolls a background from `worldData/regions/items/{regionId}/backgrounds` (weighted).
 3. Creates the `characters` doc (region chosen, background rolled as above; `title` empty, `legendLevel` null, `alive: true`, `reputation`/`gold`/`inventory` from the background) and upserts `users/{uid}` with `role: "player"` and the new `characterId`.
@@ -236,7 +236,7 @@ Region is a player *choice*; background is *rolled* server-side specifically so 
 
 ## The `performAction` Cloud Function
 
-`performAction` (`functions/src/index.js`) is a thin dispatcher, not a monolithic roller — each `actionTypeId` has its own handler module under `functions/src/actions/` (today: `partirEnQuete.js`; future actions like marchander/s'entraîner/voyager/explorer/travailler get their own module rather than being squeezed into one generic tier-roller, since their mechanics have little in common). A handler exports:
+`performAction` (`functions/src/index.ts`) is a thin dispatcher, not a monolithic roller — each `actionTypeId` has its own handler module under `functions/src/actions/` (today: `partirEnQuete.js`; future actions like marchander/s'entraîner/voyager/explorer/travailler get their own module rather than being squeezed into one generic tier-roller, since their mechanics have little in common). A handler exports:
 
 - `prepare({ db, character, actionType })` — async, runs **before** the transaction. Does any read-only setup specific to that action (e.g. drawing a quest, see below) and can `throw HttpsError` for a precondition that should block the action *without* consuming the daily lock (nothing has been written yet at this point).
 - `resolve({ tx, db, character, actionType, today, context })` — runs **inside** the transaction, after the once-per-day lock re-check. Returns `{ updates, logFields }`: `updates` is the full `characters/{id}` patch (`lastActionDate`, `lastActionAt`, `lastAction`, plus whatever else the handler decides to write - gold/inventory/talents/reputation/legendLevel/alive/wound counters are all just fields a handler can choose to touch, not a shared mechanic every action goes through), `logFields` is the handler-specific subset merged into the `actionsLog` entry (the dispatcher adds the common `characterId`/`ownerUid`/`actionTypeId`/`date`/`createdAt` fields itself).
