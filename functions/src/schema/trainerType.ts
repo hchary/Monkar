@@ -6,9 +6,9 @@
 // "Entraîneurs" in docs/TODO.md and not implemented yet.
 //
 // The document id is the Firestore key, never a field.
-
-const FIELDS = {
-  name: { type: "string", description: "Trainer type display name, e.g. \"Maître d'armes\"." },
-};
-
-module.exports = { FIELDS };
+//
+// The field contract itself lives in shared/schema/trainerType.ts so the client creator and this
+// file can never drift; this file re-exports it under the location/name this project's schema
+// convention expects, carrying the collection-level documentation above.
+export { TrainerTypeDocumentSchema } from "../../../shared/schema/trainerType";
+export type { TrainerTypeDocument } from "../../../shared/schema/trainerType";
