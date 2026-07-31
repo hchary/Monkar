@@ -7,16 +7,17 @@ import { professionRef, syncProfessionActions, unlinkDeletedProfession } from ".
 import { matchesTalent } from "./TalentsManager";
 import { matchesActionType } from "./ActionsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
+import { ProfessionDocumentSchema } from "../../../shared/schema/profession";
 
 // Matches a profession's name or description — for use as MultiSelectModalField's matchesFilter.
-export function matchesProfession(option, query) {
+export function matchesProfession(option: any, query: string) {
   const q = query.toLowerCase();
   if (!q) return true;
   return (option.name || "").toLowerCase().includes(q) || (option.description || "").toLowerCase().includes(q);
 }
 
-function useItems(collectionName) {
-  const [items, setItems] = useState([]);
+function useItems(collectionName: string) {
+  const [items, setItems] = useState<any[]>([]);
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", collectionName, "items"), (snap) => {
       setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -25,7 +26,17 @@ function useItems(collectionName) {
   return items;
 }
 
-function MultiSelectField({ legend, options, selectedIds, onToggle }) {
+function MultiSelectField({
+  legend,
+  options,
+  selectedIds,
+  onToggle,
+}: {
+  legend: string;
+  options: any[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+}) {
   return (
     <fieldset>
       <legend>{legend}</legend>
@@ -43,21 +54,22 @@ function MultiSelectField({ legend, options, selectedIds, onToggle }) {
 const emptyForm = {
   name: "",
   description: "",
-  talentIds: [],
+  talentIds: [] as string[],
   minReputation: "",
-  trainerTypeIds: [],
+  trainerTypeIds: [] as string[],
   evolutionId: "",
-  actionIds: [],
+  actionIds: [] as string[],
 };
 
 const emptyFilters = { text: "" };
 
 export default function ProfessionsManager() {
-  const [professions, setProfessions] = useState([]);
-  const [editingId, setEditingId] = useState(null);
+  const [professions, setProfessions] = useState<any[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [filters, setFilters] = useState(emptyFilters);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const talents = useItems("talents");
   const sortedTalents = [...talents].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
@@ -81,7 +93,7 @@ export default function ProfessionsManager() {
 
   const filteredProfessions = professions.filter((profession) => matchesProfession(profession, filters.text));
 
-  function startEdit(profession) {
+  function startEdit(profession: any) {
     setEditingId(profession.id);
     setForm({
       name: profession.name || "",
@@ -98,16 +110,17 @@ export default function ProfessionsManager() {
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
+    setFormError(null);
   }
 
-  function toggleTalentId(id) {
+  function toggleTalentId(id: string) {
     setForm((prev) => ({
       ...prev,
       talentIds: prev.talentIds.includes(id) ? prev.talentIds.filter((x) => x !== id) : [...prev.talentIds, id],
     }));
   }
 
-  function toggleTrainerTypeId(id) {
+  function toggleTrainerTypeId(id: string) {
     setForm((prev) => ({
       ...prev,
       trainerTypeIds: prev.trainerTypeIds.includes(id)
@@ -116,22 +129,18 @@ export default function ProfessionsManager() {
     }));
   }
 
-  function toggleActionId(id) {
+  function toggleActionId(id: string) {
     setForm((prev) => ({
       ...prev,
       actionIds: prev.actionIds.includes(id) ? prev.actionIds.filter((x) => x !== id) : [...prev.actionIds, id],
     }));
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const ref = editingId ? professionRef(editingId) : doc(collection(db, "worldData", "professions", "items"));
-    const previousActionIds = editingId ? professions.find((p) => p.id === editingId)?.actionIds || [] : [];
+    setFormError(null);
 
-    // Attaching an action here writes the profession onto that action too, so the pair can't
-    // disagree about which métiers may run it - see src/lib/professionActions.js.
-    const batch = writeBatch(db);
-    batch.set(ref, {
+    const candidate = {
       name: form.name,
       description: form.description,
       talentIds: form.talentIds,
@@ -139,14 +148,27 @@ export default function ProfessionsManager() {
       trainerTypeIds: form.trainerTypeIds,
       evolutionId: form.evolutionId,
       actionIds: form.actionIds,
-    });
+    };
+    const parsed = ProfessionDocumentSchema.safeParse(candidate);
+    if (!parsed.success) {
+      setFormError(parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(" — "));
+      return;
+    }
+
+    const ref = editingId ? professionRef(editingId) : doc(collection(db, "worldData", "professions", "items"));
+    const previousActionIds = editingId ? professions.find((p) => p.id === editingId)?.actionIds || [] : [];
+
+    // Attaching an action here writes the profession onto that action too, so the pair can't
+    // disagree about which métiers may run it - see src/lib/professionActions.js.
+    const batch = writeBatch(db);
+    batch.set(ref, parsed.data);
     syncProfessionActions(batch, ref.id, previousActionIds, form.actionIds);
 
     await batch.commit();
     resetForm();
   }
 
-  async function handleDelete(profession) {
+  async function handleDelete(profession: any) {
     const batch = writeBatch(db);
     batch.delete(professionRef(profession.id));
     unlinkDeletedProfession(batch, profession.id, actionTypes);
@@ -179,19 +201,19 @@ export default function ProfessionsManager() {
             <div>Réputation minimale : {profession.minReputation || 0}</div>
             <div>
               Talents :{" "}
-              {(profession.talentIds || []).map((id) => talents.find((t) => t.id === id)?.name || id).join(", ") ||
+              {(profession.talentIds || []).map((id: string) => talents.find((t) => t.id === id)?.name || id).join(", ") ||
                 "aucun"}
             </div>
             <div>
               Entraîneurs :{" "}
               {(profession.trainerTypeIds || [])
-                .map((id) => trainerTypes.find((t) => t.id === id)?.name || id)
+                .map((id: string) => trainerTypes.find((t) => t.id === id)?.name || id)
                 .join(", ") || "aucun"}
             </div>
             <div>
               Actions associées :{" "}
               {(profession.actionIds || [])
-                .map((id) => actionTypes.find((a) => a.id === id)?.label || id)
+                .map((id: string) => actionTypes.find((a) => a.id === id)?.label || id)
                 .join(", ") || "aucune"}
             </div>
             {profession.evolutionId && (
@@ -213,7 +235,7 @@ export default function ProfessionsManager() {
         className="collapsible-group"
         open={panelOpen}
         onToggle={(e) => {
-          if (e.target === e.currentTarget) setPanelOpen(e.target.open);
+          if (e.target === e.currentTarget) setPanelOpen((e.target as HTMLDetailsElement).open);
         }}
       >
         <summary>{editingId ? "Modifier le métier" : "Nouveau métier"}</summary>
@@ -231,6 +253,7 @@ export default function ProfessionsManager() {
             selectedIds={form.talentIds}
             onToggle={toggleTalentId}
             createLink={`/creator?section=${encodeURIComponent("Talents")}`}
+            getTooltip={undefined}
             matchesFilter={matchesTalent}
             filterPlaceholder="Filtrer par nom, effet ou rareté..."
             buttonLabel="Ajouter talents"
@@ -259,6 +282,7 @@ export default function ProfessionsManager() {
             selectedIds={form.actionIds}
             onToggle={toggleActionId}
             createLink={`/creator?section=${encodeURIComponent("Actions")}`}
+            getTooltip={undefined}
             matchesFilter={matchesActionType}
             filterPlaceholder="Filtrer par nom ou description..."
             buttonLabel="Ajouter des actions"
@@ -279,6 +303,8 @@ export default function ProfessionsManager() {
               ))}
             </select>
           </label>
+
+          {formError && <p role="alert">{formError}</p>}
 
           <div>
             <button type="submit">{editingId ? "Enregistrer" : "Créer le métier"}</button>

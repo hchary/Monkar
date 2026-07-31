@@ -1,0 +1,122 @@
+import { z } from "zod";
+
+// Structural contract for a `characters/{characterId}` document, shared between the Cloud
+// Functions codebase (functions/src/schema/character.ts extends this with server-only Firestore
+// timestamp types - see FirestoreTimestampOrSentinel there) and, in the future, any client code
+// that needs to read/validate a character shape. Kept in `shared/` even though no client code
+// writes a character document today: character is the component new features keep attaching to
+// (professions, talents, wounds, actions, ...), so it follows the shared-first pattern from the
+// start rather than needing a later migration the moment a client feature needs it.
+//
+// `createdAt`/`lastActionAt` are declared as `z.unknown()` here - they hold either a Firestore
+// `Timestamp` or a `FieldValue.serverTimestamp()` sentinel, both of which come from
+// `firebase-admin/firestore` and cannot be imported into a browser bundle. The functions-side
+// schema refines them to the real, validated type.
+
+export const CharacterDocumentSchema = z.object({
+  ownerUid: z.string().describe("Auth uid of the owning player. Set once at creation, never changes."),
+  name: z.string().describe("Player-chosen character name."),
+  age: z.number().default(18).describe("Character age in years."),
+  region: z.object({ id: z.string(), name: z.string() }).describe("{ id, name } of the starting region."),
+  origin: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string(),
+      profession: z.object({ id: z.string(), name: z.string() }).nullable(),
+      reputationStart: z.number(),
+      talents: z.array(z.object({ id: z.string(), name: z.string() })),
+      items: z.array(z.object({ id: z.string(), name: z.string() })),
+    })
+    .describe(
+      "Snapshot of the origin drawn at creation. profession is resolved from worldData/professions/items, " +
+        "not the raw professionId stored on the origin document."
+    ),
+  originIntroSeen: z.boolean().default(false).describe("Whether the player has dismissed the origin intro dialog."),
+  title: z.string().default("").describe("Character's earned title, if any."),
+  profession: z.string().describe("Display copy of the starting profession name (see origin.profession)."),
+  professionId: z
+    .string()
+    .optional()
+    .describe("Id of the currently active profession. Absent until the player picks one via switchKnownProfession."),
+  professionLevel: z
+    .number()
+    .optional()
+    .describe("Mastery level in the active profession. Absent alongside professionId."),
+  knownProfessions: z
+    .array(z.object({ professionId: z.string(), level: z.number() }))
+    .optional()
+    .describe("Every profession ever held. Absent until the first switch."),
+  reputation: z.number().describe("Reputation score, starts at origin.reputationStart."),
+  legendLevel: z.number().nullable().default(null).describe("Legendary tier, null until the first legendary roll."),
+  alive: z.boolean().default(true).describe("False once the character has died."),
+  gold: z.number().default(0),
+  inventory: z
+    .array(z.unknown())
+    .default([])
+    .describe("Reserved; item ownership is currently tracked via the separate `instances` collection instead."),
+  talents: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      quality: z.number(),
+      trainable: z.boolean(),
+      rarity: z.string(),
+      effect: z.string(),
+      tagIds: z.array(z.string()),
+      lastChangeDate: z.string(),
+      lastChangeCircumstance: z.string(),
+    })
+  ),
+  blessings: z.array(z.unknown()).default([]).describe("Reserved, not yet populated by any handler."),
+  curses: z.array(z.unknown()).default([]).describe("Reserved, not yet populated by any handler."),
+  woundsLight: z.number().default(0),
+  woundsSevere: z.number().default(0),
+  woundsPermanent: z.number().default(0),
+  lastActionDate: z.string().nullable().default(null).describe("YYYY-MM-DD of the last performed action."),
+  lastActionAt: z
+    .unknown()
+    .nullable()
+    .default(null)
+    .describe("Firestore Timestamp or serverTimestamp() sentinel; refined server-side (see functions/src/schema/character.ts)."),
+  lastAction: z
+    .unknown()
+    .nullable()
+    .default(null)
+    .describe(
+      "Shape varies per handler (see functions/src/actions/*.js); always carries the lifecycle envelope " +
+        "stamped by actionEffects.js's stampLifecycle."
+    ),
+  createdAt: z
+    .unknown()
+    .describe("Firestore Timestamp or serverTimestamp() sentinel; refined server-side (see functions/src/schema/character.ts)."),
+});
+
+export type CharacterDocument = z.infer<typeof CharacterDocumentSchema>;
+
+// Static values every new character starts with - anything computed from the region/origin draw
+// (name, region, origin, profession, reputation, talents, ownerUid, createdAt) is set explicitly
+// by createCharacter instead of living here. DEFAULTS is *derived*, not hand-duplicated: `.pick()`
+// references the same field definitions (including their `.default()`), so it can never drift
+// from the schema above.
+const DEFAULTED_KEYS = [
+  "age",
+  "originIntroSeen",
+  "title",
+  "legendLevel",
+  "alive",
+  "gold",
+  "inventory",
+  "blessings",
+  "curses",
+  "woundsLight",
+  "woundsSevere",
+  "woundsPermanent",
+  "lastActionDate",
+  "lastActionAt",
+  "lastAction",
+] as const;
+
+export const DEFAULTS = CharacterDocumentSchema.pick(
+  Object.fromEntries(DEFAULTED_KEYS.map((key) => [key, true])) as Record<(typeof DEFAULTED_KEYS)[number], true>
+).parse({});

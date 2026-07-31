@@ -1,6 +1,7 @@
 # Persisting a new component to Firestore
 
-Prerequisite: the field is already declared in `functions/src/schema/character.js` — see
+Prerequisite: the field is already declared in `functions/src/schema/character.ts` (or, for a
+field on a component not yet migrated to Zod, its legacy `FIELDS` object) — see
 [01-defining-the-contract.md](01-defining-the-contract.md).
 
 ## The constraint that shapes everything here
@@ -27,16 +28,24 @@ and when*. Pick one of the three cases below.
 ## Case A — static default, set once at character creation
 
 If the field's initial value never varies (it's in `DEFAULTS` per doc 01), you're already done:
-`createCharacter` (`functions/src/index.js`) builds the new character as
+`createCharacter` (`functions/src/index.ts`) builds the new character as
 `{ ...CHARACTER_DEFAULTS, ...computed fields }`, so anything in `DEFAULTS` is written
-automatically. No further code change needed for creation.
+automatically. No further code change needed for creation. If `character.ts` has a Zod schema
+(see doc 01), `createCharacter` also `.parse()`s the assembled document before the write — a typo
+or wrong type in your computed fields fails loudly instead of reaching Firestore silently.
 
 ## Case B — changed later, triggered directly by the player
 
 Examples already in the codebase: dismissing the origin-intro dialog (`originIntroSeen`),
 switching the active profession (`professionId`/`professionLevel`/`knownProfessions`).
 
-Add a new `onCall` in `functions/src/index.js` following the existing pattern:
+Add a new `onCall` in `functions/src/index.ts` following the existing pattern. If you're adding
+this alongside a component that already has a Zod schema, prefer wrapping the handler with
+`withAuthAndSchema` (`functions/src/lib/callableHandler.ts`) instead of hand-rolling the auth/input
+checks below — see `switchKnownProfession` in `functions/src/index.ts` for the current template,
+and [05-migrating-a-schema-to-zod-and-typescript.md](05-migrating-a-schema-to-zod-and-typescript.md)
+for the full pattern. The hand-rolled version still works and is what every callable not yet
+migrated looks like:
 
 ```js
 exports.doSomethingToStatusList = onCall(async (request) => {
@@ -56,7 +65,7 @@ exports.doSomethingToStatusList = onCall(async (request) => {
 });
 ```
 
-`getOwnCharacterSnap(uid)` (already defined in `functions/src/index.js`) is the shared helper that
+`getOwnCharacterSnap(uid)` (already defined in `functions/src/index.ts`) is the shared helper that
 resolves "the caller's one living character" — reuse it rather than re-querying
 `ownerUid`/`alive` by hand. Validate anything the client sends in `request.data`: it's untrusted
 input, exactly like an HTTP request body. See `switchKnownProfession` for an example of deriving a

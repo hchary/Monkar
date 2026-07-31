@@ -12,7 +12,7 @@ truth for whether something is allowed or what a field becomes.
 
 Wherever a Cloud Function or handler has a `character` object in scope (`request` data doesn't
 carry it — it's always fetched from Firestore, e.g. via `getOwnCharacterSnap(uid)` in
-`functions/src/index.js`, or received as the `character`/`freshCharacter` parameter inside a
+`functions/src/index.ts`, or received as the `character`/`freshCharacter` parameter inside a
 handler's `resolve()`), read it the same defensive way as the frontend:
 
 ```js
@@ -98,4 +98,4 @@ this logic; only the Cloud Function's own request/transaction plumbing needs tha
       handler.
 - [ ] New pure logic has a `*.test.js` file; `npm test` (inside `functions/`) passes.
 - [ ] Cross-checked against [01-defining-the-contract.md](01-defining-the-contract.md): the shape
-      actually read/written here matches what's documented in `functions/src/schema/character.js`.
+      actually read/written here matches what's documented in `functions/src/schema/character.ts`.
