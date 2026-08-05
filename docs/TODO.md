@@ -17,7 +17,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 5 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
 | 6 | Rumor and mission system — implementation | done | 5 | [Rumor and mission system](#rumor-and-mission-system) |
 | 7 | Quest triggers and end-of-action pop-up pages — spec | done | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
-| 8 | Quest triggers and end-of-action pop-up pages — implementation | todo | 4, 7 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
+| 8 | Quest triggers and end-of-action pop-up pages — implementation | done | 4, 7 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 9 | Trainers — spec | spec | — | [Trainers](#trainers) |
 | 10 | Training-driven talent quality-up ("s'entraîner") | todo | 9 | [Expanded talent system](#expanded-talent-system) |
 | 11 | Profession initial assignment via quest/trainer | todo | 9 | [Profession (métier) creation](#profession-métier-creation) |
@@ -33,8 +33,9 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 21 | Known recipes grant mechanism — spec | spec | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 | 22 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 23 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
+| 24 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
 
-**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows. #22-23 are intentionally last: real but low-stakes polish with no downstream dependents.
+**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows. #22-23 are intentionally last: real but low-stakes polish with no downstream dependents. #24 trails everything: it only became buildable once #8 shipped the scheduled function it hooks into, and nothing else depends on it.
 
 ## Expanded talent system
 
@@ -945,10 +946,10 @@ lands, since they're specified in terms of "per Interval".
 
 ## Rumor and mission system
 
-Status: **implemented**, except region-to-region propagation (see "Still open" below — the
-Interval-tick cadence it depends on is now resolved, shared with
+Status: **implemented**, except region-to-region propagation (roadmap #24, see "Still open"
+below — the Interval-tick cadence it depends on is now built, shared with
 [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
-but the propagation logic itself is still not built).
+but the propagation logic itself is still not written).
 A rumor is a hand-authored piece of flavor text with a rarity and an optional link to a quest;
 regions and characters each keep their own rumor journal, and a "Rumeur" action lets a character
 harvest their region's better rumors and, separately, roll for local missions generated the same
@@ -1043,17 +1044,33 @@ way "Partir en quête" generates its narration.
 - Region-to-region propagation itself is not implemented: a rumor's sightings today only ever exist
   at its authored `originRegionIds` (seeded by `RumorsManager.jsx` on save) — nothing spreads it
   further. The tick/cadence mechanism it (and mission-journal expiry) would run against is now
-  decided — a global scheduled Cloud Function ticking every Interval (12h), per
-  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) —
-  but propagation's actual sweep logic still needs to be written against that function once it
-  exists. Everything else in this entry (catalog, sightings storage, both journals, both actions,
-  the banner) is built and does not depend on it.
+  built — the scheduled `sweepQuestTriggers` Cloud Function
+  ([Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
+  `functions/src/index.ts`, ticking every Interval at 00:00/12:00 UTC) — but propagation's actual
+  sweep logic still needs to be written and hooked into it, tracked as roadmap #24 (see
+  "Implementation scope" below). Everything else in this entry (catalog, sightings storage, both
+  journals, both actions, the banner) is built and does not depend on it.
 - `rumorHarvestCount` / `missionRollCount` defaults (1 / 3) and the mission reward's "one tier
   lower" scaling factor are starting balance values, not playtested — tunable without a further
   design pass once the feature is live.
 - The Intermède-side "selling a mythic object spreads a rumor of its presence" mechanic (see
   [Intermède actions (spec needed)](#intermède-actions-spec-needed)) is a separate, still-undesigned
   trigger that would need to insert directly into a region's `rumorSightings`, once designed.
+
+**Implementation scope** (roadmap #24 — region-to-region propagation sweep):
+- Read: `functions/src/lib/questTriggers.js` (`sweepQuestTriggers`, the sibling sweep already
+  registered on the same schedule — propagation should run alongside it, e.g. a second exported
+  function called from the same `functions/src/index.ts` scheduled handler, or its own scheduled
+  export on the same cron), `src/components/creator/RegionsManager.jsx` (the `neighbors:
+  [{regionId, direction}]` adjacency graph to walk, authored as one-directional but meant to be
+  read symmetrically per this entry's "Propagation and decay" note above), and
+  `shared/schema/regionRumorSighting.ts` (the `worldData/regions/items/{regionId}/rumorSightings`
+  shape to write into, including the one-tier-per-hop rarity decay and the "first sighting for a
+  rumor id wins, never re-decayed" no-op rule already decided above).
+- Update: `functions/src/index.ts` and/or `functions/src/lib/questTriggers.js` (or a new sibling
+  lib file, e.g. `functions/src/lib/rumorPropagation.js`, if keeping the two sweeps' logic
+  separate reads better than folding propagation into the trigger-sweep file).
+- Do not read or open any other file for this entry without asking the user first.
 
 **Data model implications**:
 ```
@@ -1085,7 +1102,10 @@ banner (`RumorBanner.jsx`, wired into `CharacterProfile.jsx`), the "Rumeurs" cha
 
 ## Quest triggers and end-of-action pop-up pages
 
-Status: **specified, not implemented**. Quests are meant to be generated less frequently than
+Status: **implemented**, except the region-to-region rumor propagation the same scheduled tick
+was always meant to drive (split out as its own follow-up, roadmap #24, once this entry's
+implementation was under way — see [Rumor and mission system](#rumor-and-mission-system)). Quests
+are meant to be generated less frequently than
 missions and, unlike missions, are given to a character based on a trigger the quest defines rather
 than picked at will. A player who now satisfies a quest's trigger is notified at the start of their
 next Interval, through a new page added to the existing end-of-action result pop-up
@@ -1107,12 +1127,14 @@ next Interval, through a new page added to the existing end-of-action result pop
   e.g. 00:00 and 12:00 UTC) rather than piggybacking on any individual character's own
   `completesAt` clock. Each tick sweeps every character against every quest they don't yet own and
   haven't yet triggered (`triggeredQuestIds`); a match grants/reveals that quest to the character.
-  This is the first scheduled, non-request-triggered Cloud Function in the project — every other
+  This was the first scheduled, non-request-triggered Cloud Function in the project — every other
   mechanic so far (loot draw, talent evolution, rumor harvest, mission generation) resolves lazily
-  on a player action instead. The same tick also drives
+  on a player action instead. The same tick is also meant to drive
   [Rumor and mission system](#rumor-and-mission-system)'s region-to-region propagation, whose
-  implementation was deferred pending this exact cadence decision — see that entry's "Still open"
-  note, now resolved.
+  implementation was deferred pending this exact cadence decision; the cadence now exists, but the
+  propagation sweep itself is a separate follow-up (roadmap #24) rather than something this
+  entry's implementation pass bundled in — the two are independent Firestore sweeps that happen to
+  share a cron schedule, not one combined pass.
 - **Notification**: a newly triggered quest doesn't interrupt the player mid-session — it's
   surfaced the next time they see the end-of-action pop-up, on its own page.
 - **Multi-page pop-up**: `ActionResultDialog.jsx` (today a single-page dialog, per action — see
@@ -1127,32 +1149,70 @@ next Interval, through a new page added to the existing end-of-action result pop
   triggered quest needs no "claim" step: it's simply available (e.g. in a future quest list/journal)
   from the moment the scheduled tick grants it, whether or not the player ever opens page 2.
 
-**Implementation scope**:
-- **Spec pass (roadmap #7)**: read `src/lib/actionConditions.js` / `functions/src/lib/actionConditions.js` (the `CONDITION_TYPES` condition system this entry plans to reuse for quest triggers), `functions/src/lib/actionLifecycle.js` / `src/lib/actionLifecycle.js` (the `completesAt`/Interval clock the trigger cadence would hook into), and the [Interval (12h action cycle)](#interval-12h-action-cycle) and [Modular action framework](#modular-action-framework) entries above. The only file to update for this pass is `docs/TODO.md` itself (this entry) — resolve the open questions below into a buildable spec, the same way [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) resolved its source design document.
-- **Implementation (roadmap #8, once #7 is resolved)**: additionally read `functions/src/schema/quest.ts` / `shared/schema/quest.ts` and `functions/src/schema/character.ts` / `shared/schema/character.ts` (schemas to extend), `src/components/actions/ActionResultDialog.jsx` and `src/components/actions/ActionOutcome.jsx` (the dialog to paginate), and `functions/src/index.ts` (where the new scheduled function would be registered, alongside [Rumor and mission system](#rumor-and-mission-system)'s propagation sweep it now also drives). Update those same files, plus the new scheduled trigger-evaluation function itself.
-- Do not read or open any other file for this entry without asking the user first.
+**Implemented in**: `functions/src/lib/questTriggers.js` (`questsWithTriggers` /
+`evaluateQuestTriggersForCharacter` / `sweepQuestTriggers`, unit-tested in
+`questTriggers.test.js`), registered as the scheduled `sweepQuestTriggers` export in
+`functions/src/index.ts` (`onSchedule({ schedule: "0 0,12 * * *", timeZone: "UTC" }, ...)`),
+`shared/schema/quest.ts`'s `trigger` field and `shared/schema/character.ts`'s
+`triggeredQuestIds` field (both reused by their `functions/src/schema/*` re-exports), and the
+paginated `src/components/actions/ActionResultDialog.jsx`.
+
+- **"Newly triggered … for that Interval" tracking**: the data model deliberately adds no field
+  for this (`character.triggeredQuestIds` only ever grows, it doesn't distinguish seen from
+  unseen) — so which triggered quests are still "new" is tracked client-side, in
+  `localStorage` under a per-character key (`ActionResultDialog.jsx`'s
+  `loadShownTriggeredQuestIds`/`markTriggeredQuestsShown`). Page 2 shows whatever's in
+  `triggeredQuestIds` that this browser hasn't marked shown yet, and marks it shown when the
+  dialog closes. This is a pragmatic reading of "UI-only, no schema change" below, not a
+  precisely "per Interval" cadence — a player switching browsers/devices sees every
+  not-yet-shown quest at once instead of losing track of which Interval granted what, which is
+  strictly friendlier than the alternative.
+- **No creator UI**: `trigger` is authored directly in the Firestore console, same convention as
+  `tier.talentGain` (see [Expanded talent system](#expanded-talent-system)). `QuestsManager.jsx`'s
+  save handler was switched from a bare `setDoc` to `setDoc(ref, {...}, { merge: true })` so
+  editing a quest through the form no longer silently drops a hand-authored `trigger` (or any
+  other out-of-form field) — the same protection `ActionsManager.jsx` already had for
+  `questDifficultyWeights`.
+- **Incidental fix**: `results/DefaultResult.jsx` (the page 1 result view for every handler
+  without its own `RESULT_COMPONENTS` entry — quests, missions, rumeur) referenced `ActionOutcome`
+  without importing it, a latent `ReferenceError` on every render of that path. Fixed while
+  restructuring the dialog for pagination.
+- **Propagation split out**: the scheduled function this entry adds is also meant to drive
+  [Rumor and mission system](#rumor-and-mission-system)'s region-to-region propagation sweep, but
+  that sweep's own logic (walking `neighbors`, decaying rarity per hop) is independent enough,
+  and touches enough files outside this entry's original scope, that it was tracked separately
+  as roadmap #24 instead of bundled into this pass.
+
+**Implementation scope**: exhausted — see "Implemented in" above. Roadmap #24 (propagation) is a
+separate follow-up with its own scope, listed under
+[Rumor and mission system](#rumor-and-mission-system).
 
 **Still open (deliberately deferred)**:
 - The messages feature that page 3 anticipates doesn't exist anywhere yet — this entry only
   reserves the page, it doesn't design messaging.
+- Region-to-region rumor propagation itself — see roadmap #24 above and
+  [Rumor and mission system](#rumor-and-mission-system)'s own "Still open" note.
 
-**Data model implications** (quest trigger only — the pop-up pagination is UI-only, no schema
-change):
+**Data model implications**:
 ```
 worldData/quests/items/{id}
-  trigger: { conditions: [...] }   -- NEW, same condition shape as an action's availability
-                                    --   conditions (src/lib/actionConditions.js), evaluated
-                                    --   per character per Interval
+  trigger: { conditions: [...] } | null   -- NEW, same condition row shape as an action's
+                                            --   availability.conditions (shared/schema/actionType.ts's
+                                            --   ActionAvailabilityConditionSchema), evaluated per
+                                            --   character every Interval tick. Null/absent: never
+                                            --   auto-granted. No creator UI - Firestore console only.
 
 characters/{id}
-  triggeredQuestIds: string[]   -- NEW, quest ids already evaluated/granted, so re-evaluation
-                                  --   doesn't re-trigger or re-notify the same quest
+  triggeredQuestIds: string[]   -- NEW, quest ids already granted by the sweep, so re-evaluation
+                                  --   doesn't re-trigger or re-notify the same quest. Which of these
+                                  --   are still unseen is tracked client-side (localStorage), not here.
 ```
 
 Depends on [Interval (12h action cycle)](#interval-12h-action-cycle) for its evaluation cadence, and
 touches the same `ActionResultDialog.jsx` that [Modular action framework](#modular-action-framework)
 generalized. Its scheduled-tick decision also resolves
-[Rumor and mission system](#rumor-and-mission-system)'s propagation cadence question.
+[Rumor and mission system](#rumor-and-mission-system)'s propagation cadence question (see roadmap #24
+for that sweep's own implementation).
 
 ## Aventure exploration mechanics (spec needed)
 

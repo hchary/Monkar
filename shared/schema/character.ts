@@ -104,6 +104,17 @@ export const CharacterDocumentSchema = z.object({
         "rather than hand-authored. A rolling offer, not a history: entirely replaced every time the " +
         "'rumeur' handler resolves again, and an entry is removed once the 'mission' handler resolves it."
     ),
+  triggeredQuestIds: z
+    .array(z.string())
+    .default([])
+    .describe(
+      "worldData/quests/items ids already granted by the scheduled quest-trigger sweep " +
+        "(functions/src/lib/questTriggers.js), which runs once per Interval tick. A quest id lands here " +
+        "the moment its trigger.conditions first match this character, whether or not the player has " +
+        "seen the notification yet, so a later re-evaluation never re-triggers or re-notifies the same " +
+        "quest. Which of these are still unseen (for the result pop-up's quest-notification page) is " +
+        "tracked client-side, not here - see src/components/actions/ActionResultDialog.jsx."
+    ),
   blessings: z.array(z.unknown()).default([]).describe("Reserved, not yet populated by any handler."),
   curses: z.array(z.unknown()).default([]).describe("Reserved, not yet populated by any handler."),
   woundsLight: z.number().default(0),
@@ -145,6 +156,7 @@ const DEFAULTED_KEYS = [
   "inventory",
   "rumorJournal",
   "missionJournal",
+  "triggeredQuestIds",
   "blessings",
   "curses",
   "woundsLight",

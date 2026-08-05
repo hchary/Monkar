@@ -1,4 +1,6 @@
 // results/DefaultResult.jsx
+import ActionOutcome from "../ActionOutcome";
+
 export default function DefaultResult({ lastAction, showLoot, character, error, onClose, closing }) {
   const accent = lastAction.accent;
   const outcomeClass = accent?.kind === "difficulty" ? `difficulty-text-${accent.value}` : "";

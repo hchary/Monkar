@@ -1,8 +1,10 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 const { runActionPipeline } = require("./lib/actionPipeline");
+const { sweepQuestTriggers } = require("./lib/questTriggers");
 const {
   isActionRunning,
   isActionAcknowledged,
@@ -299,4 +301,15 @@ exports.debugAdvanceTime = onCall(async (request: any) => {
   await characterSnap.ref.update(patch);
 
   return { ok: true };
+});
+
+// The first scheduled, non-request-triggered Cloud Function in the project (docs/TODO.md "Quest
+// triggers and end-of-action pop-up pages") - every other mechanic resolves lazily on a player
+// action instead. Ticks on fixed Interval boundaries (00:00 and 12:00 UTC), independent of any
+// individual character's own completesAt clock, and sweeps every living character against every
+// quest carrying a `trigger` (functions/src/lib/questTriggers.js). A newly triggered quest is
+// surfaced on its own page in the end-of-action result pop-up the next time the player sees it
+// (ActionResultDialog.jsx) - there is no separate notification push.
+exports.sweepQuestTriggers = onSchedule({ schedule: "0 0,12 * * *", timeZone: "UTC" }, async () => {
+  await sweepQuestTriggers({ db });
 });

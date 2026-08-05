@@ -173,16 +173,23 @@ export default function QuestsManager() {
       ? doc(db, "worldData", "quests", "items", editingId)
       : doc(collection(db, "worldData", "quests", "items"));
 
-    await setDoc(ref, {
-      name: form.name,
-      objectiveIds: form.objectiveIds,
-      difficulties: form.difficulties,
-      successPhraseIds: form.successPhraseIds,
-      failurePhraseIds: form.failurePhraseIds,
-      regionIds: form.regionIds,
-      locationId: form.locationId,
-      tagIds: form.tagIds,
-    });
+    await setDoc(
+      ref,
+      {
+        name: form.name,
+        objectiveIds: form.objectiveIds,
+        difficulties: form.difficulties,
+        successPhraseIds: form.successPhraseIds,
+        failurePhraseIds: form.failurePhraseIds,
+        regionIds: form.regionIds,
+        locationId: form.locationId,
+        tagIds: form.tagIds,
+      },
+      // Preserves fields this form doesn't manage - notably `trigger`, hand-authored directly in
+      // the Firestore console (see shared/schema/quest.ts) - the same reason ActionsManager.jsx
+      // merges rather than overwrites.
+      { merge: true }
+    );
     resetForm();
   }
 
