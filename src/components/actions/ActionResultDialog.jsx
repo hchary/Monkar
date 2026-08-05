@@ -13,7 +13,7 @@ const RESULT_COMPONENTS = {
 // by Escape or backdrop click - "Fermer" is the only way out, since acknowledging is what commits
 // the handler's deferred side effect (loot becoming Instance documents, for quests - see
 // acknowledgeAction / partirEnQuete.commit).
-export default function ActionResultDialog({ lastAction, showLoot, onClose, closing, error }) {
+export default function ActionResultDialog({ lastAction, showLoot, character, onClose, closing, error }) {
   const dialogRef = useRef(null);
 
   useEffect(() => {
@@ -28,6 +28,7 @@ export default function ActionResultDialog({ lastAction, showLoot, onClose, clos
         <ResultComponent
           lastAction={lastAction}
           showLoot={showLoot}
+          character={character}
           error={error}
           onClose={onClose}
           closing={closing}

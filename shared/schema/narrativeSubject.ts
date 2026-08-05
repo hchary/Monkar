@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ActionAvailabilityConditionSchema } from "./actionType";
 
 // Structural contract for `worldData/narrativeSubjects/items/{subjectId}` documents, shared
 // between the two client creators that write this collection (see the header notes below) and the
@@ -57,13 +58,28 @@ export const NarrativeSubjectDocumentSchema = z.object({
         "unique). Picks the loot table drawn from when this objective is defeated. Written only by " +
         "QuestObjectivesManager; TextGenerationManager drops the field when it saves."
     ),
+  condition: z
+    .object({ conditions: z.array(ActionAvailabilityConditionSchema).default([]) })
+    .nullable()
+    .optional()
+    .default(null)
+    .describe(
+      "Optional strict gate, only meaningful for entries tagged \"objectif de quête\" (same row shape " +
+        "as an action's availability.conditions - see shared/schema/actionType.ts - most naturally a " +
+        "single hasTalentTag row here). Used by the quest/mission resolution algorithm's score roll " +
+        "(functions/src/lib/questResolution.js): restricts whether a character's talent-tag overlap " +
+        "with this objective counts at all toward the success-threshold and wound-threshold " +
+        "adjustments (all-or-nothing - the character must own at least one talent matching this " +
+        "condition, or none of its tag-sharing talents count). Null/absent (default): every talent " +
+        "sharing a tag with this objective counts, as before. Written only by QuestObjectivesManager."
+    ),
 });
 
 export type NarrativeSubjectDocument = z.infer<typeof NarrativeSubjectDocumentSchema>;
 
 // QuestObjectivesManager's blank form. TextGenerationManager shares the first five values but has
-// no tagIds/rarity of its own.
-const DEFAULTED_KEYS = ["type", "article", "genre", "nombre", "tagIds", "rarity"] as const;
+// no tagIds/rarity/condition of its own.
+const DEFAULTED_KEYS = ["type", "article", "genre", "nombre", "tagIds", "rarity", "condition"] as const;
 
 export const DEFAULTS = NarrativeSubjectDocumentSchema.pick(
   Object.fromEntries(DEFAULTED_KEYS.map((key) => [key, true])) as Record<(typeof DEFAULTED_KEYS)[number], true>

@@ -1,10 +1,12 @@
 import { RARITIES } from "../creator/TalentsManager";
 
+const WOUND_LABELS = { light: "légère", severe: "grave", permanent: "permanente" };
+
 // The narrative recap of a resolved action: what happened, what it granted or cost. Shared
 // between the completed-action dialog and the idle-state recap below the browser - previously
 // duplicated in both places as quest-only markup (F4), written once here
 // (docs/ISSUE-02-ACTION-FRAMEWORK.md §3.7).
-export default function ActionOutcome({ lastAction, showLoot }) {
+export default function ActionOutcome({ lastAction, showLoot, character }) {
   const sortedLoot = [...(lastAction.loot || [])].sort(
     (a, b) => RARITIES.findIndex((r) => r.value === b.rarity) - RARITIES.findIndex((r) => r.value === a.rarity)
   );
@@ -28,6 +30,23 @@ export default function ActionOutcome({ lastAction, showLoot }) {
           Mission : {lastAction.mission.name}
           {lastAction.mission.locationName && ` — ${lastAction.mission.locationName}`}
         </p>
+      )}
+
+      {lastAction.score != null && (
+        <fieldset className="action-loot-box">
+          <legend>Résolution</legend>
+          <p>
+            Jet : {lastAction.score} (seuil de réussite : {lastAction.threshold})
+          </p>
+          {lastAction.wound && (
+            <p>
+              Blessure infligée : {WOUND_LABELS[lastAction.wound] || lastAction.wound}
+              {character &&
+                ` — Blessures actuelles : ${character.woundsLight || 0} légère(s), ${character.woundsSevere || 0} grave(s), ${character.woundsPermanent || 0} permanente(s)`}
+            </p>
+          )}
+          {lastAction.success && lastAction.reputationGained > 0 && <p>Réputation gagnée : +{lastAction.reputationGained}</p>}
+        </fieldset>
       )}
 
       {lastAction.rumorsHarvested?.length > 0 && (

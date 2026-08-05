@@ -4,19 +4,16 @@
 // entry from their own character.missionJournal (generated earlier by the "rumeur" handler, see
 // rumeur.js), passed in as payload.missionId exactly like artisanat.js's payload.recetteId.
 //
-// Resolution reuses partirEnQuete.js's own narration/loot/talent-evolution pipeline wholesale
-// (buildNarrativeContext, narrateQuestSuccess, drawQuestLoot, functions/src/lib/talentEvolution.js)
-// rather than duplicating it, treating the mission journal entry as a single-objective, unnamed
-// "quest" shape. The one deliberate difference is reward magnitude: both the loot draw and the
-// talent-evolution roll are evaluated at the mission's difficulty *one tier lower* than the one
-// actually rolled and narrated (clamped at "facile") - missions are meant to pay out like a quest a
-// notch easier than their own stated difficulty, per the design note's reward-scaling decision.
+// Resolution reuses partirEnQuete.js's own resolveQuestOutcome (score roll, narration, loot,
+// talent-evolution pipeline) wholesale rather than duplicating it, treating the mission journal
+// entry as a single-objective, unnamed "quest" shape. Rewards use the mission's own drawn
+// difficulty exactly, the same way a quest uses quest.difficulty - the earlier "one tier lower,
+// clamped at facile" reward discount was a balance mistake (docs/TODO.md "Mission and quest
+// resolution algorithm") and has been removed, not preserved.
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
-const { DIFFICULTY_ORDER } = require("../lib/rolls");
-const { rollTalentEvolutions } = require("../lib/talentEvolution");
-const { buildNarrativeContext, narrateQuestSuccess, drawQuestLoot } = require("./partirEnQuete");
+const { resolveQuestOutcome } = require("./partirEnQuete");
 
 async function prepare({ db, character, payload }) {
   const missionId = payload?.missionId;
@@ -71,9 +68,6 @@ async function resolve({ character, actionTypeId, today, context }) {
   const questObjectives = [objective];
   const tagsByIdName = new Map((tags || []).map((tag) => [tag.id, tag.name]));
 
-  const difficultyIndex = DIFFICULTY_ORDER.indexOf(mission.difficulty);
-  const rewardDifficulty = difficultyIndex > 0 ? DIFFICULTY_ORDER[difficultyIndex - 1] : mission.difficulty;
-
   // The shape every reused partirEnQuete helper expects - a mission has no catalog name, so the
   // drawn objective's own noun stands in for one (only used for the {quete} narration placeholder
   // and the talent-evolution circumstance text below).
@@ -83,42 +77,26 @@ async function resolve({ character, actionTypeId, today, context }) {
     name: missionName,
     tagIds: mission.tagIds || [],
     locationId: mission.locationId || null,
+    difficulty: mission.difficulty,
   };
 
-  const { talents: nextTalents, evolutions: talentEvolutions } = rollTalentEvolutions({
-    characterTalents: character.talents || [],
-    catalogTalents: talents,
-    quest: missionAsQuest,
-    objective,
-    difficulty: rewardDifficulty,
-    today,
-    circumstance: `lors de la mission « ${missionName} »`,
-  });
-
-  const narrative = narrateQuestSuccess({
+  const outcome = resolveQuestOutcome({
+    character,
     quest: missionAsQuest,
     questObjectives,
     narrativeSubjects,
     verbPhrases,
-    context: buildNarrativeContext({
-      quest: missionAsQuest,
-      locationName,
-      talents,
-      nextTalents,
-      talentEvolutions,
-      tagsByIdName,
-    }),
-  });
-
-  const narrativeText = narrative?.text || "Vous revenez de votre mission.";
-
-  const loot = drawQuestLoot({
-    quest: missionAsQuest,
-    difficulty: rewardDifficulty,
-    questObjectives,
     lootTables,
     objects,
-    accomplishmentMessage: narrative?.clause || "vous revenez de votre mission",
+    talents,
+    tagsByIdName,
+    locationName,
+    today,
+    circumstance: `lors de la mission « ${missionName} »`,
+    defaultSuccessText: "Vous revenez de votre mission.",
+    defaultSuccessClause: "vous revenez de votre mission",
+    defaultFailureText: "Vous rentrez bredouille de votre mission.",
+    defaultFailureClause: "vous rentrez bredouille de votre mission",
   });
 
   const missionSummary = {
@@ -137,20 +115,31 @@ async function resolve({ character, actionTypeId, today, context }) {
     lastAction: {
       actionTypeId,
       date: today,
-      success: true,
-      narrativeText,
+      success: outcome.success,
+      score: outcome.score,
+      threshold: outcome.threshold,
+      wound: outcome.wound,
+      reputationGained: outcome.reputationGained,
+      narrativeText: outcome.narrativeText,
       mission: missionSummary,
-      loot,
-      talentEvolutions,
+      loot: outcome.loot,
+      talentEvolutions: outcome.talentEvolutions,
       accent: mission.difficulty ? { kind: "difficulty", value: mission.difficulty } : null,
     },
   };
 
-  if (talentEvolutions.length > 0) updates.talents = nextTalents;
+  if (outcome.talentEvolutions.length > 0) updates.talents = outcome.nextTalents;
+  if (outcome.reputationGained > 0) updates.reputation = (character.reputation || 0) + outcome.reputationGained;
+  if (outcome.woundResult) {
+    updates.woundsLight = outcome.woundResult.woundsLight;
+    updates.woundsSevere = outcome.woundResult.woundsSevere;
+    updates.woundsPermanent = outcome.woundResult.woundsPermanent;
+    if (outcome.woundResult.died) updates.alive = false;
+  }
 
   const logFields = {
-    success: true,
-    narrativeText,
+    success: outcome.success,
+    narrativeText: outcome.narrativeText,
     mission: missionSummary,
   };
 

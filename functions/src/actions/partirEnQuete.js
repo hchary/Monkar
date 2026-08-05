@@ -3,6 +3,14 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { rollWeighted, RARITY_ORDER } = require("../lib/rolls");
 const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 const { rollTalentEvolutions } = require("../lib/talentEvolution");
+const { applyWound } = require("../lib/wounds");
+const {
+  rollScore,
+  rollReputationReward,
+  computeSuccessThreshold,
+  computeWoundThresholds,
+  determineWoundSeverity,
+} = require("../lib/questResolution");
 const { generateNarrative, slotOf, SLOT_ORDER } = require("../textGeneration");
 
 const ACTION_TYPE_ID = "partir-en-quete";
@@ -91,16 +99,24 @@ async function prepare({ db, character, actionType }) {
 // tag with the quest or the (randomly chosen, per item) quest objective and matching that
 // objective's rarity - then a uniform item draw within that table. Items with no matching
 // table/objective are silently skipped rather than failing the whole quest (content gap).
-function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects, accomplishmentMessage }) {
+//
+// `rarityOffset` (default 0) shifts the target rarity down that many ranks on the shared 8-tier
+// scale, floored at "commun" - used to draw the degraded-rarity consolation loot a failed
+// resolution grants (docs/TODO.md "Mission and quest resolution algorithm"), instead of matching
+// the drawn objective's rarity exactly the way a success does.
+function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects, accomplishmentMessage, rarityOffset = 0 }) {
   const count = LOOT_COUNT_BY_DIFFICULTY[difficulty] || 0;
   const loot = [];
   for (let i = 0; i < count; i++) {
     const objective = pickRandomLoot(questObjectives);
     if (!objective) continue;
 
+    const targetRarityIndex = Math.max(RARITY_ORDER.indexOf(objective.rarity) - rarityOffset, 0);
+    const targetRarity = RARITY_ORDER[targetRarityIndex] ?? objective.rarity;
+
     const relevantTagIds = new Set([...(quest.tagIds || []), ...(objective.tagIds || [])]);
     const candidateTables = lootTables.filter(
-      (table) => table.rarity === objective.rarity && (table.tagIds || []).some((id) => relevantTagIds.has(id))
+      (table) => table.rarity === targetRarity && (table.tagIds || []).some((id) => relevantTagIds.has(id))
     );
     const table = pickRandomLoot(candidateTables);
     if (!table) continue;
@@ -123,14 +139,16 @@ function drawQuestLoot({ quest, difficulty, questObjectives, lootTables, objects
   return loot;
 }
 
-// A quest always concludes successfully once drawn - there is no more weighted roll deciding
-// death, injury, gold, or reputation the way the retired paliers system used to (see "Abandoning
-// the paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md). What still varies between two
-// resolutions of the same quest is its narration, its loot, and any talent progress - each its
-// own draw, made here rather than read off a per-tier Firestore field.
+// A quest's success/failure is now decided by resolveQuestOutcome's score roll (docs/TODO.md
+// "Mission and quest resolution algorithm"), replacing the always-succeeds behaviour left over
+// from the retired paliers system (see "Abandoning the paliers system" in
+// docs/ISSUE-02-ACTION-FRAMEWORK.md). What still varies between two resolutions of the same quest,
+// on top of that roll, is its narration, its loot, and any talent progress - each its own draw.
 const NARRATION_CIBLES = ["individuel", "groupe"];
 const DEFAULT_NARRATIVE_TEXT = "Vous revenez de votre quête.";
 const DEFAULT_ACCOMPLISHMENT_CLAUSE = "vous revenez de votre quête";
+const DEFAULT_FAILURE_TEXT = "Vous rentrez bredouille de votre quête.";
+const DEFAULT_FAILURE_CLAUSE = "vous rentrez bredouille de votre quête";
 
 // Talents and quests reference the shared worldData/tags catalog by id, while narrativeSubjects and
 // verbPhrases carry their own free-text `tags` strings (see docs/ARCHITECTURE.md's dual-tag note).
@@ -201,39 +219,84 @@ function narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPh
   return null;
 }
 
-async function resolve({ character, today, context }) {
-  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags } = context;
+// Mirrors narrateQuestSuccess exactly, just against the failure side: quest.failurePhraseIds
+// instead of successPhraseIds, resultat: "echec" instead of "victoire".
+function narrateQuestFailure({ quest, questObjectives, narrativeSubjects, verbPhrases, context }) {
+  const cibles = Math.random() < 0.5 ? NARRATION_CIBLES : [...NARRATION_CIBLES].reverse();
+  const questVerbPhrases = verbPhrases.filter((v) => (quest.failurePhraseIds || []).includes(v.id));
+  const pool = preferQuestPhrasesPerSlot({ questVerbPhrases, verbPhrases });
 
-  const questObjectives = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
-  const tagsByIdName = new Map((tags || []).map((tag) => [tag.id, tag.name]));
+  for (const cible of cibles) {
+    for (const subjects of [questObjectives, narrativeSubjects]) {
+      const narrative = generateNarrative({ resultat: "echec", cible, subjects, verbPhrases: pool, context });
+      if (narrative) return narrative;
+    }
+  }
 
-  // Every quest has a chance to evolve or unlock a talent sharing a tag with it, gated on a
-  // single objective drawn for this occurrence (same draw mechanism as loot's per-item objective,
-  // but rolled once for the whole talent pass rather than per talent) - see docs/TODO.md
-  // "Amélioration de talent".
-  //
-  // Rolled *before* the narration, unlike previously: the narration's closing sentence names the
-  // talent that progressed and is matched against that talent's own tags, so it can't be written
-  // until the roll has decided which talent - if any - changed.
-  const { talents: nextTalents, evolutions: talentEvolutions } = rollTalentEvolutions({
-    characterTalents: character.talents || [],
-    catalogTalents: talents,
-    quest,
-    objective: pickRandomLoot(questObjectives),
-    difficulty: quest.difficulty,
-    today,
-    circumstance: `lors de la quête « ${quest.name} »`,
-  });
+  return null;
+}
 
-  const narrative = narrateQuestSuccess({
-    quest,
-    questObjectives,
-    narrativeSubjects,
-    verbPhrases,
-    context: buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions, tagsByIdName }),
-  });
+// The shared score-roll resolution engine behind both "Partir en quête" and "Mission" - they
+// already share every other piece of this pipeline (narration, loot, talent evolution), and now
+// share the success/failure/wound roll itself too (docs/TODO.md "Mission and quest resolution
+// algorithm"). Draws one objective, rolls one score, compares it against the two independent
+// difficulty-derived scales, and only then narrates/rewards accordingly.
+function resolveQuestOutcome({
+  character,
+  quest,
+  questObjectives,
+  narrativeSubjects,
+  verbPhrases,
+  lootTables,
+  objects,
+  talents,
+  tagsByIdName,
+  locationName,
+  today,
+  circumstance,
+  defaultSuccessText,
+  defaultSuccessClause,
+  defaultFailureText,
+  defaultFailureClause,
+}) {
+  // Reused for the threshold/wound adjustments below and for talent evolution - the same single
+  // draw already made for that mechanism, not a second roll. Independent of loot's own per-item
+  // objective draw inside drawQuestLoot.
+  const objective = pickRandomLoot(questObjectives);
 
-  const narrativeText = narrative?.text || DEFAULT_NARRATIVE_TEXT;
+  const score = rollScore();
+  const threshold = computeSuccessThreshold({ character, objective, difficulty: quest.difficulty });
+  const success = score >= threshold;
+
+  const woundThresholds = computeWoundThresholds({ character, objective, difficulty: quest.difficulty });
+  const wound = determineWoundSeverity({ score, thresholds: woundThresholds });
+  const woundResult = wound ? applyWound(character, wound) : null;
+
+  // Talent evolution was never gated by the retired tiers roll, only by "the quest succeeds" - it
+  // now reads that flag off this score-based success instead. Rolled *before* the narration: the
+  // narration's closing sentence names the talent that progressed, so it can't be written until
+  // the roll has decided which one - if any - changed.
+  let nextTalents = character.talents || [];
+  let talentEvolutions = [];
+  if (success) {
+    ({ talents: nextTalents, evolutions: talentEvolutions } = rollTalentEvolutions({
+      characterTalents: character.talents || [],
+      catalogTalents: talents,
+      quest,
+      objective,
+      difficulty: quest.difficulty,
+      today,
+      circumstance,
+    }));
+  }
+
+  const narrativeContext = buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions, tagsByIdName });
+  const narrative = success
+    ? narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPhrases, context: narrativeContext })
+    : narrateQuestFailure({ quest, questObjectives, narrativeSubjects, verbPhrases, context: narrativeContext });
+
+  const narrativeText = narrative?.text || (success ? defaultSuccessText : defaultFailureText);
+  const reputationGained = success ? rollReputationReward(quest.difficulty) : 0;
 
   const loot = drawQuestLoot({
     quest,
@@ -243,7 +306,38 @@ async function resolve({ character, today, context }) {
     objects,
     // The climax clause, not the whole paragraph: this is embedded mid-sentence in each item's
     // description ("[Obtenue lorsque ...]"), which a three-sentence narrative would read badly in.
-    accomplishmentMessage: narrative?.clause || DEFAULT_ACCOMPLISHMENT_CLAUSE,
+    accomplishmentMessage: narrative?.clause || (success ? defaultSuccessClause : defaultFailureClause),
+    // New rewards on failure (docs/TODO.md): loot drawn the same way, just two rarity ranks below
+    // each per-item objective's own rarity, floored at "commun" - no reputation, no talent evolution.
+    rarityOffset: success ? 0 : 2,
+  });
+
+  return { score, threshold, success, wound, woundResult, reputationGained, loot, talentEvolutions, nextTalents, narrativeText };
+}
+
+async function resolve({ character, today, context }) {
+  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags } = context;
+
+  const questObjectives = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
+  const tagsByIdName = new Map((tags || []).map((tag) => [tag.id, tag.name]));
+
+  const outcome = resolveQuestOutcome({
+    character,
+    quest,
+    questObjectives,
+    narrativeSubjects,
+    verbPhrases,
+    lootTables,
+    objects,
+    talents,
+    tagsByIdName,
+    locationName,
+    today,
+    circumstance: `lors de la quête « ${quest.name} »`,
+    defaultSuccessText: DEFAULT_NARRATIVE_TEXT,
+    defaultSuccessClause: DEFAULT_ACCOMPLISHMENT_CLAUSE,
+    defaultFailureText: DEFAULT_FAILURE_TEXT,
+    defaultFailureClause: DEFAULT_FAILURE_CLAUSE,
   });
 
   const questSummary = {
@@ -260,22 +354,33 @@ async function resolve({ character, today, context }) {
     lastAction: {
       actionTypeId: ACTION_TYPE_ID,
       date: today,
-      success: true,
-      narrativeText,
+      success: outcome.success,
+      score: outcome.score,
+      threshold: outcome.threshold,
+      wound: outcome.wound,
+      reputationGained: outcome.reputationGained,
+      narrativeText: outcome.narrativeText,
       quest: questSummary,
-      loot,
-      talentEvolutions,
+      loot: outcome.loot,
+      talentEvolutions: outcome.talentEvolutions,
       // A quest colors its own frame and countdown by the difficulty that was actually drawn,
       // rather than falling back to the action's category color.
       accent: quest.difficulty ? { kind: "difficulty", value: quest.difficulty } : null,
     },
   };
 
-  if (talentEvolutions.length > 0) updates.talents = nextTalents;
+  if (outcome.talentEvolutions.length > 0) updates.talents = outcome.nextTalents;
+  if (outcome.reputationGained > 0) updates.reputation = (character.reputation || 0) + outcome.reputationGained;
+  if (outcome.woundResult) {
+    updates.woundsLight = outcome.woundResult.woundsLight;
+    updates.woundsSevere = outcome.woundResult.woundsSevere;
+    updates.woundsPermanent = outcome.woundResult.woundsPermanent;
+    if (outcome.woundResult.died) updates.alive = false;
+  }
 
   const logFields = {
-    success: true,
-    narrativeText,
+    success: outcome.success,
+    narrativeText: outcome.narrativeText,
     quest: questSummary,
   };
 
@@ -305,6 +410,8 @@ module.exports = {
   commit,
   buildNarrativeContext,
   narrateQuestSuccess,
+  narrateQuestFailure,
   preferQuestPhrasesPerSlot,
   drawQuestLoot,
+  resolveQuestOutcome,
 };

@@ -8,7 +8,16 @@ import { RARITIES } from "./TalentsManager";
 
 export const OBJECTIVE_TAG = "objectif de quête";
 
-const emptyForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tagIds: [], rarity: "commun" };
+const emptyForm = {
+  type: "groupe",
+  article: "les",
+  nom: "",
+  genre: "m",
+  nombre: "pluriel",
+  tagIds: [],
+  rarity: "commun",
+  condition: null,
+};
 
 // Matches a quest objective's display name or tags — for use as MultiSelectModalField's matchesFilter.
 export function matchesQuestObjective(option, query) {
@@ -49,6 +58,7 @@ export default function QuestObjectivesManager() {
 
   function startEdit(subject) {
     setEditingId(subject.id);
+    const conditionRow = subject.condition?.conditions?.[0];
     setForm({
       type: subject.type || "groupe",
       article: subject.article || "les",
@@ -57,6 +67,7 @@ export default function QuestObjectivesManager() {
       nombre: subject.nombre || "pluriel",
       tagIds: subject.tagIds || [],
       rarity: subject.rarity || "commun",
+      condition: conditionRow ? { tagId: conditionRow.tagId || "", minQuality: conditionRow.minQuality || 1 } : null,
     });
     setOtherTags((subject.tags || []).filter((t) => t !== OBJECTIVE_TAG));
     setPanelOpen(true);
@@ -83,6 +94,9 @@ export default function QuestObjectivesManager() {
       tags: [...otherTags, OBJECTIVE_TAG],
       tagIds: form.tagIds,
       rarity: form.rarity,
+      condition: form.condition?.tagId
+        ? { conditions: [{ type: "hasTalentTag", tagId: form.condition.tagId, minQuality: form.condition.minQuality }] }
+        : null,
     });
     resetForm();
   }
@@ -186,6 +200,52 @@ export default function QuestObjectivesManager() {
             filterPlaceholder="Filtrer par nom..."
             buttonLabel="Ajouter tags"
           />
+
+          <fieldset
+            title="Restreint, pour la résolution de quête/mission, le bonus de talent au tag choisi : un
+              personnage ne bénéficie de ses talents partageant un tag avec cet objectif que s'il possède
+              au moins un talent portant ce tag précis."
+          >
+            <legend>Condition stricte (optionnel)</legend>
+            <label>
+              <input
+                type="checkbox"
+                checked={form.condition != null}
+                onChange={(e) => setForm({ ...form, condition: e.target.checked ? { tagId: "", minQuality: 1 } : null })}
+              />
+              Restreindre le bonus de talent à un tag précis
+            </label>
+            {form.condition && (
+              <>
+                <label>
+                  Tag de talent requis
+                  <select
+                    value={form.condition.tagId}
+                    onChange={(e) => setForm({ ...form, condition: { ...form.condition, tagId: e.target.value } })}
+                  >
+                    <option value="">-- Choisir --</option>
+                    {sortedTags.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Qualité minimale
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={form.condition.minQuality}
+                    onChange={(e) =>
+                      setForm({ ...form, condition: { ...form.condition, minQuality: Number(e.target.value) } })
+                    }
+                  />
+                </label>
+              </>
+            )}
+          </fieldset>
 
           <div>
             <button type="submit">{editingId ? "Enregistrer" : "Créer l'objectif de quête"}</button>

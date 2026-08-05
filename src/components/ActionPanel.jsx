@@ -109,7 +109,7 @@ export default function ActionPanel({ character }) {
             {lastAction.success ? "Succès" : "Échec"} {expanded ? "▲" : "▼"}
           </button>
 
-          {expanded && <ActionOutcome lastAction={lastAction} showLoot={showLoot} />}
+          {expanded && <ActionOutcome lastAction={lastAction} showLoot={showLoot} character={character} />}
         </div>
       )}
 
@@ -117,6 +117,7 @@ export default function ActionPanel({ character }) {
         <ActionResultDialog
           lastAction={lastAction}
           showLoot={showLoot}
+          character={character}
           onClose={handleAcknowledge}
           closing={acknowledging}
           error={ackError}
