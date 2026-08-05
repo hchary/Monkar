@@ -12,7 +12,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 |---|------|--------|------------|-------|
 | 1 | Mission and quest resolution — score & wound algorithm (spec) | done | — | [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) |
 | 2 | Mission resolution result pop-up | done | 1 | [Mission resolution result pop-up](#mission-resolution-result-pop-up) |
-| 3 | Aventure mission launch — UX polish | todo | — | [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish) |
+| 3 | Aventure mission launch — UX polish | done | — | [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish) |
 | 4 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
 | 5 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
 | 6 | Rumor and mission system — implementation | done | 5 | [Rumor and mission system](#rumor-and-mission-system) |
@@ -1425,7 +1425,7 @@ Applies to both "Partir en quête" and "Mission", which already shared one resul
 
 ## Aventure mission launch UX polish
 
-Status: mostly implemented, minor gap. [Rumor and mission system](#rumor-and-mission-system) already
+Status: **implemented**. [Rumor and mission system](#rumor-and-mission-system) already
 implemented mission launching: `MissionPicker.jsx` lists a character's `missionJournal` entries and
 starts the "Mission" action (`kindId: "aventure"`, `handlerId: "mission"`) with the picked
 `missionId`, embedded in `ActionBrowser.jsx`'s Aventure category tab alongside "Partir en quête" and
@@ -1433,10 +1433,11 @@ starts the "Mission" action (`kindId: "aventure"`, `handlerId: "mission"`) with 
 
 - This already satisfies the substance of "launch missions from the Aventure tab, backed by the
   character's mission journal" — no separate mechanic left to build.
-- The one gap against how the source design describes it ("l'onglet Aventure/missions") is
-  presentational: missions are one action among others inside the shared Aventure tab, not a
-  visually distinct "Missions" sub-tab or section. Worth a small UX pass — e.g. giving the mission
-  list its own heading/sub-section within the Aventure tab — if that distinction matters in
-  practice, but it's cosmetic, not a missing mechanic.
+- The presentational gap against the source design ("l'onglet Aventure/missions") — missions being
+  one action among others inside the shared Aventure tab, with no visual distinction — is now
+  closed: `MissionPicker.jsx` wraps its mission list in a `<fieldset className="action-loot-box">`
+  with a `<legend>Missions en cours</legend>`, the same titled-subsection convention already used
+  by `ActionOutcome.jsx` for "Butin obtenu" and "Amélioration de talent", giving the mission list
+  its own heading within the Aventure tab's action detail panel.
 
-Not blocking anything else in this list; safe to pick up independently, low effort.
+Not blocking anything else in this list.

@@ -41,23 +41,26 @@ export default function MissionPicker({ character, onStart, submitting, availabi
 
   return (
     <div className="mission-picker">
-      {missions.length === 0 ? (
-        <p className="empty-state">Aucune mission disponible — récoltez des rumeurs pour en générer.</p>
-      ) : (
-        <ul className="mission-list">
-          {missions.map((mission) => (
-            <li key={mission.id}>
-              <button
-                type="button"
-                className={mission.id === selectedId ? "selected" : ""}
-                onClick={() => setSelectedId(mission.id)}
-              >
-                {missionLabel(mission)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <fieldset className="action-loot-box">
+        <legend>Missions en cours</legend>
+        {missions.length === 0 ? (
+          <p className="empty-state">Aucune mission disponible — récoltez des rumeurs pour en générer.</p>
+        ) : (
+          <ul className="mission-list">
+            {missions.map((mission) => (
+              <li key={mission.id}>
+                <button
+                  type="button"
+                  className={mission.id === selectedId ? "selected" : ""}
+                  onClick={() => setSelectedId(mission.id)}
+                >
+                  {missionLabel(mission)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </fieldset>
 
       <button
         type="button"
