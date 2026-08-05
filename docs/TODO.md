@@ -16,7 +16,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 4 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
 | 5 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
 | 6 | Rumor and mission system — implementation | done | 5 | [Rumor and mission system](#rumor-and-mission-system) |
-| 7 | Quest triggers and end-of-action pop-up pages — spec | spec | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
+| 7 | Quest triggers and end-of-action pop-up pages — spec | done | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 8 | Quest triggers and end-of-action pop-up pages — implementation | todo | 4, 7 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 9 | Trainers — spec | spec | — | [Trainers](#trainers) |
 | 10 | Training-driven talent quality-up ("s'entraîner") | todo | 9 | [Expanded talent system](#expanded-talent-system) |
@@ -85,6 +85,11 @@ talentGain: {
 }
 ```
 
+**Implementation scope** (training-driven quality-up path, blocked on [Trainers](#trainers)):
+- This cannot be scoped precisely until [Trainers](#trainers) decides what a training action even is. Once it is, read `functions/src/lib/talentEvolution.js` (the existing weighted-tier roll this mechanic must reuse, per that entry's note), the `character.talents` shape documented above in this entry, and whatever action-type/handler files the Trainers spec ends up naming.
+- Update: whatever new handler [Trainers](#trainers) specifies, plus `functions/src/lib/talentEvolution.js` if the quality-up logic is factored to be shared.
+- Do not read or open any handler/action file for this entry without asking the user first — wait for [Trainers](#trainers) to be resolved, since which files are even relevant is exactly what that spec decides.
+
 **Still open (deliberately deferred)**:
 - The training-driven quality-up mechanic (via a "s'entraîner" action) — deferred entirely until the trainer system itself is designed, see [Trainers](#trainers) below.
 
@@ -133,9 +138,19 @@ descendantIds: [string]   -- other worldData/talents/items ids this talent unloc
 - The actual unlock mechanic: a character currently owning a talent's ancestors doesn't grant or reveal that talent anywhere — these links are pure data for now.
 - Cycle prevention: nothing stops a creator from linking talents into a cycle (A ancestor of B, B ancestor of A) or from an ancestor/descendant list pointing back at itself indirectly. Not a problem while the graph has no gameplay consumer, but should be revisited once the unlock mechanic is designed.
 
+**Implementation scope** (roadmap #23 — ancestor/descendant cycle prevention):
+- Read: `src/components/creator/TalentsManager.jsx` (the batch-write create/edit/delete handlers maintaining the `ancestorIds`/`descendantIds` mirror invariant, where a cycle check would be inserted).
+- Update: `src/components/creator/TalentsManager.jsx`.
+- Do not read or open any other file without asking the user first.
+
 ## Trainers
 
 Design note only — nothing implemented. The talent system's "s'entraîner" (train) progression path was deliberately deferred because the trainer concept itself isn't designed yet: who/what a player trains with (an NPC? a location? a standalone action type?), whether training costs anything (gold, a full day's action slot, both), whether it's restricted to talents the character already has, and how it picks *which* trainable talent to bump when a character has several. Once this is designed, revisit "Still open" in [Expanded talent system](#expanded-talent-system) above — the mechanic should reuse the existing weighted-tier roll (a success tier grants +1 quality to a designated talent) rather than introduce a second RNG system, per prior decision.
+
+**Implementation scope**:
+- This is a pure design note — read `src/components/creator/TrainerTypesManager.jsx` (today's bare-bones trainer-type stub, see [Trainer type creation page](#trainer-type-creation-page)), the "Still open" note in [Expanded talent system](#expanded-talent-system) (the training-driven quality-up path this unblocks), and `functions/src/lib/talentEvolution.js` (the existing weighted-tier roll this entry says the mechanic should reuse rather than duplicate).
+- The only file to update is `docs/TODO.md` — this entry, and then [Expanded talent system](#expanded-talent-system)'s "Still open" note once the design is settled.
+- Do not read or open any other file without asking the user first.
 
 ## Trainer type creation page
 
@@ -143,6 +158,11 @@ Talents that are trainable now reference a required trainer type (`trainerTypeId
 
 - At minimum, a description field for what kind of trainer this represents (e.g. "Maître d'armes", "Sage ermite").
 - This is the catalog side of the still-undesigned [Trainers](#trainers) mechanic above — region/location tied to a trainer, availability, and training cost/cadence are all open questions there and will likely shape what this page needs beyond a name and description.
+
+**Implementation scope**:
+- Read: `src/components/creator/TrainerTypesManager.jsx` (the stub form to extend) and `functions/src/schema/trainerType.ts` / `shared/schema/trainerType.ts` (schema to add the description field to).
+- Update: those same files.
+- Do not read or open any other file without asking the user first.
 
 Not implemented yet beyond the name-only stub described above.
 
@@ -182,6 +202,12 @@ worldData/quests/items/{id}
 
 **Still open (deliberately deferred)**:
 - How `favoredQuestIds` on a talent should affect gameplay is still undecided (see above).
+
+**Implementation scope** (roadmap #23 — `favoredQuestIds` effect):
+- Read: `src/components/creator/TalentsManager.jsx` (`favoredQuestIds` multi-select, purely informational today), `functions/src/actions/partirEnQuete.js` (the quest-drawing code this would need to weight), and `functions/src/actions/mission.js` (the mission-generation path, if this should apply there too).
+- Update: whichever of the above ends up implementing the weighting, plus `functions/src/schema/talent.ts` / `shared/schema/talent.ts` if the field's meaning changes.
+- This needs a decision on *how* `favoredQuestIds` should affect gameplay before implementation — confirm the intended effect with the user first if it isn't already decided elsewhere.
+- Do not read or open any other file without asking the user first.
 
 Loot is now drawn on quest resolution — see [Quest loot draw](#quest-loot-draw). It ended up not needing a `lootTableId` field on the quest: which loot table is used is resolved dynamically per draw (by tag overlap and objective rarity) rather than fixed per quest.
 
@@ -307,6 +333,11 @@ character.lastAction.lootClaimed: boolean   -- flips to true once claimQuestLoot
 firestore.rules gained an `instances/{id}` rule (read: creator or the owning player via a denormalized `ownerUid`; write: false, Cloud Functions only) — it was missing entirely before this feature, so the "Inventaire" tab's `instances` query had no rule to authorize it.
 
 **Still open**: no creator UI surfaces which loot tables/objectives are actually reachable together (e.g. a rarity/tag combination with zero matching tables) — a content author has to cross-reference `QuestObjectivesManager.jsx` and `TablesDeTirageManager.jsx` by hand to avoid dead combinations.
+
+**Implementation scope** (roadmap #23 — creator tooling for unreachable loot combinations):
+- Read: `src/components/creator/QuestObjectivesManager.jsx` and `src/components/creator/TablesDeTirageManager.jsx` (the two catalogs a content author currently has to cross-reference by hand), and `functions/src/actions/partirEnQuete.js`'s `drawQuestLoot` (the exact matching rule — rarity + tag overlap — the new tooling must mirror).
+- Update: likely a new read-only report/warning surfaced in `src/components/creator/TablesDeTirageManager.jsx` or `src/components/creator/QuestObjectivesManager.jsx` — exact placement is a UI decision, confirm with the user before picking one.
+- Do not read or open any other file without asking the user first.
 
 ## Modular action framework
 
@@ -463,6 +494,11 @@ Not implemented yet. Depends conceptually on
 landing first for the `tagIds` → context-tags resolution to have a consumer, though the field
 itself could be added to `QuestLocationsManager.jsx` independently of that.
 
+**Implementation scope**:
+- Read: `src/components/creator/QuestLocationsManager.jsx` (the create/edit form to add `tagIds` to), `functions/src/schema/adventureZone.ts` / `shared/schema/adventureZone.ts` (schema to extend), `docs/ISSUE-01-GRAMMAR-ENGINE.md` (the tag-vocabulary-bridge pattern this entry's consumption step must follow), and `functions/src/textGeneration.js` (where the "opening" slot resolution would consume the new tags, once the bridge pattern lands).
+- Update: `src/components/creator/QuestLocationsManager.jsx`, `functions/src/schema/adventureZone.ts`, `shared/schema/adventureZone.ts`, and `functions/src/textGeneration.js` only if the tag-vocabulary bridge has already landed by the time this is picked up (otherwise the field can ship alone, per the note above).
+- Do not read or open any other file without asking the user first.
+
 ## Tag system unification (tagIds vs free-text tags)
 
 There is currently a dual, unrelated "tags" concept, documented in
@@ -532,6 +568,12 @@ Not implemented yet, deliberately deferred as independent from and not a prerequ
 Non-goals section) — the tag vocabulary bridge meets the grammar engine's immediate need without
 this migration.
 
+**Implementation scope**:
+- Read: `functions/src/textGeneration.js` (`generateResultText`/`generateNarrative`, the free-text `tags` matching to migrate), `src/components/creator/TagsManager.jsx` (the existing cascade-delete cleanup to extend/fix), `functions/src/schema/narrativeSubject.ts` / `shared/schema/narrativeSubject.ts` and `functions/src/schema/verbPhrase.ts` / `shared/schema/verbPhrase.ts` (schemas to migrate), `src/components/creator/QuestObjectivesManager.jsx` (the `"objectif de quête"` sentinel this entry's open question is about), and [docs/ARCHITECTURE.md](ARCHITECTURE.md)'s data model section.
+- Update: the same schema files, `functions/src/textGeneration.js`, `src/components/creator/TagsManager.jsx`, a new one-off migration script under `functions/scripts/` (see `functions/scripts/migrateActionDurationTo12h.js` for the existing convention), and [docs/ARCHITECTURE.md](ARCHITECTURE.md).
+- The sentinel open question (real tag entry vs. special-cased string) needs a decision — confirm it with the user before writing the migration script if it isn't already answered by the time this is picked up.
+- Do not read or open any other file without asking the user first.
+
 ## Profession (métier) creation
 
 Status: **implemented** (catalog, creator UI, and character link — see "Character link" below).
@@ -581,6 +623,11 @@ worldData/professions/items/{id}
 - How a character is first assigned a profession via a quest or a trainer is not implemented.
   Assignment at character creation, from the drawn origin's linked profession, is now handled by
   `createCharacter` (functions/src/index.js) — see "Character link" below.
+
+**Implementation scope**:
+- **Initial assignment via quest/trainer (roadmap #11, blocked on [Trainers](#trainers))**: read `functions/src/index.ts`'s `createCharacter` (today's only assignment path, at character creation from the drawn origin), `src/lib/professions.js` (`withProfessionChange`, the existing swap-in helper this should reuse), and `functions/src/schema/profession.ts` / `shared/schema/profession.ts`. Wait for [Trainers](#trainers) to resolve before reading any handler/action files — which ones are relevant depends on that spec.
+- **Evolution consumer (roadmap #23, misc polish)**: read `src/lib/professions.js`, `functions/src/schema/profession.ts` / `shared/schema/profession.ts` (the unread `evolutionId` field), and `src/components/ProfessionTab.jsx` (where a reached-evolution notice would surface). Update whichever of those ends up hosting the evolution trigger.
+- Do not read or open any other file for this entry without asking the user first.
 
 ### Character link
 
@@ -691,6 +738,11 @@ worldData/actionTypes/items/{id}
   procedural narrative generator's tag vocabulary, per
   [Procedural narrative generation](#procedural-narrative-generation)?), so it's listed here rather
   than just added.
+
+**Implementation scope** (roadmap #22 — bundles several independent small polish items):
+- Read: `src/lib/actionKinds.js` / `functions/src/lib/actionKinds.js` (`ACTION_KINDS` tree, to extend with a new Métier subtype), `functions/src/actions/recolte.js` and `functions/src/actions/artisanat.js` (precedent for how a Métier subtype adds its own handler + fields), `src/components/creator/ActionsManager.jsx` (the creator form each subtype extends, and where a `tagIds` field would go), `functions/src/lib/actionCatalog.js` (`resolveConditions`, where the `hasProfession` gate is injected), and `functions/src/schema/actionType.ts` / `shared/schema/actionType.ts`.
+- Update: whichever of the above the specific polish item touches. This row bundles several independent items (a new Métier subtype, an action `tagIds` field, gold/reputation/region content on an existing handler) — confirm with the user which one to pick up first rather than doing all of them in one pass.
+- Do not read or open any other file without asking the user first.
 
 ## Action de récolte
 
@@ -847,6 +899,11 @@ crafting action that *consumes* it ([Action d'artisanat](#action-dartisanat)), b
 *grants* it (a training action, a discovery, a starting background...), so every character's
 `knownRecipes` stays empty until one is designed.
 
+**Implementation scope** (grant mechanism spec, roadmap #21):
+- Read: `functions/src/actions/artisanat.js` (the only current consumer of `knownRecipes`, for what shape a grant needs to satisfy), `functions/src/schema/recette.ts` / `shared/schema/recette.ts`, `functions/src/schema/character.ts` / `shared/schema/character.ts` (`knownRecipes` field), and [Trainers](#trainers) above (a training action is one of the candidate grant mechanisms named above).
+- Update: `docs/TODO.md` only (this entry) — resolve which grant mechanism (training action, discovery, starting background, …) into a buildable spec before any code changes.
+- Do not read or open any other file without asking the user first.
+
 ## Interval (12h action cycle)
 
 Status: **implemented**. Every action used to lock a character for a fixed 24 h (`durationHours`,
@@ -888,9 +945,10 @@ lands, since they're specified in terms of "per Interval".
 
 ## Rumor and mission system
 
-Status: **implemented**, except region-to-region propagation (see "Still open" below — it depends
-on the still-undecided Interval-tick cadence shared with
-[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)).
+Status: **implemented**, except region-to-region propagation (see "Still open" below — the
+Interval-tick cadence it depends on is now resolved, shared with
+[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
+but the propagation logic itself is still not built).
 A rumor is a hand-authored piece of flavor text with a rarity and an optional link to a quest;
 regions and characters each keep their own rumor journal, and a "Rumeur" action lets a character
 harvest their region's better rumors and, separately, roll for local missions generated the same
@@ -984,11 +1042,12 @@ way "Partir en quête" generates its narration.
 **Still open (deliberately deferred)**:
 - Region-to-region propagation itself is not implemented: a rumor's sightings today only ever exist
   at its authored `originRegionIds` (seeded by `RumorsManager.jsx` on save) — nothing spreads it
-  further. The exact tick/cadence mechanism both propagation and mission-journal expiry would run
-  against — whether that's part of `performAction`'s resolution or a separate scheduled function —
-  is the same open question [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
-  already defers; resolving it there resolves it here too. Everything else in this entry (catalog,
-  sightings storage, both journals, both actions, the banner) is built and does not depend on it.
+  further. The tick/cadence mechanism it (and mission-journal expiry) would run against is now
+  decided — a global scheduled Cloud Function ticking every Interval (12h), per
+  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) —
+  but propagation's actual sweep logic still needs to be written against that function once it
+  exists. Everything else in this entry (catalog, sightings storage, both journals, both actions,
+  the banner) is built and does not depend on it.
 - `rumorHarvestCount` / `missionRollCount` defaults (1 / 3) and the mission reward's "one tier
   lower" scaling factor are starting balance values, not playtested — tunable without a further
   design pass once the feature is live.
@@ -1026,21 +1085,34 @@ banner (`RumorBanner.jsx`, wired into `CharacterProfile.jsx`), the "Rumeurs" cha
 
 ## Quest triggers and end-of-action pop-up pages
 
-Design note — not implemented. Quests are meant to be generated less frequently than missions and,
-unlike missions, are given to a character based on a trigger the quest defines rather than picked
-at will. A player who now satisfies a quest's trigger is notified at the start of their next
-Interval, through a new page added to the existing end-of-action result pop-up
+Status: **specified, not implemented**. Quests are meant to be generated less frequently than
+missions and, unlike missions, are given to a character based on a trigger the quest defines rather
+than picked at will. A player who now satisfies a quest's trigger is notified at the start of their
+next Interval, through a new page added to the existing end-of-action result pop-up
 (`ActionResultDialog.jsx`).
 
+- **Quest documents**: no new generation system. Quests stay the existing hand-authored catalog
+  (`worldData/quests/items` via `QuestsManager.jsx`) — this feature only adds a trigger that gates
+  which characters currently qualify for which already-existing quest, the same way conditions
+  already gate action availability. "Generated less frequently than missions" describes the
+  player-facing effect of a trigger being rare to satisfy, not an actual content-generation cadence.
 - **Quest trigger**: each quest carries a trigger — a set of conditions on the character (owned
-  talent, reputation, profession, region, …) — presumably reusing the existing condition system
+  talent, reputation, profession, region, …) — reusing the existing condition system
   (`CONDITION_TYPES` in `src/lib/actionConditions.js` / its server mirror) already used to gate
   action availability and, per
   [Profession (métier) creation](#profession-métier-creation), reputation thresholds, rather than
   inventing a second condition format.
-- **Trigger evaluation**: once per [Interval](#interval-12h-action-cycle), the server checks each
-  character against quests they don't yet have and haven't yet triggered; a match grants/reveals
-  that quest to the character.
+- **Trigger evaluation and cadence**: a new global scheduled Cloud Function (Firebase Cloud
+  Scheduler / pub/sub, not request-triggered), ticking on fixed Interval boundaries (every 12h,
+  e.g. 00:00 and 12:00 UTC) rather than piggybacking on any individual character's own
+  `completesAt` clock. Each tick sweeps every character against every quest they don't yet own and
+  haven't yet triggered (`triggeredQuestIds`); a match grants/reveals that quest to the character.
+  This is the first scheduled, non-request-triggered Cloud Function in the project — every other
+  mechanic so far (loot draw, talent evolution, rumor harvest, mission generation) resolves lazily
+  on a player action instead. The same tick also drives
+  [Rumor and mission system](#rumor-and-mission-system)'s region-to-region propagation, whose
+  implementation was deferred pending this exact cadence decision — see that entry's "Still open"
+  note, now resolved.
 - **Notification**: a newly triggered quest doesn't interrupt the player mid-session — it's
   surfaced the next time they see the end-of-action pop-up, on its own page.
 - **Multi-page pop-up**: `ActionResultDialog.jsx` (today a single-page dialog, per action — see
@@ -1049,20 +1121,20 @@ Interval, through a new page added to the existing end-of-action result pop-up
   - Page 2: newly triggered quests, shown only when there are any for that Interval.
   - Page 3: received messages — a placeholder for now, since no messaging feature exists yet; the
     page exists in the pagination but has nothing to show.
+- **Pop-up gating**: "Fermer" closes the dialog from any page — paging to 2/3 is optional browsing,
+  not required to close. Unlike loot/craft results (which commit a deferred side effect on close,
+  per [Quest loot draw](#quest-loot-draw) and [Action d'artisanat](#action-dartisanat)), a newly
+  triggered quest needs no "claim" step: it's simply available (e.g. in a future quest list/journal)
+  from the moment the scheduled tick grants it, whether or not the player ever opens page 2.
+
+**Implementation scope**:
+- **Spec pass (roadmap #7)**: read `src/lib/actionConditions.js` / `functions/src/lib/actionConditions.js` (the `CONDITION_TYPES` condition system this entry plans to reuse for quest triggers), `functions/src/lib/actionLifecycle.js` / `src/lib/actionLifecycle.js` (the `completesAt`/Interval clock the trigger cadence would hook into), and the [Interval (12h action cycle)](#interval-12h-action-cycle) and [Modular action framework](#modular-action-framework) entries above. The only file to update for this pass is `docs/TODO.md` itself (this entry) — resolve the open questions below into a buildable spec, the same way [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) resolved its source design document.
+- **Implementation (roadmap #8, once #7 is resolved)**: additionally read `functions/src/schema/quest.ts` / `shared/schema/quest.ts` and `functions/src/schema/character.ts` / `shared/schema/character.ts` (schemas to extend), `src/components/actions/ActionResultDialog.jsx` and `src/components/actions/ActionOutcome.jsx` (the dialog to paginate), and `functions/src/index.ts` (where the new scheduled function would be registered, alongside [Rumor and mission system](#rumor-and-mission-system)'s propagation sweep it now also drives). Update those same files, plus the new scheduled trigger-evaluation function itself.
+- Do not read or open any other file for this entry without asking the user first.
 
 **Still open (deliberately deferred)**:
-- Where quest documents actually come from at the "generated less regularly" cadence — whether that
-  means hand-authored quests get *released*/made eligible on a schedule, or an actual procedural
-  quest-generation system, is unspecified.
-- The exact trigger-check cadence and where it runs (as part of `performAction`'s resolution, or a
-  separate scheduled function ticking on the Interval boundary) is undecided.
 - The messages feature that page 3 anticipates doesn't exist anywhere yet — this entry only
   reserves the page, it doesn't design messaging.
-- How page 2/3 interact with the dialog's existing "acknowledge to close" contract (loot/craft
-  results commit their deferred side effects on close, per
-  [Quest loot draw](#quest-loot-draw) and [Action d'artisanat](#action-dartisanat)) — whether
-  paging past page 1 is required before the dialog can close, or purely optional browsing, is
-  unspecified.
 
 **Data model implications** (quest trigger only — the pop-up pagination is UI-only, no schema
 change):
@@ -1077,9 +1149,10 @@ characters/{id}
                                   --   doesn't re-trigger or re-notify the same quest
 ```
 
-Not implemented yet. Depends on [Interval (12h action cycle)](#interval-12h-action-cycle) for its
-evaluation cadence, and touches the same `ActionResultDialog.jsx` that
-[Modular action framework](#modular-action-framework) generalized.
+Depends on [Interval (12h action cycle)](#interval-12h-action-cycle) for its evaluation cadence, and
+touches the same `ActionResultDialog.jsx` that [Modular action framework](#modular-action-framework)
+generalized. Its scheduled-tick decision also resolves
+[Rumor and mission system](#rumor-and-mission-system)'s propagation cadence question.
 
 ## Aventure exploration mechanics (spec needed)
 
@@ -1121,6 +1194,11 @@ outcome entirely, there is no shared consequence roller left to hook into.
 - How this coexists with "Partir en quête" — does "Partir explorer" replace it, sit alongside it as
   a second Aventure action, or subsume quest-drawing as one possible encounter outcome?
 
+**Implementation scope**:
+- This is a design note, not ready to build — the job here is to answer the open questions above, not write code. Read: `functions/src/actions/partirEnQuete.js` (the only implemented Aventure action today, and the paliers-retirement precedent), `docs/ISSUE-02-ACTION-FRAMEWORK.md` §7 ("Abandoning the paliers system"), `functions/src/schema/character.ts` / `shared/schema/character.ts` (today's wound fields, `woundsLight`/`woundsSevere`/`woundsPermanent`, to see what a `fatigue` field would sit alongside), and [Rumor and mission system](#rumor-and-mission-system)'s "Location = region" resolution (already settles one of this entry's open questions).
+- Update: `docs/TODO.md` only (this entry) — write the design doc, following the shape [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md) took for [Modular action framework](#modular-action-framework).
+- Do not read or open any other file without asking the user first.
+
 Not implemented. This entry exists to become a design doc — the same shape
 [Modular action framework](#modular-action-framework) took in
 [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md) — before any of this is built. See
@@ -1143,6 +1221,10 @@ Artisanat, quest loot draw):
   rather than replacing it — pending the spec's answer on that point.
 - Whatever the spec decides for multi-step resolution, built as something any future action can
   reuse, not a one-off special case inside this handler alone.
+
+**Implementation scope**:
+- Blocked on the spec entry above — nothing is decided enough to name exact files yet. Once specced, expect to read/touch `functions/src/actions/recolte.js` and `functions/src/lib/harvest.js` (the closest precedent: a handler drawing from a weighted table), `functions/src/lib/actionKinds.js` / `src/lib/actionKinds.js` (registering a new Aventure-branch handler), and `functions/src/schema/character.ts` / `shared/schema/character.ts` (adding `fatigue`).
+- Do not read or open any file for this entry — spec or implementation — without asking the user first; the exact file list depends entirely on decisions the spec entry above hasn't made yet.
 
 Not implemented yet.
 
@@ -1185,6 +1267,11 @@ Intermède action, handler, or the "up to 3 per Interval" cap exists yet.
   hop-by-hop propagation decay), per the now-settled data model in
   [Rumor and mission system](#rumor-and-mission-system).
 
+**Implementation scope**:
+- Design note — the job is to answer the open questions above, not write code. Read: `src/lib/actionKinds.js` / `functions/src/lib/actionKinds.js` (the existing `intermede` root kind), [Interval (12h action cycle)](#interval-12h-action-cycle)'s phase-cycle note (the "max 3 per Interval" budget this must track against), and [Rumor and mission system](#rumor-and-mission-system)'s rumor-sighting data model (the mythic-object-sale side effect would write directly into `worldData/regions/items/{regionId}/rumorSightings/{rumorId}`, per that entry's now-settled shape).
+- Update: `docs/TODO.md` only (this entry).
+- Do not read or open any other file without asking the user first.
+
 Not implemented. This entry exists to become a design doc before any of this is built. See the
 paired [Intermède actions (implementation)](#intermède-actions-implementation) entry below.
 
@@ -1195,6 +1282,9 @@ above, and transitively on [Rumor and mission system](#rumor-and-mission-system)
 rumor-trigger example and on the messaging feature
 [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
 reserves a page for but doesn't design.
+
+**Implementation scope**:
+- Blocked on the spec entry above and transitively on the still-undesigned messaging feature. Do not read or open any file for this entry without asking the user first — nothing here is buildable yet, and the exact scope is entirely dependent on decisions not yet made.
 
 Not implemented yet — nothing to build until the spec entry resolves what an Intermède action
 actually does and how the per-Interval cap is tracked.
@@ -1225,6 +1315,11 @@ a composite quest is presumably where that reward gap matters most, as a multi-I
 - How reward tiering differs for a composite quest's final step vs. its earlier steps, vs. a normal
   one-off quest.
 
+**Implementation scope**:
+- Design note — the job is to answer the open questions above, not write code. Read: `functions/src/schema/quest.ts` / `shared/schema/quest.ts` (today's flat quest catalog shape, the model any chain-authoring decision builds on), `functions/src/schema/character.ts` / `shared/schema/character.ts` (precedent fields like `knownProfessions`/the planned `triggeredQuestIds` for tracking chain progress), and [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) above (this entry is blocked on it, and one open question here is whether to reuse its trigger/condition mechanism).
+- Update: `docs/TODO.md` only (this entry).
+- Do not read or open any other file without asking the user first.
+
 Not implemented. See the paired [Composite quests (implementation)](#composite-quests-implementation)
 entry below.
 
@@ -1235,6 +1330,9 @@ Likely touches `worldData/quests/items` (chain authoring), `characters/{id}` (pr
 and `partirEnQuete.js` / the
 [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
 mechanic (how the next step gets offered), once those are decided.
+
+**Implementation scope**:
+- Blocked on the spec entry above. Do not read or open any file for this entry without asking the user first — the files named in the paragraph above are provisional; which of them actually change, and how, is exactly what the spec entry has to decide first.
 
 Not implemented yet.
 
