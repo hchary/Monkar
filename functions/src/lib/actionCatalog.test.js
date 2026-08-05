@@ -4,21 +4,21 @@ const { resolveDurationHours, resolveConditions, normalizeActionType, evaluateAv
 const { UNKNOWN_CONDITION_REASON } = require("./actionConditions");
 
 describe("resolveDurationHours", () => {
-  test("defaults to 24h", () => {
-    assert.equal(resolveDurationHours({}), 24);
-    assert.equal(resolveDurationHours(undefined), 24);
+  test("defaults to 12h", () => {
+    assert.equal(resolveDurationHours({}), 12);
+    assert.equal(resolveDurationHours(undefined), 12);
   });
 
   test("honours a positive duration", () => {
     assert.equal(resolveDurationHours({ durationHours: 8 }), 8);
-    assert.equal(resolveDurationHours({ durationHours: "12" }), 12);
+    assert.equal(resolveDurationHours({ durationHours: "6" }), 6);
   });
 
   test("falls back to the default rather than producing an action that never completes", () => {
-    assert.equal(resolveDurationHours({ durationHours: 0 }), 24);
-    assert.equal(resolveDurationHours({ durationHours: -5 }), 24);
-    assert.equal(resolveDurationHours({ durationHours: "bientôt" }), 24);
-    assert.equal(resolveDurationHours({ durationHours: null }), 24);
+    assert.equal(resolveDurationHours({ durationHours: 0 }), 12);
+    assert.equal(resolveDurationHours({ durationHours: -5 }), 12);
+    assert.equal(resolveDurationHours({ durationHours: "bientôt" }), 12);
+    assert.equal(resolveDurationHours({ durationHours: null }), 12);
   });
 });
 
@@ -38,7 +38,7 @@ describe("normalizeActionType", () => {
     assert.equal(normalized.order, 0);
     assert.equal(normalized.enabled, true);
     assert.equal(normalized.handlerId, null);
-    assert.equal(normalized.durationHours, 24);
+    assert.equal(normalized.durationHours, 12);
     assert.deepStrictEqual(normalized.availability, {
       conditions: [],
       unmetBehaviour: "hide",
@@ -68,7 +68,7 @@ describe("normalizeActionType", () => {
       description: "Reprendre des forces.",
       order: 3,
       handlerId: "seReposer",
-      durationHours: 12,
+      durationHours: 6,
       availability: {
         conditions: [{ type: "notWounded" }],
         unmetBehaviour: "disable",
@@ -81,7 +81,7 @@ describe("normalizeActionType", () => {
     assert.equal(normalized.categoryId, "intermede");
     assert.equal(normalized.order, 3);
     assert.equal(normalized.handlerId, "seReposer");
-    assert.equal(normalized.durationHours, 12);
+    assert.equal(normalized.durationHours, 6);
     assert.equal(normalized.availability.unmetBehaviour, "disable");
     assert.equal(normalized.availability.unmetMessage, "Vous êtes déjà en pleine forme.");
     assert.deepStrictEqual(normalized.result, { accentSource: "difficulty", showLoot: true });

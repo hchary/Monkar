@@ -10,7 +10,7 @@
 // `lastAction.completesAt` is the single source of truth for both the once-per-day lock and the
 // countdown - see docs/ISSUE-02-ACTION-FRAMEWORK.md §3.6.
 
-const DEFAULT_DURATION_HOURS = 24;
+const DEFAULT_DURATION_HOURS = 12;
 const HOUR_MS = 60 * 60 * 1000;
 
 // Accepts an Admin SDK Timestamp, a client SDK Timestamp, a Date, or raw millis - the same

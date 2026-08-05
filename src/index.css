@@ -614,7 +614,7 @@ fieldset label {
 /* Action accent frame — colors whatever is showing the action's accent (the countdown while it
    runs, the recap and result dialog once it's done): either the drawn quest's difficulty, or the
    action's category as a fallback (D9). Selector-independent (F13) so both ActionCountdown and
-   the "Action de la veille" recap can compose it without duplicating the rules. */
+   the "Dernier Interval" recap can compose it without duplicating the rules. */
 .difficulty-frame,
 .category-frame {
   border: 2px solid;
