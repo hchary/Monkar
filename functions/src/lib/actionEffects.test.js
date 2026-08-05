@@ -22,7 +22,7 @@ describe("stampLifecycle", () => {
     const { lastAction } = stamp({ lastAction: {} });
 
     assert.deepStrictEqual(lastAction.startedAt, NOW);
-    assert.deepStrictEqual(lastAction.completesAt, Timestamp.fromMillis(NOW.toMillis() + 24 * HOUR_MS));
+    assert.deepStrictEqual(lastAction.completesAt, Timestamp.fromMillis(NOW.toMillis() + 12 * HOUR_MS));
   });
 
   test("honours a per-action duration, and an explicit override on top of it", () => {

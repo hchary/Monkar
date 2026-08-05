@@ -82,14 +82,14 @@ export default function ActionPanel({ character }) {
     <div className="action-panel">
       {/* TODO: remove this test-only button before the game goes live to real players */}
       <button type="button" className="debug-button" onClick={handleDebugAdvanceTime}>
-        [TEST] Avancer le temps d'un jour
+        [TEST] Avancer le temps d'un Interval
       </button>
 
       {state === "running" && <ActionCountdown character={character} now={now} />}
 
       {state === "idle" && (
         <>
-          <h2>Action du jour</h2>
+          <h2>Action de l'Interval</h2>
           <ActionBrowser
             character={character}
             actionTypes={actionTypes}
@@ -102,7 +102,7 @@ export default function ActionPanel({ character }) {
 
       {state === "idle" && lastAction && (
         <div className={`last-action ${frameClass}`.trim()}>
-          <h2>Action de la veille</h2>
+          <h2>Dernier Interval</h2>
           <p className="action-type-label">{lastAction.label}</p>
 
           <button type="button" className="status-toggle" onClick={() => setExpanded((v) => !v)}>

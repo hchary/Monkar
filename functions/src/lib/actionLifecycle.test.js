@@ -46,17 +46,17 @@ describe("toMillis", () => {
 describe("actionCompletesAtMillis", () => {
   test("uses completesAt when present", () => {
     const character = characterWith({ startedHoursAgo: 3 });
-    assert.equal(actionCompletesAtMillis(character), NOW + 21 * HOUR_MS);
+    assert.equal(actionCompletesAtMillis(character), NOW + 9 * HOUR_MS);
   });
 
-  test("falls back to startedAt + 24h for documents written before completesAt existed", () => {
+  test("falls back to startedAt + 12h for documents written before completesAt existed", () => {
     const character = { lastAction: { startedAt: hoursFromNow(-3) } };
-    assert.equal(actionCompletesAtMillis(character), NOW + 21 * HOUR_MS);
+    assert.equal(actionCompletesAtMillis(character), NOW + 9 * HOUR_MS);
   });
 
   test("falls back to the root lastActionAt when lastAction has no instant of its own", () => {
     const character = { lastActionAt: hoursFromNow(-10), lastAction: { actionTypeId: "partir-en-quete" } };
-    assert.equal(actionCompletesAtMillis(character), NOW + 14 * HOUR_MS);
+    assert.equal(actionCompletesAtMillis(character), NOW + 2 * HOUR_MS);
   });
 
   test("returns null when there is no action, or no usable instant anywhere", () => {
@@ -68,12 +68,12 @@ describe("actionCompletesAtMillis", () => {
 
 describe("isActionRunning", () => {
   test("is true while the action still has time left", () => {
-    assert.equal(isActionRunning(characterWith({ startedHoursAgo: 23 }), NOW), true);
+    assert.equal(isActionRunning(characterWith({ startedHoursAgo: 11 }), NOW), true);
   });
 
   test("is false once completesAt is reached, and exactly at completesAt", () => {
-    assert.equal(isActionRunning(characterWith({ startedHoursAgo: 24 }), NOW), false);
-    assert.equal(isActionRunning(characterWith({ startedHoursAgo: 25 }), NOW), false);
+    assert.equal(isActionRunning(characterWith({ startedHoursAgo: 12 }), NOW), false);
+    assert.equal(isActionRunning(characterWith({ startedHoursAgo: 13 }), NOW), false);
   });
 
   test("is false for a character that has never acted", () => {

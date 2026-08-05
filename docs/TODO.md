@@ -1,6 +1,37 @@
 # Planned features / backlog
 
-Design notes for features that aren't implemented yet. Not a task tracker for in-progress work — see the session's task list for that. Add new entries here when a feature is decided but not yet built.
+Design notes for features that aren't implemented yet. Not a task tracker for in-progress work — see the session's task list for that. Add new entries here when a feature is decided but not yet built. The `## Roadmap` section right below is the priority-ordered index into everything below it — start there; the detailed `##` entries further down stay the reference/spec content they've always been.
+
+## Roadmap
+
+Priority-ordered, dependency-aware queue of everything below that isn't cleanly `Status: **implemented**`. `/next-todo` reads this table to pick the next item.
+
+Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (spec is settled, build it), or `done`. `Blocked by` lists row numbers that must all be `done` before a row is actually pickable — a row's own `Status` doesn't encode blocked-ness, it's always what the row *would be* once unblocked; readiness is always `Status ≠ done` AND every listed blocker is `done`. Rows are otherwise in priority order — earlier is more important, not just "more ready".
+
+| # | Item | Status | Blocked by | Entry |
+|---|------|--------|------------|-------|
+| 1 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
+| 2 | Rumor and mission system — spec | spec | — | [Rumor and mission system](#rumor-and-mission-system) |
+| 3 | Rumor and mission system — implementation | todo | 2 | [Rumor and mission system](#rumor-and-mission-system) |
+| 4 | Quest triggers and end-of-action pop-up pages — spec | spec | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
+| 5 | Quest triggers and end-of-action pop-up pages — implementation | todo | 1, 4 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
+| 6 | Trainers — spec | spec | — | [Trainers](#trainers) |
+| 7 | Training-driven talent quality-up ("s'entraîner") | todo | 6 | [Expanded talent system](#expanded-talent-system) |
+| 8 | Profession initial assignment via quest/trainer | todo | 6 | [Profession (métier) creation](#profession-métier-creation) |
+| 9 | Trainer type creation page — description field | todo | — | [Trainer type creation page](#trainer-type-creation-page) |
+| 10 | Tag system unification (tagIds vs free-text tags) | todo | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
+| 11 | Location tags | todo | — | [Location tags](#location-tags) |
+| 12 | Aventure exploration mechanics — spec | spec | 2 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
+| 13 | Aventure exploration mechanics — implementation | todo | 12 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
+| 14 | Intermède actions — spec | spec | 2 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
+| 15 | Intermède actions — implementation | todo | 14 | [Intermède actions (implementation)](#intermède-actions-implementation) |
+| 16 | Composite quests — spec | spec | 4 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
+| 17 | Composite quests — implementation | todo | 16 | [Composite quests (implementation)](#composite-quests-implementation) |
+| 18 | Known recipes grant mechanism — spec | spec | 6 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
+| 19 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
+| 20 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
+
+**Why this order**: Interval is first because three later entries (#2, #4, and transitively #12/#14) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#2) and Quest triggers (#4) come next because they're the two specs the most other entries lean on (#3, #12, #14 read on Rumor/mission; #16 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#6) is an independent track that unblocks two separate entries (#7, #8) plus loosely #18, so it runs in parallel rather than waiting. #9-11 are small, fully unblocked, and safe to pick up any time priority allows. #19-20 are intentionally last: real but low-stakes polish with no downstream dependents.
 
 ## Expanded talent system
 
@@ -326,6 +357,12 @@ characters/{id}.lastAction
   -- lastActionDate kept but demoted to a logging/display field, no longer the lock
 ```
 
+**Still open**: a handler currently runs its `resolve()` exactly once per action occurrence — there
+is no notion of an action deciding, itself, how many resolution "rounds" it performs (e.g. drawing
+several independent encounters within a single action). No design exists yet for this; the first
+concrete case that needs it is "Partir explorer"'s T encounter draws — see
+[Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed).
+
 ## Procedural narrative generation
 
 Status: **implemented**. The feasibility study asked for by this entry is done
@@ -631,10 +668,26 @@ worldData/actionTypes/items/{id}
 - No concrete Métier subtype exists yet beyond Récolte and Artisanat (Transport, Recherche...).
   Adding one is an entry in `ACTION_KINDS` plus, if it needs bespoke mechanics, a handler in
   `ACTION_HANDLERS` - see [Action de récolte](#action-de-récolte) and
-  [Action d'artisanat](#action-dartisanat) for how those two did it.
+  [Action d'artisanat](#action-dartisanat) for how those two did it. Candidate content for future
+  Métier actions/subtypes: forger, couper du bois, cultiver, monter la garde, cuisiner, faire de la
+  musique, construire, miner - illustrations only, same status as the example actions listed in
+  [Modular action framework](#modular-action-framework)'s own analysis.
 - A kind cannot declare which handlers or which extra form fields belong to it; the handler select
   still offers every registered handler regardless of kind. Worth revisiting when the next
   subtype needs its own fields.
+- A Métier action's `resolve()` can already return `updates` touching `reputation`, `gold`, or
+  `region` - the pipeline applies whatever a handler returns, nothing new to build there (see
+  [Modular action framework](#modular-action-framework)). No handler exercises this today: Récolte
+  and Artisanat only ever touch `instances`. Since the retired paliers system stopped rolling
+  gold/reputation/wound changes entirely (`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7), which action
+  grants how much of what is undecided content, not a missing architecture piece.
+- Action types have no `tagIds` field of their own yet, unlike every other catalog collection
+  (quests, objects, loot tables, talents, recettes). Adding it is a small, low-risk change following
+  the exact same `worldData/tags/items` + `MultiSelectModalField` pattern already used everywhere
+  else - but no consumer is specified yet (filtering in the action browser? matching against the
+  procedural narrative generator's tag vocabulary, per
+  [Procedural narrative generation](#procedural-narrative-generation)?), so it's listed here rather
+  than just added.
 
 ## Action de récolte
 
@@ -790,3 +843,318 @@ characters/{characterId}
 crafting action that *consumes* it ([Action d'artisanat](#action-dartisanat)), but nothing that
 *grants* it (a training action, a discovery, a starting background...), so every character's
 `knownRecipes` stays empty until one is designed.
+
+## Interval (12h action cycle)
+
+Status: **implemented**. Every action used to lock a character for a fixed 24 h (`durationHours`,
+defaulting to 24 — see [Modular action framework](#modular-action-framework), whose
+`completesAt`-based lock already made the duration a single configurable number rather than a
+hardcoded day). The game's base time unit is now a 12 h segment, named "Interval" in-game, so a
+character can act roughly twice as often.
+
+- **Default duration**: `durationHours`'s default dropped from 24 to 12
+  (`DEFAULT_DURATION_HOURS` in `functions/src/lib/actionLifecycle.js` / `src/lib/actionLifecycle.js`,
+  and the schema default in `functions/src/schema/actionType.js`). This is a global default, not
+  just a new baseline for future documents: already-authored action types relying on the old
+  default (absent `durationHours`, or explicitly `24`) were bulk-migrated to `12` via a one-off
+  admin script, `functions/scripts/migrateActionDurationTo12h.js`. A per-action type still
+  authored with its own deliberate value (e.g. 6 h, 48 h) is untouched either way — per-action
+  overrides work exactly as before, only the fallback changed.
+- **Terminology**: the three "day"-worded UI strings tied to the action lock were reworded to
+  "Interval" — `ActionPanel.jsx`'s two headings ("Action du jour" → "Action de l'Interval",
+  "Action de la veille" → "Dernier Interval") and the debug-only `[TEST] Avancer le temps d'un
+  jour` button (→ "…d'un Interval"). No other player-facing copy referenced "jour"/"veille" for
+  the action lock specifically.
+- **Shared clock**: the rumor propagation and quest-trigger checks described below
+  ([Rumor and mission system](#rumor-and-mission-system),
+  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages))
+  are meant to tick on this same Interval boundary rather than introduce a separate cadence —
+  "beginning of an Interval" is the moment both a character's own action can complete and the
+  world-level systems (rumor propagation, quest trigger evaluation) advance. Not built yet; those
+  are separate roadmap entries.
+- **Phase cycle**: a player's Interval is described as three phases — Intermède → Action →
+  Intermède — i.e. a character can spend Intermède actions (see
+  [Intermède actions](#intermède-actions-spec-needed), capped at 3 total) both before and after
+  their one main action for that Interval, not only in a single window before or after it. The
+  Intermède mechanic itself (including how that 3-action cap is tracked) is still undesigned — see
+  that entry's own open questions.
+
+Depended on nothing else being built first — it was a default-value and copy change on top of the
+already-implemented `completesAt` lock. The rumor/quest systems below are written assuming it
+lands, since they're specified in terms of "per Interval".
+
+## Rumor and mission system
+
+Design note — not implemented, and largely undecided beyond the mechanics below. A rumor is a piece
+of flavor text with a rarity and an optional link to a quest; locations and characters each keep
+their own rumor journal, and a "Rumeur" action lets a character harvest their location's better
+rumors and, separately, roll for local missions.
+
+- **Rumor**: French flavor text, a rarity (presumably reusing the 8-tier scale shared by
+  talents/objects/quests loot — see [Expanded talent system](#expanded-talent-system) — though a
+  rumor may warrant its own lighter scale, undecided), and an optional reference to the quest it's
+  hinting at.
+- **Location rumor journal**: every location keeps its own accumulating list of rumors. Which
+  entity "location" means here — a `worldData/regions/items` entry (what a character's `region`
+  field already points to) or the more granular `worldData/adventureZones/items` ("Lieux de
+  quête") — is not decided; either way, propagation (below) needs an adjacency relationship
+  between locations that doesn't exist yet on either collection.
+- **Propagation**: at regular time intervals (presumably once per
+  [Interval](#interval-12h-action-cycle)), each location pushes its rumors out to neighboring
+  locations. Requires a "neighboring locations" graph to be authored somewhere — nothing today
+  models which locations are adjacent to which.
+- **Character rumor journal**: a character also keeps their own rumor journal — presumably the
+  rumors they've personally collected via the Rumeur action (see below), independent of their
+  current location's journal.
+- **Rumor banner**: a character standing in a location sees that location's rumors scroll through a
+  dedicated banner at the bottom of the screen, above the existing visual banner. Rumors at or above
+  a certain rarity (relative to their own object/subject, not a flat threshold) are visually called
+  out for the player.
+- **"Rumeur" action**: performing it grants the character a number of that location's rare-or-above
+  rumors (added to their personal rumor journal) and separately rolls a batch of
+  randomly-generated local missions, which are added to the character's mission journal.
+- **Mission journal and "Mission" action**: the mission journal is the list a player picks from to
+  perform a "Mission" action — analogous to how the quest system already works, but missions are
+  generated on the fly by the Rumeur action rather than hand-authored in a creator catalog.
+- **Mission vs. quest**: per later notes, a mission isn't really a separate system from a quest —
+  a "quête" is generically "an action to accomplish under particular conditions" (a location, a
+  specific encounter, crafting a specific object, …), and a mission is one instance of that,
+  generated on the fly rather than hand-authored. The two are expected to keep differing mainly in
+  how they're granted (procedurally rolled by the Rumeur action vs. hand-authored and
+  trigger-granted, see [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages))
+  and in reward magnitude — quests are meant to pay out noticeably more (gear, talent evolution, see
+  [Quest loot draw](#quest-loot-draw) and
+  [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success))
+  than missions, whose reward shape is still undesigned (see below). A quest can also be chained
+  into a multi-step sequence - see [Composite quests (spec needed)](#composite-quests-spec-needed).
+
+**Still open (deliberately deferred)** — most of the mechanic:
+- What "location" means for this feature (region vs. adventure zone vs. a new entity), and the
+  adjacency graph needed for propagation.
+- The propagation algorithm itself: does a rumor propagate indefinitely hop by hop, does it decay
+  in rarity or relevance as it travels, can the same rumor duplicate across a location's journal.
+- How a rumor's rarity is decided at generation time, and what "rare and above, relative to their
+  object" means precisely (relative to what — the quest it points to? the subject it's about?).
+- How missions are procedurally generated (content pool, difficulty, rewards) — currently the only
+  comparable system, [Quest creation and editing](#quest-creation-and-editing), is entirely
+  hand-authored per quest, not generated.
+- How a mission differs mechanically from a quest — reward shape, difficulty, whether missions can
+  also grant loot/talent evolution like quests do — is unspecified; the notes only say missions
+  "fill the mission journal" and are performed via a "Mission" action.
+- Data model not sketched yet — pending the location-identity and storage-granularity decisions
+  above (e.g. whether rumors live in a subcollection per location, a top-level `rumors` collection,
+  or a denormalized array on the location document, matters a lot for how propagation and the
+  banner query would actually work).
+
+Not implemented yet — no code, schema, or UI exists for rumors or missions.
+
+## Quest triggers and end-of-action pop-up pages
+
+Design note — not implemented. Quests are meant to be generated less frequently than missions and,
+unlike missions, are given to a character based on a trigger the quest defines rather than picked
+at will. A player who now satisfies a quest's trigger is notified at the start of their next
+Interval, through a new page added to the existing end-of-action result pop-up
+(`ActionResultDialog.jsx`).
+
+- **Quest trigger**: each quest carries a trigger — a set of conditions on the character (owned
+  talent, reputation, profession, region, …) — presumably reusing the existing condition system
+  (`CONDITION_TYPES` in `src/lib/actionConditions.js` / its server mirror) already used to gate
+  action availability and, per
+  [Profession (métier) creation](#profession-métier-creation), reputation thresholds, rather than
+  inventing a second condition format.
+- **Trigger evaluation**: once per [Interval](#interval-12h-action-cycle), the server checks each
+  character against quests they don't yet have and haven't yet triggered; a match grants/reveals
+  that quest to the character.
+- **Notification**: a newly triggered quest doesn't interrupt the player mid-session — it's
+  surfaced the next time they see the end-of-action pop-up, on its own page.
+- **Multi-page pop-up**: `ActionResultDialog.jsx` (today a single-page dialog, per action — see
+  [Modular action framework](#modular-action-framework)) gains numbered, paginated pages:
+  - Page 1: the current action's result (today's entire dialog content, unchanged).
+  - Page 2: newly triggered quests, shown only when there are any for that Interval.
+  - Page 3: received messages — a placeholder for now, since no messaging feature exists yet; the
+    page exists in the pagination but has nothing to show.
+
+**Still open (deliberately deferred)**:
+- Where quest documents actually come from at the "generated less regularly" cadence — whether that
+  means hand-authored quests get *released*/made eligible on a schedule, or an actual procedural
+  quest-generation system, is unspecified.
+- The exact trigger-check cadence and where it runs (as part of `performAction`'s resolution, or a
+  separate scheduled function ticking on the Interval boundary) is undecided.
+- The messages feature that page 3 anticipates doesn't exist anywhere yet — this entry only
+  reserves the page, it doesn't design messaging.
+- How page 2/3 interact with the dialog's existing "acknowledge to close" contract (loot/craft
+  results commit their deferred side effects on close, per
+  [Quest loot draw](#quest-loot-draw) and [Action d'artisanat](#action-dartisanat)) — whether
+  paging past page 1 is required before the dialog can close, or purely optional browsing, is
+  unspecified.
+
+**Data model implications** (quest trigger only — the pop-up pagination is UI-only, no schema
+change):
+```
+worldData/quests/items/{id}
+  trigger: { conditions: [...] }   -- NEW, same condition shape as an action's availability
+                                    --   conditions (src/lib/actionConditions.js), evaluated
+                                    --   per character per Interval
+
+characters/{id}
+  triggeredQuestIds: string[]   -- NEW, quest ids already evaluated/granted, so re-evaluation
+                                  --   doesn't re-trigger or re-notify the same quest
+```
+
+Not implemented yet. Depends on [Interval (12h action cycle)](#interval-12h-action-cycle) for its
+evaluation cadence, and touches the same `ActionResultDialog.jsx` that
+[Modular action framework](#modular-action-framework) generalized.
+
+## Aventure exploration mechanics (spec needed)
+
+Design note — not implemented, and too underspecified to build yet. Aventure actions are meant to
+be tied either to a location (dungeon presence?) or to mission announcements the player has
+discovered. Every Aventure action updates a character's state, fatigue, and wounds, and may also
+edit inventory, reputation, gold, or location; fatigue is meant to necessarily increase after an
+adventure. For a given Interval, the Aventure tab is meant to offer "Partir explorer": costs a time
+T, and the player draws T encounters from the zone's encounter tables (possibly with increasing
+difficulty as T grows).
+
+This significantly extends the Aventure kind, whose only implemented instance today is "Partir en
+quête" — which draws exactly one quest by difficulty and touches none of fatigue, wounds, gold, or
+reputation, since the paliers system that used to roll those was retired outright (see
+`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7 "Abandoning the paliers system"): each handler now owns its
+outcome entirely, there is no shared consequence roller left to hook into.
+
+**Open questions this spec needs to answer before anything gets built:**
+- What "location" means here — the same open question as in
+  [Rumor and mission system](#rumor-and-mission-system) (region vs. adventure zone vs. a new
+  entity) — plus whether "dungeon presence" implies a new sub-catalog of dungeons/locations gating
+  which Aventure actions are available where.
+- **Encounter tables**: a wholly new catalog, comparable to loot tables, doesn't exist yet. What an
+  encounter contains (a narrative subject? a monster? a skill check?), how it's tagged/weighted, and
+  how T draws compose into a single action's outcome (T independent rolls? an accumulating
+  difficulty? a first-failure-stops sequence?) are all undecided.
+- **Fatigue**: a new field on `characters/{id}` (doesn't exist today, unlike `woundsLight` /
+  `woundsSevere` / `woundsPermanent` — see [Expanded talent system](#expanded-talent-system)'s data
+  model). Its scale, what spending/recovering it means, and whether it gates future actions (can a
+  tired character still adventure?) are undecided.
+- **Wounds**: whether "increases after an adventure" means Aventure actions become the mechanic
+  that lands wounds again, now handler-owned instead of the retired generic tier roll.
+- **Multi-step resolution**: "Partir explorer" is the first concrete case needing an action that
+  runs several resolution rounds (T encounter draws) instead of the single `resolve()` call every
+  handler makes today — see [Modular action framework](#modular-action-framework)'s "Still open"
+  note. The handler contract, pipeline, and result pop-up (one outcome per action today) all assume
+  a single round.
+- How this coexists with "Partir en quête" — does "Partir explorer" replace it, sit alongside it as
+  a second Aventure action, or subsume quest-drawing as one possible encounter outcome?
+
+Not implemented. This entry exists to become a design doc — the same shape
+[Modular action framework](#modular-action-framework) took in
+[docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md) — before any of this is built. See
+the paired [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation)
+entry below.
+
+## Aventure exploration mechanics (implementation)
+
+Status: blocked. Depends entirely on
+[Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) above —
+nothing here is decided enough to build yet.
+
+Once specced, expected shape based on precedent sibling systems already implemented (Récolte,
+Artisanat, quest loot draw):
+- A new encounter-table catalog and creator UI, comparable to `worldData/lootTables/items` /
+  `TablesDeTirageManager.jsx`.
+- A `fatigue` field on `characters/{id}` — new, doesn't exist today.
+- A new handler under `functions/src/actions/` (e.g. `partirExplorer.js`), registered in
+  `ACTION_HANDLERS`, most likely as a second Aventure-branch action alongside "Partir en quête"
+  rather than replacing it — pending the spec's answer on that point.
+- Whatever the spec decides for multi-step resolution, built as something any future action can
+  reuse, not a one-off special case inside this handler alone.
+
+Not implemented yet.
+
+## Intermède actions (spec needed)
+
+Design note — not implemented, and too underspecified to build yet. Intermède actions are bonus
+actions, repeatable within an Interval, with a deliberately reduced scope — send a message, trade,
+post an announcement. A player can perform at most 3 Intermède actions (see
+[Interval (12h action cycle)](#interval-12h-action-cycle)'s phase-cycle note). Some Intermède
+actions matter far more than their small scope suggests: selling a mythic object, for instance, is
+meant to spread the rumor of that object's presence at the sale location, around the seller.
+
+The `intermede` root kind already exists in `ACTION_KINDS`
+(`src/lib/actionKinds.js` / its server mirror), reserved for exactly this since
+[Action kinds and Métier actions](#action-kinds-and-métier-actions) was built — but no concrete
+Intermède action, handler, or the "up to 3 per Interval" cap exists yet.
+
+**Open questions this spec needs to answer before anything gets built:**
+- Where the "max 3" cap is tracked and how it interacts with the once-per-Interval main-action lock
+  — presumably a separate counter reset every Interval, since Intermède actions are explicitly not
+  the one main-action slot `completesAt` already locks.
+- Whether the two Intermède windows (before/after the main action, per
+  [Interval (12h action cycle)](#interval-12h-action-cycle)'s phase-cycle note) share one budget of
+  3 or each get their own, and how a character with no main action left for the Interval but unused
+  Intermède budget is represented in the UI.
+- What "envoyer un message" does — presumably feeds the still-undesigned messaging feature that
+  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)'s
+  page 3 already reserves a slot for, but that's not confirmed.
+- What "faire du commerce" means mechanically — no buy/sell UI or NPC pricing exists; gold and
+  instances exist, but nothing exchanges them today.
+- What "placer une annonce" produces — presumably feeds the mission-announcement idea already noted
+  under [Rumor and mission system](#rumor-and-mission-system) ("aventure actions... tied to mission
+  announcements discovered by the player" — see
+  [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed)), i.e.
+  one player's announcement becoming another (or the same) player's discoverable Aventure hook. No
+  cross-character interaction of this kind exists anywhere in the game yet.
+- The rumor-spreading side effect of selling a mythic object: which sales qualify (a rarity
+  threshold?), and what it actually writes into the rumor system's data model — itself still
+  undesigned, see [Rumor and mission system](#rumor-and-mission-system).
+
+Not implemented. This entry exists to become a design doc before any of this is built. See the
+paired [Intermède actions (implementation)](#intermède-actions-implementation) entry below.
+
+## Intermède actions (implementation)
+
+Status: blocked. Depends on [Intermède actions (spec needed)](#intermède-actions-spec-needed)
+above, and transitively on [Rumor and mission system](#rumor-and-mission-system) for the
+rumor-trigger example and on the messaging feature
+[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
+reserves a page for but doesn't design.
+
+Not implemented yet — nothing to build until the spec entry resolves what an Intermède action
+actually does and how the per-Interval cap is tracked.
+
+## Composite quests (spec needed)
+
+Design note — not implemented, and too underspecified to build yet. A composite quest is a
+sequence of quests, where each step is revealed only once the previous one completes. Quests
+already grant meaningfully better rewards than missions (gear, talent evolution — see
+[Quest loot draw](#quest-loot-draw) and
+[Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success));
+a composite quest is presumably where that reward gap matters most, as a multi-Interval commitment.
+
+**Open questions this spec needs to answer before anything gets built:**
+- How a chain is authored: an ordered list of existing `worldData/quests/items` ids on a new parent
+  document, or each quest carries a `nextQuestId` pointer? The former matches how
+  [Quest creation and editing](#quest-creation-and-editing) already models a quest as a flat catalog
+  entry; the latter needs no new collection.
+- How "revealed at the end of the previous step" is tracked per character — a new field on
+  `characters/{id}` recording chain progress (comparable to `knownProfessions` /
+  `triggeredQuestIds`), or is a composite quest's next step simply granted the way
+  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
+  grants any triggered quest, with "completed the previous step" as one more condition type?
+- Whether a composite quest's individual steps are drawn/offered the same way a normal quest is
+  (`partirEnQuete.js`'s region/difficulty draw), or bypass that draw entirely once unlocked, since
+  the player is meant to specifically continue a chain rather than have it compete with an
+  unrelated quest in the random pool.
+- How reward tiering differs for a composite quest's final step vs. its earlier steps, vs. a normal
+  one-off quest.
+
+Not implemented. See the paired [Composite quests (implementation)](#composite-quests-implementation)
+entry below.
+
+## Composite quests (implementation)
+
+Status: blocked. Depends on [Composite quests (spec needed)](#composite-quests-spec-needed) above.
+Likely touches `worldData/quests/items` (chain authoring), `characters/{id}` (progress tracking),
+and `partirEnQuete.js` / the
+[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
+mechanic (how the next step gets offered), once those are decided.
+
+Not implemented yet.

@@ -64,11 +64,11 @@ export const ActionTypeDocumentSchema = z.object({
     .describe("Absent means enabled: only an explicit false hides the action and refuses it server-side."),
   durationHours: z
     .number()
-    .default(24)
+    .default(12)
     .describe(
       "How long the action occupies the character. Absent, zero, negative or non-numeric falls back to " +
-        'DEFAULT_DURATION_HOURS (24) - this is what makes "one action per day" and "an action lasts 24h" ' +
-        "one rule rather than two clocks."
+        'DEFAULT_DURATION_HOURS (12) - this is what makes "one action per Interval" and "an action lasts ' +
+        'one Interval" one rule rather than two clocks.'
     ),
   availability: z
     .object({
