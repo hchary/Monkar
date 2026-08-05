@@ -106,6 +106,23 @@ export const ActionTypeDocumentSchema = z.object({
       "Ids in worldData/tags/items - a recette qualifies when its own categoryIds overlaps this list. " +
         "Only meaningful under the Artisanat branch; forced to [] for every other kind."
     ),
+  rumorHarvestCount: z
+    .number()
+    .default(1)
+    .describe(
+      "How many rare-or-above worldData/regions/items/{regionId}/rumorSightings entries the 'rumeur' " +
+        "handler copies into character.rumorJournal per resolution. Only meaningful when handlerId is " +
+        "\"rumeur\"; gated by handlerId rather than kindId since intermede hosts several unrelated " +
+        "action archetypes, unlike the Récolte/Artisanat branches."
+    ),
+  missionRollCount: z
+    .number()
+    .default(3)
+    .describe(
+      'How many missions the "rumeur" handler generates into character.missionJournal per resolution, ' +
+        'replacing whatever was still sitting there unclaimed. Only meaningful when handlerId is "rumeur", ' +
+        "same gating convention as rumorHarvestCount."
+    ),
   questDifficultyWeights: z
     .record(z.string(), z.unknown())
     .optional()
@@ -135,6 +152,8 @@ const DEFAULTED_KEYS = [
   "lootTagIds",
   "rarity",
   "recipeCategoryIds",
+  "rumorHarvestCount",
+  "missionRollCount",
 ] as const;
 
 export const DEFAULTS = ActionTypeDocumentSchema.pick(

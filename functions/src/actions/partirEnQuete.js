@@ -299,4 +299,12 @@ async function commit({ tx, db, characterRef, lastAction, uid, today }) {
   }
 }
 
-module.exports = { prepare, resolve, commit, buildNarrativeContext, narrateQuestSuccess, preferQuestPhrasesPerSlot };
+module.exports = {
+  prepare,
+  resolve,
+  commit,
+  buildNarrativeContext,
+  narrateQuestSuccess,
+  preferQuestPhrasesPerSlot,
+  drawQuestLoot,
+};

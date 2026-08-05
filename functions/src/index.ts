@@ -16,6 +16,8 @@ import { CharacterDocumentSchema, DEFAULTS as CHARACTER_DEFAULTS } from "./schem
 const partirEnQuete = require("./actions/partirEnQuete");
 const recolte = require("./actions/recolte");
 const artisanat = require("./actions/artisanat");
+const rumeur = require("./actions/rumeur");
+const mission = require("./actions/mission");
 
 initializeApp();
 const db = getFirestore();
@@ -46,6 +48,8 @@ const ACTION_HANDLERS: Record<string, any> = {
   partirEnQuete,
   recolte,
   artisanat,
+  rumeur,
+  mission,
 };
 
 const CreateCharacterInput = z.object({
@@ -177,7 +181,7 @@ exports.performAction = onCall(async (request: any) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Login required.");
 
-  const { actionTypeId, recetteId } = request.data;
+  const { actionTypeId, recetteId, missionId } = request.data;
   if (!actionTypeId) throw new HttpsError("invalid-argument", "actionTypeId is required.");
 
   await runActionPipeline({
@@ -186,7 +190,7 @@ exports.performAction = onCall(async (request: any) => {
     actionTypeId,
     actionHandlers: ACTION_HANDLERS,
     today: todayUTC(),
-    payload: { recetteId },
+    payload: { recetteId, missionId },
   });
 
   return { ok: true };

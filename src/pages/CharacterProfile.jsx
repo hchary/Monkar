@@ -7,6 +7,7 @@ import CharacterBanner from "../components/CharacterBanner";
 import CharacterTabs from "../components/CharacterTabs";
 import ActionPanel from "../components/ActionPanel";
 import ClimateBanner from "../components/ClimateBanner";
+import RumorBanner from "../components/RumorBanner";
 import OriginIntroDialog from "../components/OriginIntroDialog";
 
 export default function CharacterProfile() {
@@ -40,7 +41,10 @@ export default function CharacterProfile() {
         <CharacterTabs character={character} />
         <ActionPanel character={character} />
       </div>
-      <ClimateBanner bannerKey={climat?.bannerKey} />
+      <div className="bottom-banners">
+        <RumorBanner regionId={character.region?.id} />
+        <ClimateBanner bannerKey={climat?.bannerKey} />
+      </div>
     </div>
   );
 }

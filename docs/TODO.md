@@ -12,7 +12,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 |---|------|--------|------------|-------|
 | 1 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
 | 2 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
-| 3 | Rumor and mission system — implementation | todo | 2 | [Rumor and mission system](#rumor-and-mission-system) |
+| 3 | Rumor and mission system — implementation | done | 2 | [Rumor and mission system](#rumor-and-mission-system) |
 | 4 | Quest triggers and end-of-action pop-up pages — spec | spec | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 5 | Quest triggers and end-of-action pop-up pages — implementation | todo | 1, 4 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 6 | Trainers — spec | spec | — | [Trainers](#trainers) |
@@ -885,10 +885,13 @@ lands, since they're specified in terms of "per Interval".
 
 ## Rumor and mission system
 
-Status: **specified, not implemented**. A rumor is a hand-authored piece of flavor text with a
-rarity and an optional link to a quest; regions and characters each keep their own rumor journal,
-and a "Rumeur" action lets a character harvest their region's better rumors and, separately, roll
-for local missions generated the same way "Partir en quête" generates its narration.
+Status: **implemented**, except region-to-region propagation (see "Still open" below — it depends
+on the still-undecided Interval-tick cadence shared with
+[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)).
+A rumor is a hand-authored piece of flavor text with a rarity and an optional link to a quest;
+regions and characters each keep their own rumor journal, and a "Rumeur" action lets a character
+harvest their region's better rumors and, separately, roll for local missions generated the same
+way "Partir en quête" generates its narration.
 
 - **Rumor catalog**: `worldData/rumors/items/{id}`, authored through a new `RumorsManager.jsx`
   ("Rumeurs" tab), same convention as quests/loot tables/narrative subjects — hand-authored, not
@@ -969,10 +972,13 @@ for local missions generated the same way "Partir en quête" generates its narra
   own stated difficulty. Once resolved, the entry is removed from `character.missionJournal`.
 
 **Still open (deliberately deferred)**:
-- The exact tick/cadence mechanism both propagation and mission-journal expiry are written against
-  — whether that's part of `performAction`'s resolution or a separate scheduled function — is the
-  same open question [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
-  already defers; resolving it there resolves it here too.
+- Region-to-region propagation itself is not implemented: a rumor's sightings today only ever exist
+  at its authored `originRegionIds` (seeded by `RumorsManager.jsx` on save) — nothing spreads it
+  further. The exact tick/cadence mechanism both propagation and mission-journal expiry would run
+  against — whether that's part of `performAction`'s resolution or a separate scheduled function —
+  is the same open question [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
+  already defers; resolving it there resolves it here too. Everything else in this entry (catalog,
+  sightings storage, both journals, both actions, the banner) is built and does not depend on it.
 - `rumorHarvestCount` / `missionRollCount` defaults (1 / 3) and the mission reward's "one tier
   lower" scaling factor are starting balance values, not playtested — tunable without a further
   design pass once the feature is live.
@@ -1001,7 +1007,12 @@ characters/{id}
   missionJournal: [{ id, objectiveId, difficulty, tagIds, locationId, regionId, generatedAt }]  -- NEW, ephemeral
 ```
 
-Not implemented yet. See the paired implementation row (#3) in the Roadmap table above.
+Implemented in `functions/src/actions/rumeur.js` and `functions/src/actions/mission.js` (registered
+as the `rumeur`/`mission` handlers in `functions/src/index.ts`), `shared/schema/rumor.ts` and
+`shared/schema/regionRumorSighting.ts`, the "Rumeurs" creator tab (`RumorsManager.jsx`), the rumor
+banner (`RumorBanner.jsx`, wired into `CharacterProfile.jsx`), the "Rumeurs" character tab
+(`CharacterTabs.jsx`), and the mission picker in `ActionBrowser.jsx`/`MissionPicker.jsx`. See the
+"Still open" note above for what's deliberately not built yet (propagation).
 
 ## Quest triggers and end-of-action pop-up pages
 
