@@ -10,28 +10,31 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 
 | # | Item | Status | Blocked by | Entry |
 |---|------|--------|------------|-------|
-| 1 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
-| 2 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
-| 3 | Rumor and mission system — implementation | done | 2 | [Rumor and mission system](#rumor-and-mission-system) |
-| 4 | Quest triggers and end-of-action pop-up pages — spec | spec | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
-| 5 | Quest triggers and end-of-action pop-up pages — implementation | todo | 1, 4 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
-| 6 | Trainers — spec | spec | — | [Trainers](#trainers) |
-| 7 | Training-driven talent quality-up ("s'entraîner") | todo | 6 | [Expanded talent system](#expanded-talent-system) |
-| 8 | Profession initial assignment via quest/trainer | todo | 6 | [Profession (métier) creation](#profession-métier-creation) |
-| 9 | Trainer type creation page — description field | todo | — | [Trainer type creation page](#trainer-type-creation-page) |
-| 10 | Tag system unification (tagIds vs free-text tags) | todo | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
-| 11 | Location tags | todo | — | [Location tags](#location-tags) |
-| 12 | Aventure exploration mechanics — spec | spec | 2 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
-| 13 | Aventure exploration mechanics — implementation | todo | 12 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
-| 14 | Intermède actions — spec | spec | 2 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
-| 15 | Intermède actions — implementation | todo | 14 | [Intermède actions (implementation)](#intermède-actions-implementation) |
-| 16 | Composite quests — spec | spec | 4 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
-| 17 | Composite quests — implementation | todo | 16 | [Composite quests (implementation)](#composite-quests-implementation) |
-| 18 | Known recipes grant mechanism — spec | spec | 6 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
-| 19 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
-| 20 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
+| 1 | Mission and quest resolution — score & wound algorithm (spec) | done | — | [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) |
+| 2 | Mission resolution result pop-up | todo | 1 | [Mission resolution result pop-up](#mission-resolution-result-pop-up) |
+| 3 | Aventure mission launch — UX polish | todo | — | [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish) |
+| 4 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
+| 5 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
+| 6 | Rumor and mission system — implementation | done | 5 | [Rumor and mission system](#rumor-and-mission-system) |
+| 7 | Quest triggers and end-of-action pop-up pages — spec | spec | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
+| 8 | Quest triggers and end-of-action pop-up pages — implementation | todo | 4, 7 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
+| 9 | Trainers — spec | spec | — | [Trainers](#trainers) |
+| 10 | Training-driven talent quality-up ("s'entraîner") | todo | 9 | [Expanded talent system](#expanded-talent-system) |
+| 11 | Profession initial assignment via quest/trainer | todo | 9 | [Profession (métier) creation](#profession-métier-creation) |
+| 12 | Trainer type creation page — description field | todo | — | [Trainer type creation page](#trainer-type-creation-page) |
+| 13 | Tag system unification (tagIds vs free-text tags) | todo | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
+| 14 | Location tags | todo | — | [Location tags](#location-tags) |
+| 15 | Aventure exploration mechanics — spec | spec | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
+| 16 | Aventure exploration mechanics — implementation | todo | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
+| 17 | Intermède actions — spec | spec | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
+| 18 | Intermède actions — implementation | todo | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
+| 19 | Composite quests — spec | spec | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
+| 20 | Composite quests — implementation | todo | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
+| 21 | Known recipes grant mechanism — spec | spec | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
+| 22 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
+| 23 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
 
-**Why this order**: Interval is first because three later entries (#2, #4, and transitively #12/#14) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#2) and Quest triggers (#4) come next because they're the two specs the most other entries lean on (#3, #12, #14 read on Rumor/mission; #16 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#6) is an independent track that unblocks two separate entries (#7, #8) plus loosely #18, so it runs in parallel rather than waiting. #9-11 are small, fully unblocked, and safe to pick up any time priority allows. #19-20 are intentionally last: real but low-stakes polish with no downstream dependents.
+**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows. #22-23 are intentionally last: real but low-stakes polish with no downstream dependents.
 
 ## Expanded talent system
 
@@ -965,11 +968,18 @@ way "Partir en quête" generates its narration.
   `character.missionJournal` and it resolves through the exact same pipeline as
   `partirEnQuete.js`'s `resolve()` — narration, loot draw, talent evolution roll — reading
   `objectiveId`/`difficulty`/`tagIds` straight off the journal entry instead of loading a
-  `worldData/quests/items` document. Reward is the same pipeline "scaled down" per the reward-magnitude
-  decision above: both `LOOT_COUNT_BY_DIFFICULTY` and the talent-evolution chance formula are
-  evaluated using the mission's difficulty *one tier lower* than the difficulty actually rolled and
-  narrated (clamped at "facile"), so a mission always pays out like a quest a notch easier than its
-  own stated difficulty. Once resolved, the entry is removed from `character.missionJournal`.
+  `worldData/quests/items` document. Once resolved, the entry is removed from
+  `character.missionJournal`.
+  **Correction, decided in [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm):**
+  `mission.js` currently evaluates `LOOT_COUNT_BY_DIFFICULTY` and the talent-evolution chance formula
+  at `mission.difficulty` *one tier lower* than the difficulty actually rolled and narrated (clamped
+  at "facile"), a "missions pay out like a quest a notch easier than their stated difficulty"
+  discount (`rewardDifficulty`) — this was a balance mistake and is being removed. A mission's loot
+  count and talent-evolution chance (and, once that entry is implemented, its success threshold,
+  wound thresholds, and reputation reward) all read `mission.difficulty` directly instead, exactly
+  like a quest reads `quest.difficulty`. `rewardDifficulty` and its "one tier lower" computation are
+  dead as of this decision and should be deleted the next time `mission.js` is touched for the
+  algorithm entry's implementation.
 
 **Still open (deliberately deferred)**:
 - Region-to-region propagation itself is not implemented: a rumor's sightings today only ever exist
@@ -1227,3 +1237,206 @@ and `partirEnQuete.js` / the
 mechanic (how the next step gets offered), once those are decided.
 
 Not implemented yet.
+
+## Mission and quest resolution algorithm
+
+Status: **specified, not implemented**. [Rumor and mission system](#rumor-and-mission-system) and
+[Quest loot draw](#quest-loot-draw) currently resolve every quest/mission through
+`partirEnQuete.js`'s existing pipeline: a quest always concludes successfully once drawn (the
+retired paliers system used to roll a weighted tier deciding death/injury/gold/reputation — see
+`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7 "Abandoning the paliers system" — nothing has replaced it
+since), and nothing touches `reputation`, `gold`, or wounds. A separate design document ("Résolution
+missions/quêtes"), handed down outside this repo, specifies a replacement resolution mechanic: draw
+a random score (1-100) and compare it against two independent difficulty-derived scales. This entry
+resolves that document's open questions into a buildable spec.
+
+**Scope** (resolved): applies to **both** "Partir en quête" and "Mission" — they already share one
+`resolve()` pipeline (`buildNarrativeContext`, `narrateQuestSuccess`, `drawQuestLoot`,
+`rollTalentEvolutions`, all defined once in `partirEnQuete.js` and reused by `mission.js`), and there
+is no live tier roll left to "sit alongside" for either of them (paliers is fully retired, per
+above) — the score becomes the sole success/failure gate for both, replacing today's
+always-succeeds behavior outright. A quest/mission's `successPhraseIds` were the only narration path
+exercised until now; failure gets a new, symmetric narration path off `failurePhraseIds` (mirroring
+`narrateQuestSuccess`, e.g. `narrateQuestFailure`, same target-shape/slot-fallback logic, just
+`resultat: "echec"`).
+
+**Missions use their full, undiscounted difficulty everywhere** (resolved, and a correction to
+already-shipped code): [Rumor and mission system](#rumor-and-mission-system)'s "one tier lower,
+clamped at facile" reward discount for a mission's loot count and talent-evolution chance was a
+balance mistake, not a decision to preserve or extend — it is removed. Missions look up the success
+threshold, the wound thresholds, the reputation reward, the loot count, and the talent-evolution
+chance all off `mission.difficulty` exactly as drawn/displayed, the same way a quest uses
+`quest.difficulty`. `mission.js`'s `rewardDifficulty` ("one tier lower than `mission.difficulty`,
+clamped at facile") is dead as of this spec and must be deleted when this entry is implemented —
+every call site that reads it switches to reading `mission.difficulty` directly, same as
+`partirEnQuete.js` already does with `quest.difficulty`.
+
+- **The score roll**: one random integer 1-100 per resolution, compared against the two independent
+  scales below.
+- **A single objective drawn per resolution**: both the threshold adjustment and the wound
+  adjustment below key off one `worldData/narrativeSubjects/items` objective, drawn once per
+  resolution occurrence — the same draw already made for
+  [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)
+  (`objective: pickRandomLoot(questObjectives)` in `partirEnQuete.js`'s `resolve()`), reused here
+  rather than drawn a second time. This is independent of loot's own per-item objective draw (see
+  [Quest loot draw](#quest-loot-draw)), which keeps re-rolling separately for each item exactly as
+  today.
+- **`difficultyRange` (success threshold)**: a base threshold per the quest/mission's difficulty
+  tier, reusing the existing 6-tier `DIFFICULTIES` scale (see [Quest difficulty](#quest-difficulty)):
+
+  | Difficulté | Seuil de réussite | Niveau de Talent requis |
+  |---|---|---|
+  | Facile | 30 | 1 |
+  | Moyen | 50 | 1 |
+  | Difficile | 80 | 2 |
+  | Très difficile | 90 | 3 |
+  | Épique | 98 | 4 |
+  | Mythique | 100 | 5 |
+
+  The score must equal or beat this threshold to succeed. Adjustment: every character talent sharing
+  a tag with the drawn objective reduces the threshold by 1, plus 1 more per talent level (i.e. its
+  `quality`, 1-5) above the tier's required level (the table's third column). Example: a quality-3
+  "Sens aiguisés" talent (tags "Survie"/"Sens") against a "difficile" objective tagged
+  "Survie"/"Poison" — base 80, -2 (1 for the shared tag, 1 for being one level above the "difficile"
+  row's required level 2) = 78. Gated by the strict objective condition below when the objective
+  carries one.
+- **Strict objective conditions**: a quest objective can optionally carry a condition (new, empty by
+  default), evaluated with the same condition evaluator already used for action availability
+  (`CONDITION_TYPES` in `src/lib/actionConditions.js` and its server mirror — most naturally a
+  `hasTalentTag` row here, no new condition type needed). It gates, all-or-nothing, whether the
+  talent-tag adjustments below apply at all for this resolution: when set, a character only benefits
+  from its talents' tag overlap (for both the threshold and the wound adjustments) if it owns at
+  least one talent matching the condition; when absent/null (the default), every owned talent
+  sharing a tag with the drawn objective counts, exactly as described above.
+- **`woundRange` (wound thresholds)**: base thresholds per difficulty tier, each with its own floor:
+
+  | Niveau de difficulté | Blessure permanente (min 1) | Blessure grave (min 2) | Blessure légère (min 3) | Coût en talents parfaits pour baisser d'un palier |
+  |---|---|---|---|---|
+  | Facile | 1 | 5 | 20 | — |
+  | Moyen | 2 | 10 | 50 | 1 |
+  | Difficile | 5 | 30 | 60 | 2 |
+  | Très difficile | 10 | 50 | 80 | 3 |
+  | Épique | 30 | 80 | 95 | 4 |
+  | Mythique | 50 | 95 | 100 | 5 |
+
+  The same score is also compared against these thresholds: landing exactly on a threshold inflicts
+  the corresponding wound, via the existing `applyWound`/`woundCounts` helpers in
+  `functions/src/lib/wounds.js` — light→severe→permanent escalation and the death rule are already
+  implemented there, but nothing calls them today. If more than one threshold coincides on the same
+  value after adjustment (possible once floors compress the range), the most severe matching wound
+  wins (permanent > severe > light) rather than stacking multiple wounds from one roll.
+
+  **Perfect-talent tier drop** (resolved): the table's last column is a per-step cost ladder, not a
+  flat "N talents = 1 step" rate — stepping from a tier down to the tier directly below it costs the
+  number of quality-5 ("talent parfait") talents shown on the *upper* tier's row (e.g. stepping
+  Mythique→Épique costs 5; Épique→Très difficile costs 4). Dropping multiple steps sums the cost of
+  each step crossed: Mythique→Très difficile (2 steps) costs 5+4=9, matching the original design
+  note's own example. A character's total count of owned quality-5 talents (tag-independent, unlike
+  the adjustment below) is spent greedily from the quest/mission's actual difficulty tier downward —
+  one step at a time, as long as the running total can afford the next step's cost — to find which
+  row of this table is actually used to look up thresholds, floored at "Facile" (never drops below
+  it, and any leftover, unaffordable balance is wasted, not banked).
+
+  After the tier lookup above, every talent sharing a tag with the drawn objective (gated by the
+  strict objective condition, same as the threshold adjustment) reduces each of the three resulting
+  thresholds by 1, down to its own floor (permanent min 1, severe min 2, light min 3).
+- **Rewards on success**: loot (unchanged, see [Quest loot draw](#quest-loot-draw), objective rarity
+  drawn independently per item as today) plus reputation, scaled by the quest/mission's own
+  difficulty — facile 1+1d2, moyen 5+1d4, difficile 10+1d6, très difficile 20+1d10, épique 80+1d20,
+  mythique 200+1d100 (`1d[N]` = a random integer 0..N). [Talent evolution and unlock on quest
+  success](#talent-evolution-and-unlock-on-quest-success) keeps running exactly as it does today
+  (`rollTalentEvolutions`, unchanged chance formula) — it was never gated by the retired tiers roll
+  in the first place, only by "the quest succeeds", so it now reads that flag off this entry's
+  score-based success instead.
+- **Rewards on failure** (new — today a failed quest/mission grants nothing): loot drawn the same
+  way as success loot (`drawQuestLoot`, one random objective per item, independent of the single
+  objective drawn above for thresholds), except matching loot tables against a rarity two ranks
+  below each per-item objective's own rarity instead of an exact match, floored at "commun" — stays
+  entirely on the existing 8-tier rarity scale used by [Quest loot draw](#quest-loot-draw), no new
+  difficulty-to-rarity mapping introduced. No reputation, no talent evolution on failure.
+
+**Resolution order** in `resolve()`: draw the single objective for this occurrence → roll the score
+→ compute the (talent- and condition-adjusted) `difficultyRange` threshold and determine
+success/failure → compute the (perfect-talent- and tag-adjusted) `woundRange` thresholds and apply
+any matching wound immediately via `applyWound`/`woundCounts` (same "no claim step, apply directly
+in `resolve()`" precedent as talent evolution — a wound is a character-stat change, not an
+instance-creating side effect like loot) → on success: reputation reward, existing loot draw,
+`rollTalentEvolutions` → on failure: degraded-rarity loot draw only → narrate (success or failure
+phrases) using whichever outcome was decided.
+
+**Data model implications**:
+```
+worldData/narrativeSubjects/items/{id}    -- only the addition; see Quest creation and editing
+  condition: { conditions: [...] } | null  -- NEW, optional, default null/empty; same shape as an
+                                            --   action's availability conditions (reuse, not a new
+                                            --   format) — restricts which character talents count
+                                            --   toward this objective's threshold/wound adjustments
+
+character.lastAction (quest/mission handlers only, additive)
+  success: boolean            -- unchanged field, but now genuinely varies instead of always true
+  score: number                -- NEW, the 1-100 roll, shown in the result pop-up
+  wound: string | null         -- NEW, "light" | "severe" | "permanent" | null, this resolution's
+                                --   wound (if any) — the character's post-resolution woundsLight/
+                                --   woundsSevere/woundsPermanent counters are read off the character
+                                --   document itself, not duplicated here
+  reputationGained: number     -- NEW, 0 on failure
+  loot: [...]                  -- unchanged shape (see Quest loot draw), now also populated (at
+                                --   degraded rarity) on failure instead of only on success
+```
+
+Builds on [Rumor and mission system](#rumor-and-mission-system) (mission generation/journal, and the
+now-removed reward discount above), [Quest loot draw](#quest-loot-draw) (loot table draw mechanics),
+[Quest difficulty](#quest-difficulty) (the 6-tier scale reused here), and the currently-uncalled
+`applyWound`/`woundCounts` in `functions/src/lib/wounds.js`. Not implemented yet — no roadmap row
+currently tracks the algorithm's own implementation separately from the paired
+[Mission resolution result pop-up](#mission-resolution-result-pop-up) entry below, which is what
+actually surfaces its output; building that entry is expected to include building this algorithm as
+a prerequisite, not just the pop-up UI.
+
+## Mission resolution result pop-up
+
+Status: blocked. Depends on
+[Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) above for the
+score/threshold/wound outcome shape it would display.
+
+Today a resolved quest or mission shows its outcome through the existing generic dialog
+(`ActionResultDialog.jsx` / `ActionOutcome.jsx`, shared with every other action) — narration, a
+"Succès"/"Échec" toggle, and a "Butin obtenu" fieldset (see
+[Quest loot draw](#quest-loot-draw)). Once the score-based algorithm above lands, that outcome gains
+new pieces worth surfacing explicitly rather than folding silently into the narration text, reading
+off `lastAction.score` / `lastAction.wound` / `lastAction.reputationGained` (see that entry's "Data
+model implications"):
+
+- The rolled score itself, and the (talent-adjusted) success threshold it was compared against.
+- Any wound inflicted (severity, and which threshold it landed on), alongside the character's
+  post-resolution wound counters.
+- The reputation gained on success, or the degraded-rarity loot drawn on failure (both new rewards
+  introduced by the algorithm entry above).
+
+The algorithm entry's scope question is now resolved — this applies to both "Partir en quête" and
+"Mission" (they already share one result pop-up path). Still undecided: whether this is a dedicated
+section specific to mission/quest resolution within the existing `ActionResultDialog.jsx`, or a
+generalization of its current "Butin obtenu" fieldset pattern into a broader "Résolution" fieldset
+reusable by any future score-based action — a UI-architecture call left to whoever builds this row,
+not required to unblock it.
+
+Not implemented yet. Expected to include building the algorithm itself (see above), not just this
+pop-up's UI — no separate roadmap row tracks the algorithm implementation on its own.
+
+## Aventure mission launch UX polish
+
+Status: mostly implemented, minor gap. [Rumor and mission system](#rumor-and-mission-system) already
+implemented mission launching: `MissionPicker.jsx` lists a character's `missionJournal` entries and
+starts the "Mission" action (`kindId: "aventure"`, `handlerId: "mission"`) with the picked
+`missionId`, embedded in `ActionBrowser.jsx`'s Aventure category tab alongside "Partir en quête" and
+"Rumeur".
+
+- This already satisfies the substance of "launch missions from the Aventure tab, backed by the
+  character's mission journal" — no separate mechanic left to build.
+- The one gap against how the source design describes it ("l'onglet Aventure/missions") is
+  presentational: missions are one action among others inside the shared Aventure tab, not a
+  visually distinct "Missions" sub-tab or section. Worth a small UX pass — e.g. giving the mission
+  list its own heading/sub-section within the Aventure tab — if that distinction matters in
+  practice, but it's cosmetic, not a missing mechanic.
+
+Not blocking anything else in this list; safe to pick up independently, low effort.
