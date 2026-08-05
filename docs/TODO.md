@@ -11,7 +11,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | # | Item | Status | Blocked by | Entry |
 |---|------|--------|------------|-------|
 | 1 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
-| 2 | Rumor and mission system — spec | spec | — | [Rumor and mission system](#rumor-and-mission-system) |
+| 2 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
 | 3 | Rumor and mission system — implementation | todo | 2 | [Rumor and mission system](#rumor-and-mission-system) |
 | 4 | Quest triggers and end-of-action pop-up pages — spec | spec | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 5 | Quest triggers and end-of-action pop-up pages — implementation | todo | 1, 4 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
@@ -885,68 +885,123 @@ lands, since they're specified in terms of "per Interval".
 
 ## Rumor and mission system
 
-Design note — not implemented, and largely undecided beyond the mechanics below. A rumor is a piece
-of flavor text with a rarity and an optional link to a quest; locations and characters each keep
-their own rumor journal, and a "Rumeur" action lets a character harvest their location's better
-rumors and, separately, roll for local missions.
+Status: **specified, not implemented**. A rumor is a hand-authored piece of flavor text with a
+rarity and an optional link to a quest; regions and characters each keep their own rumor journal,
+and a "Rumeur" action lets a character harvest their region's better rumors and, separately, roll
+for local missions generated the same way "Partir en quête" generates its narration.
 
-- **Rumor**: French flavor text, a rarity (presumably reusing the 8-tier scale shared by
-  talents/objects/quests loot — see [Expanded talent system](#expanded-talent-system) — though a
-  rumor may warrant its own lighter scale, undecided), and an optional reference to the quest it's
-  hinting at.
-- **Location rumor journal**: every location keeps its own accumulating list of rumors. Which
-  entity "location" means here — a `worldData/regions/items` entry (what a character's `region`
-  field already points to) or the more granular `worldData/adventureZones/items` ("Lieux de
-  quête") — is not decided; either way, propagation (below) needs an adjacency relationship
-  between locations that doesn't exist yet on either collection.
-- **Propagation**: at regular time intervals (presumably once per
-  [Interval](#interval-12h-action-cycle)), each location pushes its rumors out to neighboring
-  locations. Requires a "neighboring locations" graph to be authored somewhere — nothing today
-  models which locations are adjacent to which.
-- **Character rumor journal**: a character also keeps their own rumor journal — presumably the
-  rumors they've personally collected via the Rumeur action (see below), independent of their
-  current location's journal.
-- **Rumor banner**: a character standing in a location sees that location's rumors scroll through a
-  dedicated banner at the bottom of the screen, above the existing visual banner. Rumors at or above
-  a certain rarity (relative to their own object/subject, not a flat threshold) are visually called
-  out for the player.
-- **"Rumeur" action**: performing it grants the character a number of that location's rare-or-above
-  rumors (added to their personal rumor journal) and separately rolls a batch of
-  randomly-generated local missions, which are added to the character's mission journal.
-- **Mission journal and "Mission" action**: the mission journal is the list a player picks from to
-  perform a "Mission" action — analogous to how the quest system already works, but missions are
-  generated on the fly by the Rumeur action rather than hand-authored in a creator catalog.
-- **Mission vs. quest**: per later notes, a mission isn't really a separate system from a quest —
-  a "quête" is generically "an action to accomplish under particular conditions" (a location, a
-  specific encounter, crafting a specific object, …), and a mission is one instance of that,
-  generated on the fly rather than hand-authored. The two are expected to keep differing mainly in
-  how they're granted (procedurally rolled by the Rumeur action vs. hand-authored and
-  trigger-granted, see [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages))
-  and in reward magnitude — quests are meant to pay out noticeably more (gear, talent evolution, see
-  [Quest loot draw](#quest-loot-draw) and
-  [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success))
-  than missions, whose reward shape is still undesigned (see below). A quest can also be chained
-  into a multi-step sequence - see [Composite quests (spec needed)](#composite-quests-spec-needed).
+- **Rumor catalog**: `worldData/rumors/items/{id}`, authored through a new `RumorsManager.jsx`
+  ("Rumeurs" tab), same convention as quests/loot tables/narrative subjects — hand-authored, not
+  procedurally generated. A rumor carries French flavor text, a rarity (the existing shared 8-tier
+  scale — commun .. unique — reused as-is, not a separate lighter scale, for the same reason every
+  other loot/talent/quest system already reuses it), the region(s) it originates in
+  (`originRegionIds`, same shape as `quest.regionIds`), and an optional `linkedQuestId` pointing at
+  `worldData/quests/items`.
+- **Location = region**: resolved by investigation, not by design call. Propagation (below) needs
+  an adjacency graph between locations, and that graph already exists — but only on
+  `worldData/regions/items` (`neighbors: [{regionId, direction}]`, authored and wired up in
+  `RegionsManager.jsx`), not on `worldData/adventureZones/items` (name + description only, no
+  adjacency). So "location" for this whole feature means region, the same entity a character's
+  `region` field already points to. This also settles the same open question raised in
+  [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed).
+- **Region rumor journal**: a new subcollection, `worldData/regions/items/{regionId}/rumorSightings/{rumorId}`
+  — one doc per rumor currently present in that region, holding the rumor's *effective* rarity at
+  that location (see decay below) and an `arrivedAt` timestamp. A subcollection rather than an
+  array field on the region document, since sightings accumulate indefinitely and are never pruned
+  (see propagation below) — an array risks the document outgrowing Firestore's per-document limits
+  over a long-running game the way a bounded list like `character.talents` doesn't.
+- **Propagation and decay**: once per Interval (same shared cadence as the still-undecided
+  trigger-check mechanism in
+  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) —
+  whichever mechanism ends up ticking that also ticks this), every region with a rumor sighting
+  pushes it to each neighbor from `neighbors` (checked symmetrically — a region counts as a
+  neighbor of its own listed neighbors even though the edge is authored on one side only, matching
+  how `RegionsManager.jsx` already treats the list as undirected for display). Each hop drops the
+  rumor's effective rarity by one tier from what it was at the sending region. A rumor already at
+  "commun" does not propagate further (it would decay below the scale's floor); a rumor's very
+  first hop out of its origin region carries the catalog's authored rarity unchanged. If the
+  receiving region already has a sighting for that rumor id, the arrival is a no-op — the earlier
+  sighting's rarity is never upgraded or downgraded by a later, differently-decayed arrival.
+- **Character rumor journal**: `character.rumorJournal`, an unbounded array of denormalized copies
+  (`{ id, text, rarity, linkedQuestId, receivedAt }`, same "copy the catalog entry so a later rename
+  doesn't rewrite already-granted history" convention as `character.talents`) — the rumors a
+  character has personally harvested via the Rumeur action, independent of any region's journal and
+  never pruned.
+- **Rumor banner**: a character standing in a region sees that region's `rumorSightings` scroll
+  through a dedicated banner at the bottom of the screen, above the existing visual banner. A
+  sighting is visually called out when its effective rarity is "rare" or above — a flat floor on
+  the existing 8-tier scale, not scaled to whatever the rumor is about.
+- **"Rumeur" action** (`kindId: "intermede"`, new `handlerId: "rumeur"`): performing it does two
+  things in the same resolution:
+  - Harvests up to `rumorHarvestCount` (new `worldData/actionTypes/items` field, only meaningful
+    when `handlerId` is `"rumeur"`, default 1) sightings at or above "rare" from the character's
+    current region into `character.rumorJournal`, skipping rumor ids the character already owns;
+    harvesting fewer than requested when fewer qualify is not an error.
+  - Generates `missionRollCount` (same convention, default 3) missions into
+    `character.missionJournal`, replacing whatever was left there unclaimed (see mission journal
+    below).
+- **Mission generation**: reuses "Partir en quête"'s own generative building blocks instead of a
+  new content pool — a mission is not hand-authored. Each rolled mission draws one random
+  `worldData/narrativeSubjects/items` entry tagged "objectif de quête" (the same pool
+  `QuestObjectivesManager.jsx` populates) and one difficulty, picked uniformly across the 6
+  `DIFFICULTIES` tiers. The mission's `tagIds` are copied from the drawn objective's own `tagIds` —
+  there is no mission-level catalog entry to carry them. `character.missionJournal` entries have
+  the shape:
+  ```
+  { id, objectiveId, difficulty, tagIds, locationId, regionId, generatedAt }
+  ```
+  where `locationId` is drawn from the character's current region's `adventureZoneIds` (or `""`
+  when the region lists none) and `regionId` is that region's id, both fixed at generation time.
+- **Mission journal expiry**: `character.missionJournal` is not a growing history like the rumor
+  journal — it's a rolling offer. Missions still sitting there unclaimed are simply overwritten the
+  next time the Rumeur action resolves (see above); nothing else prunes them, since there's no
+  global per-Interval tick to hook a separate expiry into yet (same open cadence question as
+  propagation, above).
+- **"Mission" action** (`kindId: "aventure"`, new `handlerId: "mission"`, sibling of
+  `partirEnQuete`'s `handlerId: "partirEnQuete"`): a player picks one entry from
+  `character.missionJournal` and it resolves through the exact same pipeline as
+  `partirEnQuete.js`'s `resolve()` — narration, loot draw, talent evolution roll — reading
+  `objectiveId`/`difficulty`/`tagIds` straight off the journal entry instead of loading a
+  `worldData/quests/items` document. Reward is the same pipeline "scaled down" per the reward-magnitude
+  decision above: both `LOOT_COUNT_BY_DIFFICULTY` and the talent-evolution chance formula are
+  evaluated using the mission's difficulty *one tier lower* than the difficulty actually rolled and
+  narrated (clamped at "facile"), so a mission always pays out like a quest a notch easier than its
+  own stated difficulty. Once resolved, the entry is removed from `character.missionJournal`.
 
-**Still open (deliberately deferred)** — most of the mechanic:
-- What "location" means for this feature (region vs. adventure zone vs. a new entity), and the
-  adjacency graph needed for propagation.
-- The propagation algorithm itself: does a rumor propagate indefinitely hop by hop, does it decay
-  in rarity or relevance as it travels, can the same rumor duplicate across a location's journal.
-- How a rumor's rarity is decided at generation time, and what "rare and above, relative to their
-  object" means precisely (relative to what — the quest it points to? the subject it's about?).
-- How missions are procedurally generated (content pool, difficulty, rewards) — currently the only
-  comparable system, [Quest creation and editing](#quest-creation-and-editing), is entirely
-  hand-authored per quest, not generated.
-- How a mission differs mechanically from a quest — reward shape, difficulty, whether missions can
-  also grant loot/talent evolution like quests do — is unspecified; the notes only say missions
-  "fill the mission journal" and are performed via a "Mission" action.
-- Data model not sketched yet — pending the location-identity and storage-granularity decisions
-  above (e.g. whether rumors live in a subcollection per location, a top-level `rumors` collection,
-  or a denormalized array on the location document, matters a lot for how propagation and the
-  banner query would actually work).
+**Still open (deliberately deferred)**:
+- The exact tick/cadence mechanism both propagation and mission-journal expiry are written against
+  — whether that's part of `performAction`'s resolution or a separate scheduled function — is the
+  same open question [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
+  already defers; resolving it there resolves it here too.
+- `rumorHarvestCount` / `missionRollCount` defaults (1 / 3) and the mission reward's "one tier
+  lower" scaling factor are starting balance values, not playtested — tunable without a further
+  design pass once the feature is live.
+- The Intermède-side "selling a mythic object spreads a rumor of its presence" mechanic (see
+  [Intermède actions (spec needed)](#intermède-actions-spec-needed)) is a separate, still-undesigned
+  trigger that would need to insert directly into a region's `rumorSightings`, once designed.
 
-Not implemented yet — no code, schema, or UI exists for rumors or missions.
+**Data model implications**:
+```
+worldData/rumors/items/{id}                                        -- NEW catalog
+  text: string                       -- French flavor text
+  rarity: string                     -- 8-tier RARITIES
+  originRegionIds: string[]          -- worldData/regions/items ids, same shape as quest.regionIds
+  linkedQuestId: string | null       -- worldData/quests/items id, or null
+
+worldData/regions/items/{regionId}/rumorSightings/{rumorId}        -- NEW subcollection
+  rarity: string                     -- effective rarity at this region (decayed from origin)
+  arrivedAt: timestamp
+
+worldData/actionTypes/items/{id}
+  rumorHarvestCount: number          -- NEW, default 1, only meaningful when handlerId is "rumeur"
+  missionRollCount: number           -- NEW, default 3, only meaningful when handlerId is "rumeur"
+
+characters/{id}
+  rumorJournal: [{ id, text, rarity, linkedQuestId, receivedAt }]                        -- NEW, unbounded
+  missionJournal: [{ id, objectiveId, difficulty, tagIds, locationId, regionId, generatedAt }]  -- NEW, ephemeral
+```
+
+Not implemented yet. See the paired implementation row (#3) in the Roadmap table above.
 
 ## Quest triggers and end-of-action pop-up pages
 
@@ -1022,10 +1077,11 @@ reputation, since the paliers system that used to roll those was retired outrigh
 outcome entirely, there is no shared consequence roller left to hook into.
 
 **Open questions this spec needs to answer before anything gets built:**
-- What "location" means here — the same open question as in
-  [Rumor and mission system](#rumor-and-mission-system) (region vs. adventure zone vs. a new
-  entity) — plus whether "dungeon presence" implies a new sub-catalog of dungeons/locations gating
-  which Aventure actions are available where.
+- What "location" means here — settled by
+  [Rumor and mission system](#rumor-and-mission-system) as region (the only one of the two
+  candidates with an authored adjacency graph today) — still open here is whether "dungeon
+  presence" implies a new sub-catalog of dungeons/locations gating which Aventure actions are
+  available where.
 - **Encounter tables**: a wholly new catalog, comparable to loot tables, doesn't exist yet. What an
   encounter contains (a narrative subject? a monster? a skill check?), how it's tagged/weighted, and
   how T draws compose into a single action's outcome (T independent rolls? an accumulating
@@ -1103,8 +1159,10 @@ Intermède action, handler, or the "up to 3 per Interval" cap exists yet.
   one player's announcement becoming another (or the same) player's discoverable Aventure hook. No
   cross-character interaction of this kind exists anywhere in the game yet.
 - The rumor-spreading side effect of selling a mythic object: which sales qualify (a rarity
-  threshold?), and what it actually writes into the rumor system's data model — itself still
-  undesigned, see [Rumor and mission system](#rumor-and-mission-system).
+  threshold?) is still open. What it would write is not — it would insert a
+  `worldData/regions/items/{regionId}/rumorSightings/{rumorId}` entry directly (skipping the normal
+  hop-by-hop propagation decay), per the now-settled data model in
+  [Rumor and mission system](#rumor-and-mission-system).
 
 Not implemented. This entry exists to become a design doc before any of this is built. See the
 paired [Intermède actions (implementation)](#intermède-actions-implementation) entry below.
