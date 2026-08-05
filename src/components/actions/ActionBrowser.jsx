@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { ACTION_CATEGORIES } from "../../lib/actionCategories";
 import { normalizeActionType, evaluateAvailability } from "../../lib/actionCatalog";
+import MissionPicker from "./MissionPicker";
 
 // hasInstanceTag needs the tag set of everything the character owns, resolved through the object
 // catalog exactly like the server's buildConditionContext (functions/src/lib/actionContext.js) -
@@ -132,13 +133,22 @@ export default function ActionBrowser({ character, actionTypes, onStart, submitt
               <div className="action-detail">
                 {activeAction.description && <p>{activeAction.description}</p>}
                 {!activeAction.availability.ok && <p className="error">{activeAction.availability.reason}</p>}
-                <button
-                  type="button"
-                  disabled={submitting || !activeAction.availability.ok}
-                  onClick={() => onStart(activeAction.id)}
-                >
-                  Commencer
-                </button>
+                {activeAction.handlerId === "mission" ? (
+                  <MissionPicker
+                    character={character}
+                    onStart={(payload) => onStart(activeAction.id, payload)}
+                    submitting={submitting}
+                    availabilityOk={activeAction.availability.ok}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    disabled={submitting || !activeAction.availability.ok}
+                    onClick={() => onStart(activeAction.id)}
+                  >
+                    Commencer
+                  </button>
+                )}
               </div>
             )}
           </>

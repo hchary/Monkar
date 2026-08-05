@@ -37,12 +37,12 @@ export default function ActionPanel({ character }) {
   const lastAction = character.lastAction;
   const state = actionState(character, now);
 
-  async function handleStart(actionTypeId) {
+  async function handleStart(actionTypeId, payload = {}) {
     setSubmitting(true);
     setError("");
     try {
       const performAction = httpsCallable(functions, "performAction");
-      await performAction({ actionTypeId });
+      await performAction({ actionTypeId, ...payload });
     } catch (err) {
       setError(err.message);
     } finally {

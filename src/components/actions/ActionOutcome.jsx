@@ -23,6 +23,27 @@ export default function ActionOutcome({ lastAction, showLoot }) {
         </p>
       )}
 
+      {lastAction.mission && (
+        <p className="quest-info">
+          Mission : {lastAction.mission.name}
+          {lastAction.mission.locationName && ` — ${lastAction.mission.locationName}`}
+        </p>
+      )}
+
+      {lastAction.rumorsHarvested?.length > 0 && (
+        <fieldset className="action-loot-box">
+          <legend>Rumeurs collectées</legend>
+          <ul className="instance-list">
+            {lastAction.rumorsHarvested.map((rumor) => (
+              <li key={rumor.id} className={`talent-card rarity-${rumor.rarity}`}>
+                {rumor.text}
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
+      {lastAction.missionsGeneratedCount > 0 && <p>Missions générées : {lastAction.missionsGeneratedCount}</p>}
+
       {lastAction.success && (
         <ul>
           {(lastAction.goldGain > 0 || lastAction.itemGain) && (

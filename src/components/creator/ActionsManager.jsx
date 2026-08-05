@@ -28,7 +28,7 @@ import MultiSelectModalField from "./MultiSelectModalField";
 // "Abandoning the paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md). Kept in step with that
 // registry by hand, since the creator UI can't see the server's registry - the closest thing to
 // compile-time safety a Firestore-authored catalog can have (F2).
-const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte", "artisanat"];
+const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte", "artisanat", "rumeur", "mission"];
 
 // Matches an action's label or description - for use as MultiSelectModalField's matchesFilter,
 // and as this manager's own free-text search.
@@ -195,6 +195,8 @@ const emptyForm = {
   lootTagIds: [],
   rarity: RARITIES[0].value,
   recipeCategoryIds: [],
+  rumorHarvestCount: 1,
+  missionRollCount: 3,
 };
 
 export default function ActionsManager() {
@@ -262,6 +264,8 @@ export default function ActionsManager() {
       lootTagIds: actionType.lootTagIds || [],
       rarity: actionType.rarity || RARITIES[0].value,
       recipeCategoryIds: actionType.recipeCategoryIds || [],
+      rumorHarvestCount: Number.isFinite(Number(actionType.rumorHarvestCount)) ? Number(actionType.rumorHarvestCount) : 1,
+      missionRollCount: Number.isFinite(Number(actionType.missionRollCount)) ? Number(actionType.missionRollCount) : 3,
     });
     setPanelOpen(true);
   }
@@ -302,6 +306,10 @@ export default function ActionsManager() {
   const isHarvestAction = actionKindInheritsFrom(form.kindId, HARVEST_ACTION_KIND_ID);
   // Only the Artisanat branch carries recipe categories - same convention as isHarvestAction.
   const isCraftingAction = actionKindInheritsFrom(form.kindId, CRAFTING_ACTION_KIND_ID);
+  // Gated by handlerId rather than kindId, unlike the three fields above: intermede/aventure each
+  // host several unrelated action archetypes (docs/TODO.md "Intermède actions", "Aventure
+  // exploration mechanics"), so kindId alone can't tell a Rumeur action apart from a sibling one.
+  const isRumeurAction = form.handlerId === "rumeur";
 
   function toggleProfessionId(id) {
     setForm((prev) => ({
@@ -370,6 +378,8 @@ export default function ActionsManager() {
         lootTagIds: isHarvestAction ? form.lootTagIds : [],
         rarity: isHarvestAction ? form.rarity : null,
         recipeCategoryIds: isCraftingAction ? form.recipeCategoryIds : [],
+        rumorHarvestCount: isRumeurAction ? Number(form.rumorHarvestCount) || 1 : 1,
+        missionRollCount: isRumeurAction ? Number(form.missionRollCount) || 3 : 3,
       },
       { merge: true }
     );
@@ -455,6 +465,12 @@ export default function ActionsManager() {
                   Catégories de recettes :{" "}
                   {(actionType.recipeCategoryIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") ||
                     <span className="error">aucune — l'action ne pourra fabriquer aucune recette</span>}
+                </div>
+              )}
+              {actionType.handlerId === "rumeur" && (
+                <div>
+                  Rumeurs récoltées : {actionType.rumorHarvestCount ?? 1} — Missions générées :{" "}
+                  {actionType.missionRollCount ?? 3}
                 </div>
               )}
               <div>
@@ -583,6 +599,33 @@ export default function ActionsManager() {
                   Sans catégorie de recettes, cette action ne pourra fabriquer aucune recette.
                 </p>
               )}
+            </>
+          )}
+
+          {isRumeurAction && (
+            <>
+              <label>
+                Nombre de rumeurs récoltées
+                <input
+                  type="number"
+                  min="0"
+                  value={form.rumorHarvestCount}
+                  onChange={(e) => setForm({ ...form, rumorHarvestCount: e.target.value })}
+                />
+              </label>
+              <label>
+                Nombre de missions générées
+                <input
+                  type="number"
+                  min="0"
+                  value={form.missionRollCount}
+                  onChange={(e) => setForm({ ...form, missionRollCount: e.target.value })}
+                />
+              </label>
+              <p>
+                À chaque résolution : récolte jusqu'à ce nombre de rumeurs rares ou plus de la région actuelle, et
+                génère ce nombre de missions (remplaçant celles non réclamées).
+              </p>
             </>
           )}
 

@@ -17,6 +17,7 @@ import ProfessionsManager from "../components/creator/ProfessionsManager";
 import TablesDeTirageManager from "../components/creator/TablesDeTirageManager";
 import ActionsManager from "../components/creator/ActionsManager";
 import RecettesManager from "../components/creator/RecettesManager";
+import RumorsManager from "../components/creator/RumorsManager";
 
 const DEFAULT_SECTION = "Régions";
 
@@ -35,6 +36,7 @@ const GROUPS = [
       Quêtes: QuestsManager,
       "Objectifs de quête": QuestObjectivesManager,
       "Lieux de quête": QuestLocationsManager,
+      Rumeurs: RumorsManager,
     },
   },
   {
