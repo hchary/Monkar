@@ -1,5 +1,5 @@
 // results/DefaultResult.jsx
-export default function DefaultResult({ lastAction, showLoot, error, onClose, closing }) {
+export default function DefaultResult({ lastAction, showLoot, character, error, onClose, closing }) {
   const accent = lastAction.accent;
   const outcomeClass = accent?.kind === "difficulty" ? `difficulty-text-${accent.value}` : "";
 
@@ -11,7 +11,7 @@ export default function DefaultResult({ lastAction, showLoot, error, onClose, cl
       </h3>
       <p className={`outcome ${outcomeClass}`.trim()}>{lastAction.success ? "Succès" : "Échec"}</p>
 
-      <ActionOutcome lastAction={lastAction} showLoot={showLoot} />
+      <ActionOutcome lastAction={lastAction} showLoot={showLoot} character={character} />
 
       {error && <p className="error">{error}</p>}
 

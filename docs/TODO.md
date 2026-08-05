@@ -11,7 +11,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | # | Item | Status | Blocked by | Entry |
 |---|------|--------|------------|-------|
 | 1 | Mission and quest resolution — score & wound algorithm (spec) | done | — | [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) |
-| 2 | Mission resolution result pop-up | todo | 1 | [Mission resolution result pop-up](#mission-resolution-result-pop-up) |
+| 2 | Mission resolution result pop-up | done | 1 | [Mission resolution result pop-up](#mission-resolution-result-pop-up) |
 | 3 | Aventure mission launch — UX polish | todo | — | [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish) |
 | 4 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
 | 5 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
@@ -1240,7 +1240,7 @@ Not implemented yet.
 
 ## Mission and quest resolution algorithm
 
-Status: **specified, not implemented**. [Rumor and mission system](#rumor-and-mission-system) and
+Status: **implemented**. [Rumor and mission system](#rumor-and-mission-system) and
 [Quest loot draw](#quest-loot-draw) currently resolve every quest/mission through
 `partirEnQuete.js`'s existing pipeline: a quest always concludes successfully once drawn (the
 retired paliers system used to roll a weighted tier deciding death/injury/gold/reputation — see
@@ -1375,6 +1375,10 @@ worldData/narrativeSubjects/items/{id}    -- only the addition; see Quest creati
 character.lastAction (quest/mission handlers only, additive)
   success: boolean            -- unchanged field, but now genuinely varies instead of always true
   score: number                -- NEW, the 1-100 roll, shown in the result pop-up
+  threshold: number             -- NEW, the (talent-adjusted) success threshold `score` was compared
+                                --   against — added during implementation: the result pop-up needs
+                                --   it to show alongside the score, and it wasn't listed here
+                                --   originally even though the pop-up entry below always called for it
   wound: string | null         -- NEW, "light" | "severe" | "permanent" | null, this resolution's
                                 --   wound (if any) — the character's post-resolution woundsLight/
                                 --   woundsSevere/woundsPermanent counters are read off the character
@@ -1386,42 +1390,38 @@ character.lastAction (quest/mission handlers only, additive)
 
 Builds on [Rumor and mission system](#rumor-and-mission-system) (mission generation/journal, and the
 now-removed reward discount above), [Quest loot draw](#quest-loot-draw) (loot table draw mechanics),
-[Quest difficulty](#quest-difficulty) (the 6-tier scale reused here), and the currently-uncalled
-`applyWound`/`woundCounts` in `functions/src/lib/wounds.js`. Not implemented yet — no roadmap row
-currently tracks the algorithm's own implementation separately from the paired
-[Mission resolution result pop-up](#mission-resolution-result-pop-up) entry below, which is what
-actually surfaces its output; building that entry is expected to include building this algorithm as
-a prerequisite, not just the pop-up UI.
+[Quest difficulty](#quest-difficulty) (the 6-tier scale reused here), and the
+`applyWound`/`woundCounts` helpers in `functions/src/lib/wounds.js` (now actually called from
+`resolveQuestOutcome`, shared by `functions/src/actions/partirEnQuete.js` and `mission.js`). The
+pure score/threshold/wound math lives in `functions/src/lib/questResolution.js`. A wound severe
+enough to trigger `applyWound`'s death rule flips `character.alive` to `false`, which is what
+actually removes the character from play (`useOwnCharacter`'s query and `runActionPipeline`'s
+character lookup both filter on `alive == true` already) — not a new mechanic, just the first
+caller of a rule that already existed.
 
 ## Mission resolution result pop-up
 
-Status: blocked. Depends on
-[Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) above for the
-score/threshold/wound outcome shape it would display.
+Status: **implemented**. Built alongside
+[Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) above, per that
+entry's own note that building this row was expected to include building the algorithm as a
+prerequisite.
 
-Today a resolved quest or mission shows its outcome through the existing generic dialog
+A resolved quest or mission still shows its outcome through the existing generic dialog
 (`ActionResultDialog.jsx` / `ActionOutcome.jsx`, shared with every other action) — narration, a
-"Succès"/"Échec" toggle, and a "Butin obtenu" fieldset (see
-[Quest loot draw](#quest-loot-draw)). Once the score-based algorithm above lands, that outcome gains
-new pieces worth surfacing explicitly rather than folding silently into the narration text, reading
-off `lastAction.score` / `lastAction.wound` / `lastAction.reputationGained` (see that entry's "Data
-model implications"):
+"Succès"/"Échec" toggle, and a "Butin obtenu" fieldset (see [Quest loot draw](#quest-loot-draw), now
+also populated at degraded rarity on failure, so it needed no changes of its own). `ActionOutcome.jsx`
+gained a dedicated "Résolution" `fieldset` (a new section, not a generalization of "Butin obtenu" —
+resolving the entry's one open UI-architecture question), shown whenever `lastAction.score != null`
+(inert for every non-quest/mission handler):
 
-- The rolled score itself, and the (talent-adjusted) success threshold it was compared against.
-- Any wound inflicted (severity, and which threshold it landed on), alongside the character's
-  post-resolution wound counters.
-- The reputation gained on success, or the degraded-rarity loot drawn on failure (both new rewards
-  introduced by the algorithm entry above).
+- The rolled score and the (talent-adjusted) success threshold it was compared against, always shown.
+- Any wound inflicted (`lastAction.wound`'s severity), alongside the character's current
+  `woundsLight`/`woundsSevere`/`woundsPermanent` counters — read off a new `character` prop threaded
+  through `ActionPanel.jsx` → `ActionResultDialog.jsx` → `DefaultResult.jsx` → `ActionOutcome.jsx`,
+  since those counters live on the character document itself, not on `lastAction`.
+- The reputation gained, shown on success when positive.
 
-The algorithm entry's scope question is now resolved — this applies to both "Partir en quête" and
-"Mission" (they already share one result pop-up path). Still undecided: whether this is a dedicated
-section specific to mission/quest resolution within the existing `ActionResultDialog.jsx`, or a
-generalization of its current "Butin obtenu" fieldset pattern into a broader "Résolution" fieldset
-reusable by any future score-based action — a UI-architecture call left to whoever builds this row,
-not required to unblock it.
-
-Not implemented yet. Expected to include building the algorithm itself (see above), not just this
-pop-up's UI — no separate roadmap row tracks the algorithm implementation on its own.
+Applies to both "Partir en quête" and "Mission", which already shared one result pop-up path.
 
 ## Aventure mission launch UX polish
 

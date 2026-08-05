@@ -11,7 +11,10 @@ import { z } from "zod";
 // normalizeActionType is the single place those defaults live - the "absent means..." notes on
 // each field describe what it does, they are not a second implementation.
 
-const ActionAvailabilityConditionSchema = z
+// Exported so other schemas gating on the same closed condition set (e.g.
+// shared/schema/narrativeSubject.ts's `condition`) can reuse this row shape instead of
+// redeclaring it.
+export const ActionAvailabilityConditionSchema = z
   .object({ type: z.string() })
   .passthrough()
   .describe(
