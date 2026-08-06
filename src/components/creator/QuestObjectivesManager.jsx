@@ -6,7 +6,11 @@ import MultiSelectModalField from "./MultiSelectModalField";
 import { matchesTag } from "./TagsManager";
 import { RARITIES } from "./TalentsManager";
 
+// Display name of the reserved objective tag, shown to authors. The id below is what every
+// consumer actually matches on (functions/src/actions/rumeur.js keeps a hand-mirrored copy,
+// src/components/creator/QuestsManager.jsx imports it directly).
 export const OBJECTIVE_TAG = "objectif de quête";
+export const OBJECTIVE_TAG_ID = "objectif-de-quete";
 
 const emptyForm = {
   type: "groupe",
@@ -20,11 +24,14 @@ const emptyForm = {
 };
 
 // Matches a quest objective's display name or tags — for use as MultiSelectModalField's matchesFilter.
+// `option.tagNames` is the resolved tag names for the objective (see filteredObjectives below and
+// QuestsManager.jsx's own usage), since narrativeSubjects only stores tag ids.
 export function matchesQuestObjective(option, query) {
   const q = query.toLowerCase();
   if (!q) return true;
   return (
-    (option.name || "").toLowerCase().includes(q) || (option.tags || []).some((tag) => tag.toLowerCase().includes(q))
+    (option.name || "").toLowerCase().includes(q) ||
+    (option.tagNames || []).some((tag) => tag.toLowerCase().includes(q))
   );
 }
 
@@ -32,7 +39,6 @@ export default function QuestObjectivesManager() {
   const [subjects, setSubjects] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [otherTags, setOtherTags] = useState([]);
   const [filterText, setFilterText] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [tags, setTags] = useState([]);
@@ -50,10 +56,16 @@ export default function QuestObjectivesManager() {
   }, []);
 
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+  // The reserved objective tag is force-injected on every save below, never a user-toggled choice.
+  const pickableTags = sortedTags.filter((t) => t.id !== OBJECTIVE_TAG_ID);
+  const tagsById = new Map(tags.map((t) => [t.id, t.name]));
 
-  const objectives = subjects.filter((subject) => (subject.tags || []).includes(OBJECTIVE_TAG));
+  const objectives = subjects.filter((subject) => (subject.tagIds || []).includes(OBJECTIVE_TAG_ID));
   const filteredObjectives = objectives.filter((subject) =>
-    matchesQuestObjective({ name: subject.nom, tags: subject.tags }, filterText)
+    matchesQuestObjective(
+      { name: subject.nom, tagNames: (subject.tagIds || []).map((id) => tagsById.get(id)).filter(Boolean) },
+      filterText
+    )
   );
 
   function startEdit(subject) {
@@ -65,18 +77,16 @@ export default function QuestObjectivesManager() {
       nom: subject.nom || "",
       genre: subject.genre || "m",
       nombre: subject.nombre || "pluriel",
-      tagIds: subject.tagIds || [],
+      tagIds: (subject.tagIds || []).filter((id) => id !== OBJECTIVE_TAG_ID),
       rarity: subject.rarity || "commun",
       condition: conditionRow ? { tagId: conditionRow.tagId || "", minQuality: conditionRow.minQuality || 1 } : null,
     });
-    setOtherTags((subject.tags || []).filter((t) => t !== OBJECTIVE_TAG));
     setPanelOpen(true);
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
-    setOtherTags([]);
   }
 
   async function handleSubmit(e) {
@@ -91,8 +101,7 @@ export default function QuestObjectivesManager() {
       nom: form.nom,
       genre: form.genre,
       nombre: form.nombre,
-      tags: [...otherTags, OBJECTIVE_TAG],
-      tagIds: form.tagIds,
+      tagIds: [...form.tagIds, OBJECTIVE_TAG_ID],
       rarity: form.rarity,
       condition: form.condition?.tagId
         ? { conditions: [{ type: "hasTalentTag", tagId: form.condition.tagId, minQuality: form.condition.minQuality }] }
@@ -192,7 +201,7 @@ export default function QuestObjectivesManager() {
 
           <MultiSelectModalField
             legend="Tags"
-            options={sortedTags}
+            options={pickableTags}
             selectedIds={form.tagIds}
             onToggle={toggleTagId}
             createLink={`/creator?section=${encodeURIComponent("Tag")}`}

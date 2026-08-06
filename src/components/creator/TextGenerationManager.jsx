@@ -2,16 +2,28 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import NarrativeSubjectList from "./NarrativeSubjectList";
+import MultiSelectModalField from "./MultiSelectModalField";
+import { matchesTag } from "./TagsManager";
 
-const emptySubjectForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tags: "" };
+const emptySubjectForm = { type: "groupe", article: "les", nom: "", genre: "m", nombre: "pluriel", tagIds: [] };
 const emptyVerbPhraseForm = {
   resultat: "victoire",
   cible: "groupe",
   slot: "climax",
   talentChange: "les_deux",
   template: "",
-  tags: "",
+  tagIds: [],
 };
+
+function useTags() {
+  const [tags, setTags] = useState([]);
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", "tags", "items"), (snap) => {
+      setTags(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+  return [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+}
 
 // The role a phrase plays in the generated paragraph — see docs/NARRATIVE-GENERATION.md. "climax" is
 // the default both here and when reading Firestore, so every phrase authored before slots existed
@@ -32,14 +44,8 @@ export function slotLabel(slot) {
   return NARRATIVE_SLOTS.find((s) => s.value === (slot || "climax"))?.label || slot;
 }
 
-function parseTags(tags) {
-  return tags
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
-}
-
-// Matches a verb phrase's template text, slot, cible, or tags — for use as MultiSelectModalField's matchesFilter.
+// Matches a verb phrase's template text, slot, cible, or tags — for use as MultiSelectModalField's
+// matchesFilter. `option.tagNames` is the resolved tag names (verbPhrases only store tag ids).
 export function matchesVerbPhrase(option, query) {
   const q = query.toLowerCase();
   if (!q) return true;
@@ -47,7 +53,7 @@ export function matchesVerbPhrase(option, query) {
     (option.name || "").toLowerCase().includes(q) ||
     (option.cible || "").toLowerCase().includes(q) ||
     slotLabel(option.slot).toLowerCase().includes(q) ||
-    (option.tags || []).some((tag) => tag.toLowerCase().includes(q))
+    (option.tagNames || []).some((tag) => tag.toLowerCase().includes(q))
   );
 }
 
@@ -56,6 +62,8 @@ function SubjectsManager() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptySubjectForm);
   const [filterText, setFilterText] = useState("");
+  const sortedTags = useTags();
+  const tagsById = new Map(sortedTags.map((t) => [t.id, t.name]));
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "narrativeSubjects", "items"), (snap) => {
@@ -68,7 +76,7 @@ function SubjectsManager() {
     return (
       !q ||
       (subject.nom || "").toLowerCase().includes(q) ||
-      (subject.tags || []).some((tag) => tag.toLowerCase().includes(q))
+      (subject.tagIds || []).some((id) => (tagsById.get(id) || "").toLowerCase().includes(q))
     );
   });
 
@@ -80,13 +88,20 @@ function SubjectsManager() {
       nom: subject.nom || "",
       genre: subject.genre || "m",
       nombre: subject.nombre || "pluriel",
-      tags: (subject.tags || []).join(", "),
+      tagIds: subject.tagIds || [],
     });
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(emptySubjectForm);
+  }
+
+  function toggleTagId(id) {
+    setForm((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
+    }));
   }
 
   async function handleSubmit(e) {
@@ -101,7 +116,7 @@ function SubjectsManager() {
       nom: form.nom,
       genre: form.genre,
       nombre: form.nombre,
-      tags: parseTags(form.tags),
+      tagIds: form.tagIds,
     });
     resetForm();
   }
@@ -130,6 +145,7 @@ function SubjectsManager() {
         subjects={filteredSubjects}
         onEdit={startEdit}
         onDelete={(subject) => deleteDoc(doc(db, "worldData", "narrativeSubjects", "items", subject.id))}
+        tagsCatalog={sortedTags}
       />
 
       {editingId && (
@@ -172,10 +188,15 @@ function SubjectsManager() {
                 <option value="pluriel">pluriel</option>
               </select>
             </label>
-            <input
-              placeholder="Tags (séparés par des virgules, ex: hostile, humanoïde)"
-              value={form.tags}
-              onChange={(e) => setForm({ ...form, tags: e.target.value })}
+            <MultiSelectModalField
+              legend="Tags"
+              options={sortedTags}
+              selectedIds={form.tagIds}
+              onToggle={toggleTagId}
+              createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+              matchesFilter={matchesTag}
+              filterPlaceholder="Filtrer par nom..."
+              buttonLabel="Ajouter tags"
             />
             <div>
               <button type="submit">Enregistrer</button>
@@ -198,6 +219,9 @@ function VerbPhrasesManager() {
   const [form, setForm] = useState(emptyVerbPhraseForm);
   const [filters, setFilters] = useState(emptyVerbPhraseFilters);
   const [panelOpen, setPanelOpen] = useState(false);
+  const sortedTags = useTags();
+  const tagsById = new Map(sortedTags.map((t) => [t.id, t.name]));
+  const tagNamesOf = (tagIds) => (tagIds || []).map((id) => tagsById.get(id)).filter(Boolean);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "verbPhrases", "items"), (snap) => {
@@ -209,7 +233,12 @@ function VerbPhrasesManager() {
     if (filters.resultat && verbPhrase.resultat !== filters.resultat) return false;
     if (filters.slot && (verbPhrase.slot || "climax") !== filters.slot) return false;
     return matchesVerbPhrase(
-      { name: verbPhrase.template, cible: verbPhrase.cible, slot: verbPhrase.slot, tags: verbPhrase.tags },
+      {
+        name: verbPhrase.template,
+        cible: verbPhrase.cible,
+        slot: verbPhrase.slot,
+        tagNames: tagNamesOf(verbPhrase.tagIds),
+      },
       filters.text
     );
   });
@@ -222,7 +251,7 @@ function VerbPhrasesManager() {
       slot: verbPhrase.slot || "climax",
       talentChange: verbPhrase.talentChange || "les_deux",
       template: verbPhrase.template || "",
-      tags: (verbPhrase.tags || []).join(", "),
+      tagIds: verbPhrase.tagIds || [],
     });
     setPanelOpen(true);
   }
@@ -230,6 +259,13 @@ function VerbPhrasesManager() {
   function resetForm() {
     setEditingId(null);
     setForm(emptyVerbPhraseForm);
+  }
+
+  function toggleTagId(id) {
+    setForm((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
+    }));
   }
 
   // A cible restricts which target shape a phrase can be drawn for. The action sentence nearly
@@ -246,14 +282,13 @@ function VerbPhrasesManager() {
       ? doc(db, "worldData", "verbPhrases", "items", editingId)
       : doc(collection(db, "worldData", "verbPhrases", "items"));
 
-    const tags = parseTags(form.tags);
     await setDoc(ref, {
       resultat: form.resultat,
       slot: form.slot,
       cible: form.cible,
       template: form.template,
       ...(form.slot === "talentGrowth" ? { talentChange: form.talentChange } : {}),
-      ...(tags.length > 0 ? { tags } : {}),
+      ...(form.tagIds.length > 0 ? { tagIds: form.tagIds } : {}),
     });
     resetForm();
   }
@@ -306,7 +341,7 @@ function VerbPhrasesManager() {
           <li key={verbPhrase.id}>
             <strong>{verbPhrase.template}</strong> ({verbPhrase.resultat}, {slotLabel(verbPhrase.slot)},{" "}
             {verbPhrase.cible})
-            {verbPhrase.tags?.length > 0 && ` — tags : ${verbPhrase.tags.join(", ")}`}
+            {verbPhrase.tagIds?.length > 0 && ` — tags : ${tagNamesOf(verbPhrase.tagIds).join(", ")}`}
             <button type="button" onClick={() => startEdit(verbPhrase)}>
               Modifier
             </button>
@@ -370,16 +405,20 @@ function VerbPhrasesManager() {
             onChange={(e) => setForm({ ...form, template: e.target.value })}
             required
           />
-          <input
-            placeholder="Tags requis (optionnel, séparés par des virgules)"
-            value={form.tags}
-            onChange={(e) => setForm({ ...form, tags: e.target.value })}
+          <MultiSelectModalField
+            legend="Tags requis"
+            options={sortedTags}
+            selectedIds={form.tagIds}
+            onToggle={toggleTagId}
+            createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+            matchesFilter={matchesTag}
+            filterPlaceholder="Filtrer par nom..."
+            buttonLabel="Ajouter tags"
           />
           <p>
             La phrase n'est retenue que si <em>tous</em> ses tags sont présents dans le contexte de la quête
             (tags de la cible, tags de la quête, tags du talent qui a progressé) ; sans tag, elle sert de
-            secours générique. Les tags saisis ici sont du texte libre : ils doivent être orthographiés
-            exactement comme les tags du catalogue « Tags » utilisés par les quêtes et les talents.
+            secours générique.
           </p>
           <div>
             <button type="submit">{editingId ? "Enregistrer" : "Créer la phrase-verbe"}</button>

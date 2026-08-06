@@ -22,7 +22,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 10 | Training-driven talent quality-up ("s'entraîner") | done | 9 | [Expanded talent system](#expanded-talent-system) |
 | 11 | Profession initial assignment via quest/trainer | done | 9 | [Profession (métier) creation](#profession-métier-creation) |
 | 12 | Trainer type creation page — description field | todo | — | [Trainer type creation page](#trainer-type-creation-page) |
-| 13 | Tag system unification (tagIds vs free-text tags) | todo | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
+| 13 | Tag system unification (tagIds vs free-text tags) | done | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
 | 14 | Location tags | todo | — | [Location tags](#location-tags) |
 | 15 | Aventure exploration mechanics — spec | spec | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
 | 16 | Aventure exploration mechanics — implementation | todo | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
@@ -519,78 +519,50 @@ itself could be added to `QuestLocationsManager.jsx` independently of that.
 
 ## Tag system unification (tagIds vs free-text tags)
 
-There is currently a dual, unrelated "tags" concept, documented in
-[docs/ARCHITECTURE.md](ARCHITECTURE.md)'s data model section. `worldData/narrativeSubjects/items`
-and `worldData/verbPhrases/items` each carry a `tags: string[]` field of free-text strings (e.g.
-`["hostile", "humanoïde"]`) that **is** functionally read by the procedural text generator
-(`generateResultText`/`generateNarrative` in `functions/src/textGeneration.js`) to match subjects
-to verb phrases. Separately, `narrativeSubjects` (like quests, objects, loot tables, and talents)
-also carries a `tagIds: string[]` field referencing the shared `worldData/tags/items` catalog
-(CRUD'd via `TagsManager.jsx`) — but on `narrativeSubjects` that `tagIds` field is creator-only
-metadata, never read by any player-facing or Cloud Function code, and `verbPhrases` doesn't have
-a `tagIds` field at all.
+Status: **implemented**. `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items`
+now carry `tagIds: string[]` referencing the shared `worldData/tags/items` catalog, the same
+mechanism every other tagged collection (objects, loot tables, quests, talents) already used. The
+free-text `tags: string[]` field is gone from both schemas; `functions/src/textGeneration.js`'s
+`tagsOf` reads `tagIds` directly, and the "tag vocabulary bridge" that used to resolve quest/talent
+`tagIds` to tag *names* before matching (`resolveTagNames`/`tagsByIdName` in `partirEnQuete.js` and
+`mission.js`) is gone — `buildNarrativeContext` now passes `tagIds` straight through.
 
-This split was called out as unresolved debt in
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) (the multi-slot narrative grammar
-engine spec), which sidesteps it for now via a "tag vocabulary bridge" — resolving talents' and
-quests' `tagIds` to tag *names* at generation time, then matching those names against
-`narrativeSubjects`'/`verbPhrases`' free-text `tags`. That bridge works but has a real
-content-authoring fragility: a tag like "feu" must be spelled *identically* in a
-`worldData/tags/items` catalog entry's `name` and in every free-text `tags` array that wants to
-reference it — no fuzzy matching, no referential integrity, easy to typo into a silent content
-gap (a fragment that never matches because "feu" and "Feu" or "feu " don't compare equal). This
-entry tracks the actual fix, as a separate, independently-decidable piece of work rather than a
-prerequisite for the grammar engine.
+**The reserved sentinel**: the free-text `"objectif de quête"` value that used to mark a
+narrativeSubject as a selectable quest objective is now a real `worldData/tags/items` entry, at
+the fixed document id `"objectif-de-quete"` (`OBJECTIVE_TAG_ID`, exported from
+`QuestObjectivesManager.jsx`, hand-mirrored as a literal in `functions/src/actions/rumeur.js` per
+the project's usual functions/src ⇄ src convention). `QuestObjectivesManager.jsx` force-injects
+that id into `tagIds` on every save and hides it from its own tags picker (never a user-toggled
+choice); `rumeur.js` and `QuestsManager.jsx` filter on it the same way `.tags.includes(...)` used
+to.
 
-- **Migration**: move `narrativeSubjects.tags` and `verbPhrases.tags` from free-text string
-  arrays to `tagIds: string[]` referencing `worldData/tags/items`, matching every other tagged
-  collection (objects, loot tables, quests, talents) and making the shared catalog the single
-  source of truth for tag vocabulary everywhere, not just on some collections.
-- **Cascade-delete cleanup**: `TagsManager.jsx`'s existing delete handler already strips a
-  deleted tag's id from quests/objects/loot tables/talents (and `narrativeSubjects.tagIds`, the
-  currently-unused field) before deleting the tag doc. Once migrated, this same cleanup needs to
-  cover `verbPhrases.tagIds` and the newly-migrated, now-functional `narrativeSubjects.tagIds` —
-  today's cleanup runs against the wrong (unused) field on `narrativeSubjects` and doesn't touch
-  `verbPhrases` at all.
-- **Data migration for existing content**: for each free-text tag string currently used in
-  `narrativeSubjects.tags`/`verbPhrases.tags`, find-or-create a matching `worldData/tags/items`
-  doc by name, then replace the free-text array with the resolved `tagIds` array. Expected to be
-  a lightweight one-off script — there's no seeded example content in either collection beyond
-  UI placeholder text, so the live dataset is small.
-- **Open question**: `narrativeSubjects.tags` also carries the reserved sentinel value
-  `"objectif de quête"` (which makes a subject show up as a selectable quest objective in
-  `QuestObjectivesManager.jsx` — there's no separate collection for quest objectives). Migrating
-  to `tagIds` means deciding whether that sentinel becomes a real `worldData/tags/items` entry
-  referenced by id like any other tag, or stays a special-cased string check independent of the
-  `tagIds` migration. Leaning toward a real tag entry for consistency, but this needs a decision
-  before implementation, not an assumption baked into the migration script.
-- Once migrated, the "tag vocabulary bridge" in
-  [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) becomes unnecessary (`tagIds`
-  sets can be compared/unioned directly, no name-resolution step needed) and could be simplified
-  or removed as a follow-up.
+**Cascade-delete cleanup**: `TagsManager.jsx`'s delete handler now also strips a deleted tag's id
+from `verbPhrases.tagIds`, alongside the collections it already covered.
+
+**Data migration for existing content**: `functions/scripts/migrateTagsToTagIds.js` (same one-off
+admin-script convention as `migrateActionDurationTo12h.js`) resolves every free-text tag name still
+sitting in `narrativeSubjects.tags`/`verbPhrases.tags` to a `worldData/tags/items` id (creating the
+catalog entry if none matches by name yet), merges the result into `tagIds`, and deletes the old
+`tags` field. It also ensures the reserved `"objectif-de-quete"` tag doc exists. **Not run against
+production yet** — mutating live Firestore data needs a separate go-ahead; run with
+`node functions/scripts/migrateTagsToTagIds.js` after `gcloud auth application-default login`.
 
 **Data model implications**:
 ```
 worldData/narrativeSubjects/items/{id}
-  tagIds: string[]   -- worldData/tags/items ids; REPURPOSED to become the functional tag field,
-                      --   replacing the free-text `tags` array below
-  -- tags: string[]  -- REMOVED once migrated (was free-text, functionally used for matching)
+  tagIds: string[]   -- worldData/tags/items ids; now the functional tag field, read by
+                      --   textGeneration.js and by partirEnQuete.js's loot draw / talent
+                      --   evolution gating when the subject acts as a quest objective
+  -- tags: string[]  -- REMOVED (was free-text, functionally used for matching)
 
 worldData/verbPhrases/items/{id}
-  tagIds: string[]   -- worldData/tags/items ids; NEW field, replaces the free-text `tags` array
-  -- tags: string[]  -- REMOVED once migrated (was free-text, functionally used for matching)
+  tagIds: string[]   -- worldData/tags/items ids, optional (omitted when empty)
+  -- tags: string[]  -- REMOVED (was free-text, functionally used for matching)
 ```
 
-Not implemented yet, deliberately deferred as independent from and not a prerequisite for
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)'s grammar engine (see that doc's
-Non-goals section) — the tag vocabulary bridge meets the grammar engine's immediate need without
-this migration.
-
-**Implementation scope**:
-- Read: `functions/src/textGeneration.js` (`generateResultText`/`generateNarrative`, the free-text `tags` matching to migrate), `src/components/creator/TagsManager.jsx` (the existing cascade-delete cleanup to extend/fix), `functions/src/schema/narrativeSubject.ts` / `shared/schema/narrativeSubject.ts` and `functions/src/schema/verbPhrase.ts` / `shared/schema/verbPhrase.ts` (schemas to migrate), `src/components/creator/QuestObjectivesManager.jsx` (the `"objectif de quête"` sentinel this entry's open question is about), and [docs/ARCHITECTURE.md](ARCHITECTURE.md)'s data model section.
-- Update: the same schema files, `functions/src/textGeneration.js`, `src/components/creator/TagsManager.jsx`, a new one-off migration script under `functions/scripts/` (see `functions/scripts/migrateActionDurationTo12h.js` for the existing convention), and [docs/ARCHITECTURE.md](ARCHITECTURE.md).
-- The sentinel open question (real tag entry vs. special-cased string) needs a decision — confirm it with the user before writing the migration script if it isn't already answered by the time this is picked up.
-- Do not read or open any other file without asking the user first.
+Once the migration script has run against production, the "tag vocabulary bridge" section of
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) is stale and could be trimmed as a
+follow-up — not done in this pass since it's documentation-only and low priority.
 
 ## Profession (métier) creation
 

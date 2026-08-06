@@ -51,7 +51,7 @@ function slotOf(fragment) {
 }
 
 function tagsOf(taggable) {
-  return taggable.tags || [];
+  return taggable.tagIds || [];
 }
 
 // A fragment qualifies only if EVERY one of its tags is in the context - tags narrow a fragment,
