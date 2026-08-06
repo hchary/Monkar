@@ -14,6 +14,7 @@ const { evaluateConditions } = require("./actionConditions");
 const {
   PROFESSION_ACTION_KIND_ID,
   TRAINING_ACTION_KIND_ID,
+  PROFESSION_LEARNING_ACTION_KIND_ID,
   actionKindCategoryId,
   actionKindInheritsFrom,
 } = require("./actionKinds");
@@ -65,13 +66,15 @@ function resolveTrainerTypeId(actionType) {
 // The conditions actually evaluated for an action: the authored ones, plus whatever a kind
 // implies. Anything inheriting from Métier gets the profession gate implied by its "Métiers
 // associés" field; anything inheriting from Entraînement gets the trainer-reachability gate
-// implied by its own trainerTypeId. Neither gate is an authored row: each is what belonging to
-// that kind *means*, so it can't be forgotten or contradicted by the condition editor, and a
-// subtype inherits it without restating it.
+// implied by its own trainerTypeId; anything inheriting from Apprentissage (itself under
+// Entraînement) additionally gets the professionless gate, reserving it to characters who don't
+// yet practise a profession. Neither gate is an authored row: each is what belonging to that kind
+// *means*, so it can't be forgotten or contradicted by the condition editor, and a subtype
+// inherits it without restating it.
 //
 // Each injection is individually guarded so normalizing an already-normalized document is
-// idempotent; nothing else can produce a hasProfession/trainerReachable row, since neither is
-// offered by CONDITION_TYPES.
+// idempotent; nothing else can produce a hasProfession/trainerReachable/professionless row, since
+// none of them is offered by CONDITION_TYPES.
 function resolveConditions(actionType) {
   const authored = Array.isArray(actionType?.availability?.conditions) ? actionType.availability.conditions : [];
   const kindId = resolveKindId(actionType);
@@ -86,6 +89,13 @@ function resolveConditions(actionType) {
     !authored.some((c) => c?.type === "trainerReachable")
   ) {
     conditions = [...conditions, { type: "trainerReachable", trainerTypeId: resolveTrainerTypeId(actionType) }];
+  }
+
+  if (
+    actionKindInheritsFrom(kindId, PROFESSION_LEARNING_ACTION_KIND_ID) &&
+    !authored.some((c) => c?.type === "professionless")
+  ) {
+    conditions = [...conditions, { type: "professionless" }];
   }
 
   return conditions;

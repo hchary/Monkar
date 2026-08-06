@@ -21,6 +21,7 @@ const artisanat = require("./actions/artisanat");
 const rumeur = require("./actions/rumeur");
 const mission = require("./actions/mission");
 const sEntrainer = require("./actions/sEntrainer");
+const apprentissage = require("./actions/apprentissage");
 
 initializeApp();
 const db = getFirestore();
@@ -54,6 +55,7 @@ const ACTION_HANDLERS: Record<string, any> = {
   rumeur,
   mission,
   sEntrainer,
+  apprentissage,
 };
 
 const CreateCharacterInput = z.object({
@@ -185,7 +187,7 @@ exports.performAction = onCall(async (request: any) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Login required.");
 
-  const { actionTypeId, recetteId, missionId, talentId } = request.data;
+  const { actionTypeId, recetteId, missionId, talentId, professionId } = request.data;
   if (!actionTypeId) throw new HttpsError("invalid-argument", "actionTypeId is required.");
 
   await runActionPipeline({
@@ -194,7 +196,7 @@ exports.performAction = onCall(async (request: any) => {
     actionTypeId,
     actionHandlers: ACTION_HANDLERS,
     today: todayUTC(),
-    payload: { recetteId, missionId, talentId },
+    payload: { recetteId, missionId, talentId, professionId },
   });
 
   return { ok: true };

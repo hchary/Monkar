@@ -85,8 +85,13 @@ worldData/actionTypes/items/{id}
                                              -- facile 55 / moyen 30 / difficile 10 / tres_difficile 4 / epique 1
                                              -- when absent, see "Quest drawing" below
   trainerTypeId: string | null      -- worldData/trainerTypes/items id this action trains at; only
-                                     -- meaningful when kindId inherits from "entrainement" (the
-                                     -- "S'entraîner" action, handlerId "sEntrainer")
+                                     -- meaningful when kindId inherits from "entrainement" - the
+                                     -- "S'entraîner" action itself (handlerId "sEntrainer"), or its
+                                     -- "apprentissage" subtype (handlerId "apprentissage"), which
+                                     -- grants a character its first worldData/professions/items
+                                     -- entry instead of bumping a talent's quality, and is
+                                     -- additionally reserved to characters with no professionId yet
+                                     -- (the implicit "professionless" condition)
   -- there used to be a `tiers: [...]` field here (a per-action weighted roll deciding
   -- success/failure, gold, wounds, death, narrativeText) - retired; each handler now decides its
   -- own outcome and gains directly in code. A `tiers` array left over on an old document is inert.
