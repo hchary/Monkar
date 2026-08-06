@@ -8,32 +8,23 @@ const {
   resolveQuestOutcome,
 } = require("./partirEnQuete");
 
-// worldData/tags/items: the id-keyed catalog quests and talents reference.
-const TAGS_BY_ID = new Map([
-  ["t-feu", "feu"],
-  ["t-magie", "magie"],
-  ["t-protection", "protection"],
-  ["t-lame", "lame"],
-]);
-
 const QUEST = { id: "q1", name: "Le siège de Vaubourg", tagIds: ["t-protection"] };
 
 const PYROMANCIE = { id: "tal-pyro", name: "Pyromancie", rarity: "rare", tagIds: ["t-feu", "t-magie"] };
 const ESCRIME = { id: "tal-escrime", name: "Escrime", rarity: "commun", tagIds: ["t-lame"] };
 
 describe("buildNarrativeContext", () => {
-  test("resolves quest and progressed-talent tagIds to the free-text tag names the generator matches", () => {
+  test("carries the quest's and the progressed talent's tagIds straight through as context tags", () => {
     const context = buildNarrativeContext({
       quest: QUEST,
       locationName: "Vaubourg",
       talents: [PYROMANCIE],
       nextTalents: [PYROMANCIE],
       talentEvolutions: [{ talentId: "tal-pyro", name: "Pyromancie", kind: "evolution", rarity: "rare" }],
-      tagsByIdName: TAGS_BY_ID,
     });
 
-    assert.deepEqual(context.talentTags, ["feu", "magie"]);
-    assert.deepEqual(context.questTags, ["protection"]);
+    assert.deepEqual(context.talentTags, ["t-feu", "t-magie"]);
+    assert.deepEqual(context.questTags, ["t-protection"]);
     assert.equal(context.talentChange, "evolution");
     assert.equal(context.talentName, "Pyromancie");
     assert.equal(context.locationName, "Vaubourg");
@@ -47,7 +38,6 @@ describe("buildNarrativeContext", () => {
       talents: [PYROMANCIE],
       nextTalents: [PYROMANCIE],
       talentEvolutions: [],
-      tagsByIdName: TAGS_BY_ID,
     });
 
     assert.deepEqual(context.talentTags, []);
@@ -64,11 +54,10 @@ describe("buildNarrativeContext", () => {
         { talentId: "tal-escrime", name: "Escrime", kind: "evolution", rarity: "commun" },
         { talentId: "tal-pyro", name: "Pyromancie", kind: "evolution", rarity: "rare" },
       ],
-      tagsByIdName: TAGS_BY_ID,
     });
 
     assert.equal(context.talentName, "Pyromancie");
-    assert.deepEqual(context.talentTags, ["feu", "magie"]);
+    assert.deepEqual(context.talentTags, ["t-feu", "t-magie"]);
   });
 
   test("finds a freshly unlocked talent that isn't on the character's sheet yet", () => {
@@ -77,23 +66,10 @@ describe("buildNarrativeContext", () => {
       talents: [PYROMANCIE],
       nextTalents: [],
       talentEvolutions: [{ talentId: "tal-pyro", name: "Pyromancie", kind: "unlock", rarity: "rare" }],
-      tagsByIdName: TAGS_BY_ID,
     });
 
     assert.equal(context.talentChange, "unlock");
-    assert.deepEqual(context.talentTags, ["feu", "magie"]);
-  });
-
-  test("drops tag ids with no catalog entry rather than leaking raw ids into the text", () => {
-    const context = buildNarrativeContext({
-      quest: { ...QUEST, tagIds: ["t-protection", "t-supprime"] },
-      talents: [],
-      nextTalents: [],
-      talentEvolutions: [],
-      tagsByIdName: TAGS_BY_ID,
-    });
-
-    assert.deepEqual(context.questTags, ["protection"]);
+    assert.deepEqual(context.talentTags, ["t-feu", "t-magie"]);
   });
 });
 
@@ -135,8 +111,8 @@ describe("preferQuestPhrasesPerSlot", () => {
 
 describe("narrateQuestSuccess", () => {
   const subjects = [
-    { id: "s-bandits", type: "groupe", article: "les", nom: "bandits du col", tags: ["humanoide"] },
-    { id: "s-chef", type: "individuel", article: "le", nom: "chef de la bande", tags: ["humanoide"] },
+    { id: "s-bandits", type: "groupe", article: "les", nom: "bandits du col", tagIds: ["humanoide"] },
+    { id: "s-chef", type: "individuel", article: "le", nom: "chef de la bande", tagIds: ["humanoide"] },
   ];
   const verbPhrases = [
     { id: "v-groupe", resultat: "victoire", cible: "groupe", template: "vous avez dispersé {sujet}" },
@@ -177,8 +153,8 @@ describe("narrateQuestSuccess", () => {
 
 describe("narrateQuestFailure", () => {
   const subjects = [
-    { id: "s-bandits", type: "groupe", article: "les", nom: "bandits du col", tags: ["humanoide"] },
-    { id: "s-chef", type: "individuel", article: "le", nom: "chef de la bande", tags: ["humanoide"] },
+    { id: "s-bandits", type: "groupe", article: "les", nom: "bandits du col", tagIds: ["humanoide"] },
+    { id: "s-chef", type: "individuel", article: "le", nom: "chef de la bande", tagIds: ["humanoide"] },
   ];
   const verbPhrases = [
     { id: "v-groupe", resultat: "echec", cible: "groupe", template: "vous avez été repoussé par {sujet}" },
@@ -251,7 +227,6 @@ describe("resolveQuestOutcome", () => {
       lootTables,
       objects,
       talents: [],
-      tagsByIdName: TAGS_BY_ID,
       locationName: null,
       today: "2026-08-05",
       circumstance: "lors de la quête « Le siège de Vaubourg »",

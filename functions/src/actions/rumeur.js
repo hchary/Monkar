@@ -26,11 +26,11 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { RARITY_ORDER, DIFFICULTY_ORDER } = require("../lib/rolls");
 const { pickRandom } = require("../lib/loot");
 
-// Same tag QuestObjectivesManager.jsx's OBJECTIVE_TAG forces onto every quest objective it
-// authors - duplicated as a literal here rather than imported, since functions/ shares no build
-// step with the Vite app (same reason actionKinds.js/actionConditions.js are hand-mirrored copies
-// instead of a shared import).
-const OBJECTIVE_TAG = "objectif de quête";
+// Same reserved tag id QuestObjectivesManager.jsx's OBJECTIVE_TAG_ID forces onto every quest
+// objective it authors - duplicated as a literal here rather than imported, since functions/
+// shares no build step with the Vite app (same reason actionKinds.js/actionConditions.js are
+// hand-mirrored copies instead of a shared import).
+const OBJECTIVE_TAG_ID = "objectif-de-quete";
 
 // Picks up to `count` distinct items without replacement - used for both the rumor harvest (never
 // hand the same sighting twice) and, implicitly, is not needed for missions, which draw with
@@ -62,7 +62,7 @@ async function prepare({ db, character }) {
   const rumors = rumorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objectives = narrativeSubjectsSnap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((subject) => (subject.tags || []).includes(OBJECTIVE_TAG));
+    .filter((subject) => (subject.tagIds || []).includes(OBJECTIVE_TAG_ID));
 
   return { region, sightings, rumors, objectives };
 }

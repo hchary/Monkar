@@ -8,10 +8,10 @@ import { ActionAvailabilityConditionSchema } from "./actionType";
 //
 // Authored through two creator screens that write the same document with different field sets:
 //   - src/components/creator/QuestObjectivesManager.jsx (creates objectives; writes tagIds + rarity,
-//     and always forces OBJECTIVE_TAG into `tags`)
-//   - src/components/creator/TextGenerationManager.jsx (edits any subject; writes `tags` only, and
-//     drops tagIds/rarity from the document when it saves)
-// That asymmetry is the reason tagIds and rarity are marked optional below.
+//     and always forces the reserved "objectif de quête" tag id (OBJECTIVE_TAG_ID) into tagIds)
+//   - src/components/creator/TextGenerationManager.jsx (edits any subject; writes tagIds only, and
+//     drops rarity from the document when it saves)
+// That asymmetry is the reason rarity is marked optional below.
 
 export const NarrativeSubjectDocumentSchema = z.object({
   type: z
@@ -34,20 +34,16 @@ export const NarrativeSubjectDocumentSchema = z.object({
     .string()
     .default("pluriel")
     .describe('"singulier" | "pluriel". Authored but not yet read by the generator - `type` drives agreement.'),
-  tags: z
-    .array(z.string())
-    .describe(
-      "Free-text tag NAMES (not worldData/tags ids). They form the narrative context a verb phrase's own " +
-        '`tags` must be a subset of, so they must be spelled exactly like the phrase\'s. Contains ' +
-        'OBJECTIVE_TAG ("objectif de quête") when the subject is a quest objective.'
-    ),
   tagIds: z
     .array(z.string())
     .optional()
     .default([])
     .describe(
-      "Ids in worldData/tags/items. Written only by QuestObjectivesManager; TextGenerationManager drops " +
-        "the field when it saves. Not read by textGeneration.js - the generator matches on `tags`."
+      "Ids in worldData/tags/items. Written by both creator screens. Forms the narrative context a verb " +
+        "phrase's own `tagIds` must be a subset of (functions/src/textGeneration.js's tagsOf/isSubset). " +
+        'Contains the reserved "objectif de quête" tag id (OBJECTIVE_TAG_ID) when the subject is a quest ' +
+        "objective. Also read directly by functions/src/actions/partirEnQuete.js's drawQuestLoot and " +
+        "rollTalentEvolutions when the subject acts as a quest objective."
     ),
   rarity: z
     .string()
@@ -77,8 +73,8 @@ export const NarrativeSubjectDocumentSchema = z.object({
 
 export type NarrativeSubjectDocument = z.infer<typeof NarrativeSubjectDocumentSchema>;
 
-// QuestObjectivesManager's blank form. TextGenerationManager shares the first five values but has
-// no tagIds/rarity/condition of its own.
+// QuestObjectivesManager's blank form. TextGenerationManager shares the first six values (including
+// tagIds) but has no rarity/condition of its own.
 const DEFAULTED_KEYS = ["type", "article", "genre", "nombre", "tagIds", "rarity", "condition"] as const;
 
 export const DEFAULTS = NarrativeSubjectDocumentSchema.pick(

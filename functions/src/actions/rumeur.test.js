@@ -4,7 +4,6 @@ const { resolve } = require("./rumeur");
 const { DIFFICULTY_ORDER } = require("../lib/rolls");
 
 const REGION = { id: "region1", adventureZoneIds: ["zone1"] };
-const OBJECTIVE_TAG = "objectif de quête";
 
 function context(overrides = {}) {
   return { region: REGION, sightings: [], rumors: [], objectives: [], ...overrides };
@@ -84,7 +83,7 @@ describe("rumeur resolve()", () => {
   });
 
   test("generates missionRollCount missions from objectif-de-quête narrativeSubjects", async () => {
-    const objectives = [{ id: "obj1", nom: "bandits", tags: [OBJECTIVE_TAG], tagIds: ["tag-x"] }];
+    const objectives = [{ id: "obj1", nom: "bandits", tagIds: ["tag-x"] }];
     const character = { region: REGION, rumorJournal: [], missionJournal: [], talents: [] };
     const actionType = { rumorHarvestCount: 0, missionRollCount: 3 };
 

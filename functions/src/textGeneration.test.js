@@ -9,7 +9,7 @@ const MORTS_VIVANTS = {
   nom: "hordes de morts-vivants",
   genre: "f",
   nombre: "pluriel",
-  tags: ["mort-vivant", "hostile"],
+  tagIds: ["mort-vivant", "hostile"],
 };
 
 const BANDITS = {
@@ -19,7 +19,7 @@ const BANDITS = {
   nom: "bandits du col",
   genre: "m",
   nombre: "pluriel",
-  tags: ["humanoide", "hostile"],
+  tagIds: ["humanoide", "hostile"],
 };
 
 const LOUP = {
@@ -29,7 +29,7 @@ const LOUP = {
   nom: "loup géant",
   genre: "m",
   nombre: "singulier",
-  tags: ["bete", "hostile"],
+  tagIds: ["bete", "hostile"],
 };
 
 // Mirrors the shape of worldData/verbPhrases/items documents.
@@ -151,9 +151,9 @@ describe("generateNarrative fragment selection", () => {
       subjects: [MORTS_VIVANTS],
       verbPhrases: [
         GENERIC_CLIMAX,
-        phrase({ tags: ["feu"], template: "vos flammes ont eu raison de {sujet}" }),
+        phrase({ tagIds: ["feu"], template: "vos flammes ont eu raison de {sujet}" }),
         phrase({
-          tags: ["feu", "mort-vivant"],
+          tagIds: ["feu", "mort-vivant"],
           template: "d'un geste, d'une incantation, vous avez carbonisé {sujet}",
         }),
       ],
@@ -167,8 +167,8 @@ describe("generateNarrative fragment selection", () => {
     // The caravan/village case from narrative-poc/report.md: the quest is tagged "protection" but
     // not "village", so the village-specific opening must stay out even though it shares a tag.
     const verbPhrases = [
-      phrase({ id: "o-village", slot: "opening", tags: ["protection", "village"], template: "{lieu} n'a pas perdu une seule planche grâce à vous" }),
-      phrase({ id: "o-generic", slot: "opening", tags: [], template: "votre mission touche à sa fin" }),
+      phrase({ id: "o-village", slot: "opening", tagIds: ["protection", "village"], template: "{lieu} n'a pas perdu une seule planche grâce à vous" }),
+      phrase({ id: "o-generic", slot: "opening", tagIds: [], template: "votre mission touche à sa fin" }),
       GENERIC_CLIMAX,
     ];
 
@@ -206,8 +206,8 @@ describe("generateNarrative fragment selection", () => {
       subjects: [BANDITS, MORTS_VIVANTS],
       verbPhrases: [
         GENERIC_CLIMAX,
-        phrase({ tags: ["mort-vivant"], template: "vous avez carbonisé {sujet}" }),
-        phrase({ slot: "opening", tags: ["mort-vivant"], template: "{sujet} avançaient sans un bruit" }),
+        phrase({ tagIds: ["mort-vivant"], template: "vous avez carbonisé {sujet}" }),
+        phrase({ slot: "opening", tagIds: ["mort-vivant"], template: "{sujet} avançaient sans un bruit" }),
       ],
       context: {},
     });
@@ -368,7 +368,7 @@ describe("generateNarrative fallback to the caller's own text", () => {
       resultat: "victoire",
       cible: "groupe",
       subjects: [BANDITS],
-      verbPhrases: [phrase({ tags: ["mort-vivant"], template: "vous avez carbonisé {sujet}" })],
+      verbPhrases: [phrase({ tagIds: ["mort-vivant"], template: "vous avez carbonisé {sujet}" })],
       context: {},
     });
 

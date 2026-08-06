@@ -35,38 +35,35 @@ async function prepare({ db, character, payload }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap, tagsSnap] = await Promise.all([
+  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
     db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
     db.collection("worldData").doc("verbPhrases").collection("items").get(),
     db.collection("worldData").doc("lootTables").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
     db.collection("worldData").doc("talents").collection("items").get(),
-    db.collection("worldData").doc("tags").collection("items").get(),
   ]);
   const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const tags = tagsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
   // Missions carry a single objectiveId rather than a curated list (see rumeur.js) - resolved
   // here so resolve() below can fail closed if the narrativeSubject it points to was deleted
   // between generation and resolution, instead of narrating with nothing.
   const objective = narrativeSubjects.find((s) => s.id === mission.objectiveId) || null;
 
-  return { mission, objective, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags };
+  return { mission, objective, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
 }
 
 async function resolve({ character, actionTypeId, today, context }) {
-  const { mission, objective, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags } = context;
+  const { mission, objective, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
 
   if (!objective) {
     throw new HttpsError("failed-precondition", "L'objectif de cette mission n'existe plus.");
   }
 
   const questObjectives = [objective];
-  const tagsByIdName = new Map((tags || []).map((tag) => [tag.id, tag.name]));
 
   // The shape every reused partirEnQuete helper expects - a mission has no catalog name, so the
   // drawn objective's own noun stands in for one (only used for the {quete} narration placeholder
@@ -89,7 +86,6 @@ async function resolve({ character, actionTypeId, today, context }) {
     lootTables,
     objects,
     talents,
-    tagsByIdName,
     locationName,
     today,
     circumstance: `lors de la mission « ${missionName} »`,

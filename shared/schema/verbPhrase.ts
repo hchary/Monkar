@@ -44,14 +44,14 @@ export const VerbPhraseDocumentSchema = z.object({
       '"les_deux" | "evolution" | "unlock" - which kind of talent progression the phrase narrates. ' +
         'Written only when slot is "talentGrowth"; absent is read as "les_deux".'
     ),
-  tags: z
+  tagIds: z
     .array(z.string())
     .optional()
     .describe(
-      "Free-text tag NAMES (not worldData/tags ids), spelled exactly like the tag names used by subjects, " +
-        "quests and talents. ALL of them must be present in the action's context for the phrase to " +
-        "qualify, and the qualifying phrase with the most tags wins. Omitted entirely when empty, which " +
-        "makes the phrase a generic fallback."
+      "Ids in worldData/tags/items, the same catalog subjects/quests/talents reference. ALL of them must " +
+        "be present in the action's context tagIds (enemy tags, quest tags, progressed-talent tags) for " +
+        "the phrase to qualify, and the qualifying phrase with the most tags wins. Omitted entirely when " +
+        "empty, which makes the phrase a generic fallback."
     ),
 });
 
