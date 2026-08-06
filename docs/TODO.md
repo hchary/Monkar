@@ -28,7 +28,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 16 | Aventure exploration mechanics — implementation | done | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
 | 17 | Intermède actions — spec | done | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
 | 18 | Intermède actions — implementation | done | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
-| 19 | Composite quests — spec | spec | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
+| 19 | Composite quests — spec | done | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
 | 20 | Composite quests — implementation | todo | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | spec | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 | 22 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
@@ -1518,48 +1518,105 @@ mechanism.
 
 ## Composite quests (spec needed)
 
-Design note — not implemented, and too underspecified to build yet. A composite quest is a
-sequence of quests, where each step is revealed only once the previous one completes. Quests
-already grant meaningfully better rewards than missions (gear, talent evolution — see
+Status: **designed, not implemented**. A composite quest is a sequence of quests, where each step
+beyond the first is revealed only once the previous step is completed. Quests already grant
+meaningfully better rewards than missions (gear, talent evolution — see
 [Quest loot draw](#quest-loot-draw) and
-[Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success));
-a composite quest is presumably where that reward gap matters most, as a multi-Interval commitment.
+[Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)); a
+composite quest is where that reward gap matters most, as a multi-Interval commitment — resolved
+below by reusing the existing reward engine verbatim rather than adding a second one.
 
-**Open questions this spec needs to answer before anything gets built:**
-- How a chain is authored: an ordered list of existing `worldData/quests/items` ids on a new parent
-  document, or each quest carries a `nextQuestId` pointer? The former matches how
-  [Quest creation and editing](#quest-creation-and-editing) already models a quest as a flat catalog
-  entry; the latter needs no new collection.
-- How "revealed at the end of the previous step" is tracked per character — a new field on
-  `characters/{id}` recording chain progress (comparable to `knownProfessions` /
-  `triggeredQuestIds`), or is a composite quest's next step simply granted the way
-  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
-  grants any triggered quest, with "completed the previous step" as one more condition type?
-- Whether a composite quest's individual steps are drawn/offered the same way a normal quest is
-  (`partirEnQuete.js`'s region/difficulty draw), or bypass that draw entirely once unlocked, since
-  the player is meant to specifically continue a chain rather than have it compete with an
-  unrelated quest in the random pool.
-- How reward tiering differs for a composite quest's final step vs. its earlier steps, vs. a normal
-  one-off quest.
+**Resolved decisions:**
+- **Chain authoring**: a new catalog, `worldData/questChains/items/{id}`, each entry an ordered
+  array `questIds: string[]` of existing `worldData/quests/items` ids (step 1 first) — not a
+  `nextQuestId` pointer on the quest document itself. An explicit ordered list gives the chain its
+  own identity to track progress against, and avoids the cycle-safety problem
+  [Talent relations](#talent-relations) already flagged for a pairwise ancestor/descendant-style
+  link; it also matches how every other catalog in this project (loot tables' `itemIds`,
+  professions' `actionIds`, quests' own `objectiveIds`) already references another catalog through
+  an id array on a parent document, rather than a self-referencing pointer. No creator UI in the
+  first pass — authored directly in the Firestore console, same convention as `quest.trigger` and
+  `tier.talentGain`.
+- **Reveal mechanism**: reused, not reinvented. A composite quest's first step is just an ordinary
+  quest, discoverable however quests normally are (the random region/difficulty draw, or its own
+  `trigger` per
+  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)) —
+  a chain only starts mattering once step 1 is *completed*. When `partirEnQuete.js`'s `resolve()`
+  resolves a quest **successfully**, it checks whether that quest's id appears in some chain's
+  `questIds`; if so, and it isn't that chain's last step, the next step's quest id is pushed
+  straight into `character.triggeredQuestIds` (the same `FieldValue.arrayUnion` write
+  `questTriggers.js`'s scheduled sweep already does for a normal trigger match), and
+  `character.questChainProgress[chainId]` is bumped to the new step index. This reuses the entire
+  existing reveal/notification pipeline (end-of-action pop-up page 2, localStorage "shown"
+  tracking) for free, with no new condition type and no new "completed quests" history field —
+  only a small, chain-scoped progress counter is added. A failed step does not advance the chain;
+  the character keeps the same step pending and simply attempts it again.
+- **Drawing steps 2+**: once a chain step beyond the first is pending (granted into
+  `triggeredQuestIds` but not yet reflected in `questChainProgress[chainId]`), it does not compete
+  in `partirEnQuete.js`'s normal random region/difficulty pool. `prepare()` checks for a pending
+  chain step first; if the character has one, that exact quest is used, bypassing the `regionIds`
+  filter entirely (the chain has already earned the right to be offered regardless of where the
+  character currently is), and a difficulty is picked uniformly at random from the step's own
+  `difficulties` array (content authors are expected to author chain steps with a single difficulty
+  each to keep this deterministic, though nothing enforces it). Resolution then falls straight
+  through to the existing `resolveQuestOutcome` engine, unchanged. While a chain step is pending,
+  "Partir en quête" offers only that step — no unrelated quest can be drawn instead, matching the
+  design intent that a chain shouldn't compete with an unrelated quest in the random pool.
+  "Mission" (`mission.js`) is untouched: composite quests only ever apply to the hand-authored
+  `worldData/quests/items` catalog "Partir en quête" draws from, not missions' on-the-fly generated
+  offers.
+- **Multiple pending chains**: if a character somehow has more than one chain's step pending at
+  once, the earliest-granted pending step wins (earliest insertion into `triggeredQuestIds`) — a
+  rare content-authoring edge case, resolved with a simple deterministic tiebreak rather than left
+  ambiguous.
+- **Reward tiering**: unchanged from a normal quest — no new reward math. Difficulty, and
+  therefore loot count, reputation, and talent-evolution chance, are still whatever each step's own
+  `difficulties` says, exactly like
+  [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) already
+  resolves for any quest. A chain's escalating stakes (a modest early step, an epic finale) are
+  purely a content-authoring choice — pick harder quests for later steps — not a mechanic the engine
+  special-cases, the same way [Aventure exploration mechanics](#aventure-exploration-mechanics-spec-needed)
+  resolved its own "how do rounds differ" question by reusing the resolution engine verbatim.
 
-**Implementation scope**:
-- Design note — the job is to answer the open questions above, not write code. Read: `functions/src/schema/quest.ts` / `shared/schema/quest.ts` (today's flat quest catalog shape, the model any chain-authoring decision builds on), `functions/src/schema/character.ts` / `shared/schema/character.ts` (precedent fields like `knownProfessions`/the planned `triggeredQuestIds` for tracking chain progress), and [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) above (this entry is blocked on it, and one open question here is whether to reuse its trigger/condition mechanism).
-- Update: `docs/TODO.md` only (this entry).
+**Data model implications**:
+```
+worldData/questChains/items/{id}   -- NEW collection
+  name: string           -- French, for reference/authoring only; not shown to players yet
+  questIds: string[]     -- worldData/quests/items ids, ordered, step 1 first
+
+characters/{id}
+  questChainProgress: { [chainId: string]: number }   -- NEW, number of steps of that chain
+                                                        --   completed so far (0 = chain not
+                                                        --   started) - an index into the chain's
+                                                        --   questIds this character has cleared
+```
+
+**Implementation scope** (roadmap #20, now unblocked):
+- Read: `functions/src/actions/partirEnQuete.js` (`prepare()`'s region/difficulty draw and
+  `resolve()`'s success handling — both need the chain-step branch described above),
+  `functions/src/lib/questTriggers.js` (the `triggeredQuestIds` arrayUnion convention this reuses),
+  `shared/schema/quest.ts` and `shared/schema/character.ts` (where `questChainProgress` and the new
+  collection's schema land, per this project's schema-file convention).
+- Create: a `worldData/questChains/items` schema file (Zod format, per this project's rule for new
+  components) and the collection itself.
+- Update: `functions/src/actions/partirEnQuete.js`, `shared/schema/character.ts`
+  (`questChainProgress`), and the `functions/src/schema/quest.ts`/`character.ts` re-exports.
 - Do not read or open any other file without asking the user first.
 
-Not implemented. See the paired [Composite quests (implementation)](#composite-quests-implementation)
-entry below.
+Not implemented yet — see the paired
+[Composite quests (implementation)](#composite-quests-implementation) entry below.
 
 ## Composite quests (implementation)
 
-Status: blocked. Depends on [Composite quests (spec needed)](#composite-quests-spec-needed) above.
-Likely touches `worldData/quests/items` (chain authoring), `characters/{id}` (progress tracking),
-and `partirEnQuete.js` / the
-[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
-mechanic (how the next step gets offered), once those are decided.
+Status: todo, unblocked. Builds exactly the shape
+[Composite quests (spec needed)](#composite-quests-spec-needed) above decided: a new
+`worldData/questChains/items` catalog, a `character.questChainProgress` counter, and the
+chain-step branch in `partirEnQuete.js`'s `prepare()`/`resolve()`.
 
-**Implementation scope**:
-- Blocked on the spec entry above. Do not read or open any file for this entry without asking the user first — the files named in the paragraph above are provisional; which of them actually change, and how, is exactly what the spec entry has to decide first.
+**Implementation scope**: see
+[Composite quests (spec needed)](#composite-quests-spec-needed)'s own "Implementation scope"
+above — the same file list applies here, since the spec pass already scoped exactly what building
+it touches.
 
 Not implemented yet.
 
