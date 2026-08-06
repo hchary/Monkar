@@ -26,7 +26,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 14 | Location tags | done | — | [Location tags](#location-tags) |
 | 15 | Aventure exploration mechanics — spec | done | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
 | 16 | Aventure exploration mechanics — implementation | done | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
-| 17 | Intermède actions — spec | spec | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
+| 17 | Intermède actions — spec | done | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
 | 18 | Intermède actions — implementation | todo | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
 | 19 | Composite quests — spec | spec | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
 | 20 | Composite quests — implementation | todo | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
@@ -1387,64 +1387,101 @@ the spec entry's own "Still open" section already flagged.
 
 ## Intermède actions (spec needed)
 
-Design note — not implemented, and too underspecified to build yet. Intermède actions are bonus
-actions, repeatable within an Interval, with a deliberately reduced scope — send a message, trade,
-post an announcement. A player can perform at most 3 Intermède actions (see
-[Interval (12h action cycle)](#interval-12h-action-cycle)'s phase-cycle note). Some Intermède
-actions matter far more than their small scope suggests: selling a mythic object, for instance, is
-meant to spread the rumor of that object's presence at the sale location, around the seller.
+Status: **designed, not implemented**. Intermède actions are bonus actions, repeatable within an
+Interval, with a deliberately reduced scope — send a message, trade, post an announcement. A
+player can perform at most 3 Intermède actions per Interval, shared across both Intermède windows
+(see "Cap tracking" below). Some Intermède actions matter far more than their small scope
+suggests: selling a mythic object, for instance, is meant to spread the rumor of that object's
+presence at the sale location, around the seller.
 
 The `intermede` root kind already exists in `ACTION_KINDS`
 (`src/lib/actionKinds.js` / its server mirror), reserved for exactly this since
-[Action kinds and Métier actions](#action-kinds-and-métier-actions) was built — but no concrete
-Intermède action, handler, or the "up to 3 per Interval" cap exists yet.
+[Action kinds and Métier actions](#action-kinds-and-métier-actions) was built — this entry resolves
+what a concrete Intermède action does and how its per-Interval cap is tracked; the paired
+[Intermède actions (implementation)](#intermède-actions-implementation) entry builds what turned
+out to be buildable.
 
-**Open questions this spec needs to answer before anything gets built:**
-- Where the "max 3" cap is tracked and how it interacts with the once-per-Interval main-action lock
-  — presumably a separate counter reset every Interval, since Intermède actions are explicitly not
-  the one main-action slot `completesAt` already locks.
-- Whether the two Intermède windows (before/after the main action, per
-  [Interval (12h action cycle)](#interval-12h-action-cycle)'s phase-cycle note) share one budget of
-  3 or each get their own, and how a character with no main action left for the Interval but unused
-  Intermède budget is represented in the UI.
-- What "envoyer un message" does — presumably feeds the still-undesigned messaging feature that
+**Resolved decisions:**
+- **Cap tracking**: a new counter, `character.intermedeActionsThisInterval` (integer, default 0),
+  fully decoupled from the main-action lock (`lastAction.completesAt`) — Intermède actions never
+  touch it. Availability is instead gated by an implicit condition (same "nobody authors this row"
+  convention as `hasProfession`/`trainerReachable`/`professionless`, see
+  [Action kinds and Métier actions](#action-kinds-and-métier-actions) and
+  [Trainers](#trainers)), checked against `< 3` and incremented by 1 on each successful resolution.
+  Reset to 0 by the same Interval-boundary scheduled tick already driving
   [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)'s
-  page 3 already reserves a slot for, but that's not confirmed.
-- What "faire du commerce" means mechanically — no buy/sell UI or NPC pricing exists; gold and
-  instances exist, but nothing exchanges them today.
-- What "placer une annonce" produces — presumably feeds the mission-announcement idea already noted
-  under [Rumor and mission system](#rumor-and-mission-system) ("aventure actions... tied to mission
-  announcements discovered by the player" — see
-  [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed)), i.e.
-  one player's announcement becoming another (or the same) player's discoverable Aventure hook. No
-  cross-character interaction of this kind exists anywhere in the game yet.
-- The rumor-spreading side effect of selling a mythic object: which sales qualify (a rarity
-  threshold?) is still open. What it would write is not — it would insert a
-  `worldData/regions/items/{regionId}/rumorSightings/{rumorId}` entry directly (skipping the normal
-  hop-by-hop propagation decay), per the now-settled data model in
-  [Rumor and mission system](#rumor-and-mission-system).
+  `sweepQuestTriggers` — the shared cadence the
+  [Interval (12h action cycle)](#interval-12h-action-cycle) entry's "Shared clock" bullet calls for
+  — as a sibling reset pass inside that same scheduled function, not a second cron schedule.
+- **Shared budget across both windows**: one shared budget of 3 total per Interval, not 3 per
+  window — the reading the [Interval (12h action cycle)](#interval-12h-action-cycle) entry's
+  phase-cycle note already implied ("capped at 3 total"), confirmed explicitly here rather than
+  left ambiguous. Since the budget check never reads `lastAction.completesAt`, a character with no
+  main action slot left for the Interval (mid-countdown) but unused Intermède budget still has
+  their Intermède category tabs active — the UI represents this the same way the main Action tab
+  already shows its own lock state (disabling "Commencer" and showing e.g. "X/3 restantes cet
+  Interval" once exhausted), not a separate UI concept.
+- **"faire du commerce"**: scoped to selling only, not buying — buying would need an NPC/shop
+  pricing catalog that doesn't exist and isn't part of this pass. Mechanically: the player sells one
+  owned Instance (see [Object creation](#object-creation)) for gold; the sale removes the Instance
+  and credits `character.gold`. The exact price formula is left to the implementation entry (same
+  "starting balance, decided at build time" precedent as `trainingCost`, see
+  [Trainers](#trainers)), not fixed here.
+- **Mythic-sale rumor side effect — which sales qualify**: the sold object's own rarity (see
+  [Object creation](#object-creation)) must be "mythique" or above (mythique, divin, unique on the
+  shared 8-tier scale) — reusing the exact tier the original design note named ("selling a mythic
+  object") as the floor, rather than inventing a separate threshold. What the side effect writes was
+  already settled by [Rumor and mission system](#rumor-and-mission-system): a direct
+  `worldData/regions/items/{regionId}/rumorSightings/{rumorId}` entry at the seller's current
+  region, skipping the normal hop-by-hop propagation decay.
 
-**Implementation scope**:
-- Design note — the job is to answer the open questions above, not write code. Read: `src/lib/actionKinds.js` / `functions/src/lib/actionKinds.js` (the existing `intermede` root kind), [Interval (12h action cycle)](#interval-12h-action-cycle)'s phase-cycle note (the "max 3 per Interval" budget this must track against), and [Rumor and mission system](#rumor-and-mission-system)'s rumor-sighting data model (the mythic-object-sale side effect would write directly into `worldData/regions/items/{regionId}/rumorSightings/{rumorId}`, per that entry's now-settled shape).
-- Update: `docs/TODO.md` only (this entry).
-- Do not read or open any other file without asking the user first.
+**Still open (deliberately deferred):**
+- **"envoyer un message"**: confirmed to feed the still-undesigned messaging feature
+  ([Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)'s
+  page 3 reserves a slot for it but doesn't design it). Not buildable until messaging gets its own
+  spec entry — out of this pass's and the paired implementation entry's scope.
+- **"placer une annonce"**: confirmed to feed the mission-announcement idea noted under
+  [Rumor and mission system](#rumor-and-mission-system) — one player's announcement becoming
+  another (or the same) player's discoverable Aventure hook. [Aventure exploration mechanics
+  (implementation)](#aventure-exploration-mechanics-implementation) shipped without any such hook:
+  "Partir explorer" only ever draws encounters from the static "objectif de quête" pool, never from
+  anything player-generated. Building "placer une annonce" needs that discoverable-hook mechanism
+  designed first — no cross-character interaction of this kind exists anywhere in the game yet, and
+  this pass doesn't invent one.
+- **Mythic-sale rumor content**: a sale has no backing `worldData/rumors/items` catalog entry to
+  copy text/rarity from the way a hand-authored rumor does — how the sighting's (and, once
+  harvested, the character journal entry's) flavor text gets generated for a sale-triggered sighting
+  isn't decided here. Left to the implementation entry.
 
-Not implemented. This entry exists to become a design doc before any of this is built. See the
-paired [Intermède actions (implementation)](#intermède-actions-implementation) entry below.
+**Implementation scope**: see
+[Intermède actions (implementation)](#intermède-actions-implementation) below — partially
+unblocked by this entry's decisions (cap tracking and "faire du commerce" are buildable now;
+"envoyer un message" and "placer une annonce" stay out of scope until their own prerequisites are
+designed).
 
 ## Intermède actions (implementation)
 
-Status: blocked. Depends on [Intermède actions (spec needed)](#intermède-actions-spec-needed)
-above, and transitively on [Rumor and mission system](#rumor-and-mission-system) for the
-rumor-trigger example and on the messaging feature
+Status: **not implemented**. Unblocked by
+[Intermède actions (spec needed)](#intermède-actions-spec-needed) above, but scoped down to what
+it actually resolved: the per-Interval cap-tracking mechanism, plus "faire du commerce" (sell
+only). "envoyer un message" and "placer une annonce" stay out of scope — both need prerequisites
+(the still-undesigned messaging feature
 [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
-reserves a page for but doesn't design.
+reserves a page for, and a not-yet-existing player-announcement discoverable-hook mechanism for
+[Aventure exploration mechanics](#aventure-exploration-mechanics-implementation)) that this spec
+pass deliberately didn't invent.
 
 **Implementation scope**:
-- Blocked on the spec entry above and transitively on the still-undesigned messaging feature. Do not read or open any file for this entry without asking the user first — nothing here is buildable yet, and the exact scope is entirely dependent on decisions not yet made.
+- Build: the `character.intermedeActionsThisInterval` counter and its reset (piggybacked on
+  `sweepQuestTriggers`'s scheduled tick), the implicit Intermède-budget condition, and a "faire du
+  commerce" sell-only handler (new `kindId` under `intermede`, new handlerId) including the
+  mythic-rarity-triggers-rumor-sighting side effect.
+- Do not build "envoyer un message" or "placer une annonce" in this pass — see "Still open" above.
+- Do not read or open any file for this entry without asking the user first — confirm the full
+  file list (handlers, schema, UI) with the user when this row is actually picked up for
+  implementation.
 
-Not implemented yet — nothing to build until the spec entry resolves what an Intermède action
-actually does and how the per-Interval cap is tracked.
+Not implemented yet.
 
 ## Composite quests (spec needed)
 
