@@ -24,7 +24,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 12 | Trainer type creation page — description field | done | — | [Trainer type creation page](#trainer-type-creation-page) |
 | 13 | Tag system unification (tagIds vs free-text tags) | done | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
 | 14 | Location tags | done | — | [Location tags](#location-tags) |
-| 15 | Aventure exploration mechanics — spec | spec | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
+| 15 | Aventure exploration mechanics — spec | done | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
 | 16 | Aventure exploration mechanics — implementation | todo | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
 | 17 | Intermède actions — spec | spec | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
 | 18 | Intermède actions — implementation | todo | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
@@ -1227,75 +1227,131 @@ for that sweep's own implementation).
 
 ## Aventure exploration mechanics (spec needed)
 
-Design note — not implemented, and too underspecified to build yet. Aventure actions are meant to
-be tied either to a location (dungeon presence?) or to mission announcements the player has
-discovered. Every Aventure action updates a character's state, fatigue, and wounds, and may also
-edit inventory, reputation, gold, or location; fatigue is meant to necessarily increase after an
-adventure. For a given Interval, the Aventure tab is meant to offer "Partir explorer": costs a time
-T, and the player draws T encounters from the zone's encounter tables (possibly with increasing
-difficulty as T grows).
+Status: **designed, not implemented**. The open questions below are now resolved by reuse of
+machinery [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) and
+[Rumor and mission system](#rumor-and-mission-system) already built, rather than by inventing a
+parallel system — see [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation)
+for the resulting build plan.
 
-This significantly extends the Aventure kind, whose only implemented instance today is "Partir en
-quête" — which draws exactly one quest by difficulty and touches none of fatigue, wounds, gold, or
-reputation, since the paliers system that used to roll those was retired outright (see
-`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7 "Abandoning the paliers system"): each handler now owns its
-outcome entirely, there is no shared consequence roller left to hook into.
+Aventure actions are tied to a location, updating a character's state, fatigue, and wounds, and may
+also edit inventory, reputation, gold. For a given Interval, the Aventure tab offers "Partir
+explorer": costs a time T, and the player draws T encounters from the zone (possibly with
+increasing difficulty as T grows).
 
-**Open questions this spec needs to answer before anything gets built:**
-- What "location" means here — settled by
-  [Rumor and mission system](#rumor-and-mission-system) as region (the only one of the two
-  candidates with an authored adjacency graph today) — still open here is whether "dungeon
-  presence" implies a new sub-catalog of dungeons/locations gating which Aventure actions are
-  available where.
-- **Encounter tables**: a wholly new catalog, comparable to loot tables, doesn't exist yet. What an
-  encounter contains (a narrative subject? a monster? a skill check?), how it's tagged/weighted, and
-  how T draws compose into a single action's outcome (T independent rolls? an accumulating
-  difficulty? a first-failure-stops sequence?) are all undecided.
-- **Fatigue**: a new field on `characters/{id}` (doesn't exist today, unlike `woundsLight` /
-  `woundsSevere` / `woundsPermanent` — see [Expanded talent system](#expanded-talent-system)'s data
-  model). Its scale, what spending/recovering it means, and whether it gates future actions (can a
-  tired character still adventure?) are undecided.
-- **Wounds**: whether "increases after an adventure" means Aventure actions become the mechanic
-  that lands wounds again, now handler-owned instead of the retired generic tier roll.
-- **Multi-step resolution**: "Partir explorer" is the first concrete case needing an action that
-  runs several resolution rounds (T encounter draws) instead of the single `resolve()` call every
-  handler makes today — see [Modular action framework](#modular-action-framework)'s "Still open"
-  note. The handler contract, pipeline, and result pop-up (one outcome per action today) all assume
-  a single round.
-- How this coexists with "Partir en quête" — does "Partir explorer" replace it, sit alongside it as
-  a second Aventure action, or subsume quest-drawing as one possible encounter outcome?
+This extends the Aventure kind, whose implemented instances today are "Partir en quête" and
+"Mission" — both drawing exactly one occurrence and resolving it through
+`resolveQuestOutcome` (`functions/src/actions/partirEnQuete.js`), the shared score-roll engine
+[Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) built: one
+random score (1-100) per resolution, compared against a difficulty-derived success threshold and
+wound-threshold scale, landing loot, reputation, talent evolution, and wounds through
+`applyWound`. "Partir explorer" reuses this engine verbatim, called T times in one action instead
+of once — no second consequence roller is introduced.
 
-**Implementation scope**:
-- This is a design note, not ready to build — the job here is to answer the open questions above, not write code. Read: `functions/src/actions/partirEnQuete.js` (the only implemented Aventure action today, and the paliers-retirement precedent), `docs/ISSUE-02-ACTION-FRAMEWORK.md` §7 ("Abandoning the paliers system"), `functions/src/schema/character.ts` / `shared/schema/character.ts` (today's wound fields, `woundsLight`/`woundsSevere`/`woundsPermanent`, to see what a `fatigue` field would sit alongside), and [Rumor and mission system](#rumor-and-mission-system)'s "Location = region" resolution (already settles one of this entry's open questions).
-- Update: `docs/TODO.md` only (this entry) — write the design doc, following the shape [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md) took for [Modular action framework](#modular-action-framework).
-- Do not read or open any other file without asking the user first.
+**Resolved decisions:**
+- **Location**: region, per [Rumor and mission system](#rumor-and-mission-system)'s "Location =
+  region" resolution. No new dungeon/location sub-catalog: at the start of the action, a single
+  `worldData/adventureZones/items` entry is drawn at random from the character's current region's
+  `adventureZoneIds` — the exact same draw [Rumor and mission system](#rumor-and-mission-system)
+  already performs for a generated mission's own `locationId` — and stays fixed for every encounter
+  drawn within that one action occurrence. Its `tagIds` (see [Location tags](#location-tags)) gate
+  which encounter content can be drawn, giving that field its first consumer; a location with no
+  tags (the common case today, since nothing has authored any yet) leaves the encounter pool
+  unfiltered rather than empty. No reachability condition gates the action itself (unlike
+  [Trainers](#trainers)' `trainerReachable`) — the zone is drawn from the region automatically, the
+  player doesn't travel to a specific one.
+- **Encounter content**: no new catalog. Each encounter is one round of `resolveQuestOutcome`
+  against a synthetic, in-memory pseudo-quest built for that round: `difficulty` rolled
+  independently per round from the action's own `questDifficultyWeights` (same field/mechanism
+  `partirEnQuete.js` already reads, no new one introduced — automatic difficulty *escalation* across
+  rounds is deliberately not built now, see "Still open" below), `tagIds` from the drawn location,
+  `objectiveIds` the full `worldData/narrativeSubjects/items` pool tagged "objectif de quête"
+  (`OBJECTIVE_TAG_ID`) filtered by overlap with the location's `tagIds` when it has any, and no
+  `successPhraseIds`/`failurePhraseIds` of its own — `resolveQuestOutcome`'s existing per-slot
+  fallback (`preferQuestPhrasesPerSlot`) already falls back to the global verb-phrase pool when a
+  "quest" carries none, so this needs no new fallback logic either. This mirrors
+  [Rumor and mission system](#rumor-and-mission-system)'s own precedent of reusing the objective
+  pool for generated content instead of authoring a second one.
+- **Multi-step resolution**: T = `encounterCount`, a new `worldData/actionTypes/items` field (same
+  convention as `rumorHarvestCount`/`missionRollCount`, only meaningful for this handler),
+  author-set rather than player-chosen — keeps the action a plain "Commencer" button, no new picker.
+  The handler calls `resolveQuestOutcome` up to `encounterCount` times, sequentially: each round's
+  `character` argument carries forward the previous round's `nextTalents` and updated wound counters
+  (`woundResult`), so a mid-run talent evolution or escalating wound state genuinely affects the
+  next round's threshold/wound math instead of every round rolling against the character's
+  pre-action snapshot. If a round's wound kills the character (`woundResult.died`), the loop stops
+  immediately — an already-dead character doesn't draw further encounters — leaving fewer than
+  `encounterCount` rounds recorded for that occurrence. This is the generic "several resolution
+  rounds in one action" mechanism [Modular action framework](#modular-action-framework)'s "Still
+  open" note asked for, and it's exactly `resolveQuestOutcome` called in a loop, not a parallel
+  implementation — any future action needing multiple rounds can reuse the same pattern.
+- **Fatigue**: new `character.fatigue` field (integer, default 0, doesn't exist today — sits
+  alongside `woundsLight`/`woundsSevere`/`woundsPermanent` in the schema). Increases by a flat +1
+  per encounter round actually resolved (not scaled by difficulty — wounds already carry that
+  scaling burden), regardless of that round's success/failure. Nothing recovers or reads it yet (no
+  "Repos" action exists — [Modular action framework](#modular-action-framework) names it an
+  out-of-scope illustration only) — it accumulates, unconsumed, same as
+  [Location tags](#location-tags)' `tagIds` shipped before textGeneration read them.
+- **Wounds**: yes — "increases after an adventure" means each encounter round is a full
+  `resolveQuestOutcome` wound roll (`computeWoundThresholds`/`determineWoundSeverity`/`applyWound`),
+  not a new mechanic. A single action can land several wounds, one per round that happens to hit a
+  threshold, same escalation/death rules as a single quest already has via `wounds.js`.
+- **Coexistence with "Partir en quête"**: "Partir explorer" is a second, sibling Aventure-branch
+  action (registered under its own `partirExplorer` handlerId), alongside "Partir en quête" and
+  "Mission" — not a replacement, and it does not subsume quest-drawing as an encounter outcome.
+  Encounters draw plain objectives from the shared pool, never a full `worldData/quests/items`
+  document; quests and missions keep their own distinct, larger-stakes actions untouched by this
+  feature.
 
-Not implemented. This entry exists to become a design doc — the same shape
-[Modular action framework](#modular-action-framework) took in
-[docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md) — before any of this is built. See
-the paired [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation)
-entry below.
+**Still open (deliberately deferred)**:
+- **Escalating difficulty across rounds**: the design note's "possibly with increasing difficulty
+  as T grows" isn't built as an automatic mechanic — each round independently rolls from the same
+  `questDifficultyWeights`. A content author can already bias that weighting harder without any new
+  code; a genuine escalation curve (e.g. a per-round tier bump) is future balance work if flat
+  per-round weights turn out to feel wrong in play, same "starting balance, not playtested" status
+  as `rumorHarvestCount`/`missionRollCount`.
+- **Fatigue as a gate**: whether a tired character can still adventure, and how fatigue would ever
+  recover, are unanswered — the field ships write-only, exactly like `triggeredQuestIds` or
+  `Location tags`' `tagIds` shipped before anything consumed them.
+- **Result pop-up**: `ActionOutcome.jsx`'s existing "Résolution" fieldset assumes one score/threshold
+  pair (gated on `lastAction.score != null`); a multi-round action needs its own new section
+  listing each round. Left to the implementation entry below, not designed here.
+
+**Implementation scope**: see [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation)
+below — now unblocked by this entry's decisions.
 
 ## Aventure exploration mechanics (implementation)
 
-Status: blocked. Depends entirely on
-[Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) above —
-nothing here is decided enough to build yet.
+Status: **todo**, unblocked — [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed)
+above has resolved every open question. No design work remains, only the build.
 
-Once specced, expected shape based on precedent sibling systems already implemented (Récolte,
-Artisanat, quest loot draw):
-- A new encounter-table catalog and creator UI, comparable to `worldData/lootTables/items` /
-  `TablesDeTirageManager.jsx`.
-- A `fatigue` field on `characters/{id}` — new, doesn't exist today.
-- A new handler under `functions/src/actions/` (e.g. `partirExplorer.js`), registered in
-  `ACTION_HANDLERS`, most likely as a second Aventure-branch action alongside "Partir en quête"
-  rather than replacing it — pending the spec's answer on that point.
-- Whatever the spec decides for multi-step resolution, built as something any future action can
-  reuse, not a one-off special case inside this handler alone.
+Per that entry's decisions, expected shape:
+- New `functions/src/actions/partirExplorer.js`, registered under a new `partirExplorer` handlerId
+  in `ACTION_HANDLERS` (`functions/src/index.js`), as a second Aventure-branch action alongside
+  "Partir en quête" and "Mission" — not a replacement.
+- Draws one `worldData/adventureZones/items` entry from the character's region's
+  `adventureZoneIds` (mirrors `mission.js`'s own `locationId` draw), then calls
+  `partirEnQuete.js`'s exported `resolveQuestOutcome` up to `actionType.encounterCount` times in a
+  loop, each round against a synthetic pseudo-quest (`difficulty` from `questDifficultyWeights`,
+  `tagIds` from the drawn location, `objectiveIds` the "objectif de quête" pool filtered by that
+  location's `tagIds`), threading each round's `nextTalents`/wound counters into the next round's
+  `character` argument, and stopping early on `woundResult.died`.
+- New `encounterCount` field on `worldData/actionTypes/items` (author-set, no creator UI needed —
+  same "authored directly in Firestore" convention as `tier.talentGain`, or a plain number input in
+  `ActionsManager.jsx` next to `rumorHarvestCount` if that's a cheap addition while touching that
+  form).
+- A `fatigue` field on `characters/{id}` — new, doesn't exist today, `+1` per resolved round.
+- `lastAction` for this handler: flattened `loot`/`talentEvolutions` arrays across every round (so
+  `ActionOutcome.jsx`'s existing "Butin obtenu"/"Amélioration de talent" fieldsets need no changes),
+  plus a new `rounds: [{ objectiveId, difficulty, score, threshold, success, wound,
+  reputationGained }]` array and a summed `totalReputationGained` — the round-by-round detail these
+  need is genuinely new UI, not a reuse of the existing single-score "Résolution" fieldset.
+- No new encounter-table catalog — the spec entry decided against one in favor of reusing the
+  existing quest-objective pool.
 
 **Implementation scope**:
-- Blocked on the spec entry above — nothing is decided enough to name exact files yet. Once specced, expect to read/touch `functions/src/actions/recolte.js` and `functions/src/lib/harvest.js` (the closest precedent: a handler drawing from a weighted table), `functions/src/lib/actionKinds.js` / `src/lib/actionKinds.js` (registering a new Aventure-branch handler), and `functions/src/schema/character.ts` / `shared/schema/character.ts` (adding `fatigue`).
-- Do not read or open any file for this entry — spec or implementation — without asking the user first; the exact file list depends entirely on decisions the spec entry above hasn't made yet.
+- Read: `functions/src/actions/partirEnQuete.js` (`resolveQuestOutcome`, the engine this reuses verbatim), `functions/src/actions/mission.js` (the closest precedent for a second Aventure-branch handler reusing that same engine, and its `locationId`-from-region draw), `functions/src/lib/actionKinds.js` / `src/lib/actionKinds.js` (registering the new handler), `functions/src/schema/character.ts` / `shared/schema/character.ts` (adding `fatigue`, alongside `woundsLight`/`woundsSevere`/`woundsPermanent`), `functions/src/schema/actionType.js` (adding `encounterCount`), and `src/components/actions/ActionOutcome.jsx` (the new per-round "Rencontres" section).
+- Update: the files above, plus `functions/src/index.js` (handler registration) and `docs/ARCHITECTURE.md` if this adds a system worth documenting there.
+- Do not read or open any other file without asking the user first.
 
 Not implemented yet.
 
