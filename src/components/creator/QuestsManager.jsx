@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { OBJECTIVE_TAG, matchesQuestObjective } from "./QuestObjectivesManager";
+import { OBJECTIVE_TAG_ID, matchesQuestObjective } from "./QuestObjectivesManager";
 import { matchesVerbPhrase, slotLabel } from "./TextGenerationManager";
 import { matchesRegion } from "./RegionsManager";
 import { matchesTag } from "./TagsManager";
@@ -84,7 +84,7 @@ export default function QuestsManager() {
   const [panelOpen, setPanelOpen] = useState(false);
 
   const subjects = useItems("narrativeSubjects");
-  const objectives = subjects.filter((subject) => (subject.tags || []).includes(OBJECTIVE_TAG));
+  const objectives = subjects.filter((subject) => (subject.tagIds || []).includes(OBJECTIVE_TAG_ID));
   const regions = useItems("regions");
   const locations = useItems("adventureZones");
   const verbPhrases = useItems("verbPhrases");
@@ -92,6 +92,8 @@ export default function QuestsManager() {
   const failurePhrases = verbPhrases.filter((vp) => vp.resultat === "echec");
   const tags = useItems("tags");
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+  const tagsById = new Map(tags.map((t) => [t.id, t.name]));
+  const tagNamesOf = (tagIds) => (tagIds || []).map((id) => tagsById.get(id)).filter(Boolean);
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "quests", "items"), (snap) => {
@@ -287,7 +289,7 @@ export default function QuestsManager() {
 
           <MultiSelectModalField
             legend="Objectifs de quête"
-            options={objectives.map((o) => ({ ...o, name: subjectLabel(o) }))}
+            options={objectives.map((o) => ({ ...o, name: subjectLabel(o), tagNames: tagNamesOf(o.tagIds) }))}
             selectedIds={form.objectiveIds}
             onToggle={(id) => toggleIn("objectiveIds", id)}
             createLink={`/creator?section=${encodeURIComponent("Objectifs de quête")}`}
@@ -304,7 +306,11 @@ export default function QuestsManager() {
 
           <MultiSelectModalField
             legend="Phrases de réussite"
-            options={successPhrases.map((vp) => ({ ...vp, name: `${vp.template} — ${slotLabel(vp.slot)}` }))}
+            options={successPhrases.map((vp) => ({
+              ...vp,
+              name: `${vp.template} — ${slotLabel(vp.slot)}`,
+              tagNames: tagNamesOf(vp.tagIds),
+            }))}
             selectedIds={form.successPhraseIds}
             onToggle={(id) => toggleIn("successPhraseIds", id)}
             createLink={`/creator?section=${encodeURIComponent("Génération de texte")}`}
@@ -314,7 +320,11 @@ export default function QuestsManager() {
 
           <MultiSelectModalField
             legend="Phrases d'échec"
-            options={failurePhrases.map((vp) => ({ ...vp, name: `${vp.template} — ${slotLabel(vp.slot)}` }))}
+            options={failurePhrases.map((vp) => ({
+              ...vp,
+              name: `${vp.template} — ${slotLabel(vp.slot)}`,
+              tagNames: tagNamesOf(vp.tagIds),
+            }))}
             selectedIds={form.failurePhraseIds}
             onToggle={(id) => toggleIn("failurePhraseIds", id)}
             createLink={`/creator?section=${encodeURIComponent("Génération de texte")}`}

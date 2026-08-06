@@ -69,6 +69,9 @@ export default function TagsManager() {
     const referencingTalents = await getDocs(
       query(collection(db, "worldData", "talents", "items"), where("tagIds", "array-contains", selectedTag.id))
     );
+    const referencingVerbPhrases = await getDocs(
+      query(collection(db, "worldData", "verbPhrases", "items"), where("tagIds", "array-contains", selectedTag.id))
+    );
     const referencingRecettesByTag = await getDocs(
       query(collection(db, "worldData", "recettes", "items"), where("tagIds", "array-contains", selectedTag.id))
     );
@@ -90,6 +93,11 @@ export default function TagsManager() {
       ),
       ...referencingTalents.docs.map((talentDoc) =>
         updateDoc(talentDoc.ref, { tagIds: (talentDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
+      ),
+      ...referencingVerbPhrases.docs.map((verbPhraseDoc) =>
+        updateDoc(verbPhraseDoc.ref, {
+          tagIds: (verbPhraseDoc.data().tagIds || []).filter((id) => id !== selectedTag.id),
+        })
       ),
       ...referencingRecettesByTag.docs.map((recetteDoc) =>
         updateDoc(recetteDoc.ref, { tagIds: (recetteDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })

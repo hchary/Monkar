@@ -1,8 +1,8 @@
 // Canonical contract for `worldData/narrativeSubjects/items/{subjectId}`: the "who/what" a
 // generated sentence is about - the noun phrase substituted for {sujet} by
-// functions/src/textGeneration.js. A subject tagged with the literal string "objectif de quête"
-// (QuestObjectivesManager's OBJECTIVE_TAG) doubles as a quest objective and is what quest.objectiveIds
-// point at; there is no separate collection for objectives.
+// functions/src/textGeneration.js. A subject carrying the reserved "objectif de quête" tag id
+// (QuestObjectivesManager's OBJECTIVE_TAG_ID) in its tagIds doubles as a quest objective and is
+// what quest.objectiveIds point at; there is no separate collection for objectives.
 //
 // The document id is the Firestore key, never a field.
 //

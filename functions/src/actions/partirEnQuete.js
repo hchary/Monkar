@@ -74,25 +74,20 @@ async function prepare({ db, character, actionType }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  // The tags catalog is read here, once, rather than per tag id inside the transaction - the
-  // narration resolves the quest's and the progressed talent's `tagIds` to tag *names* to match
-  // them against verb phrases, see narrateQuestSuccess below.
-  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap, tagsSnap] = await Promise.all([
+  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
     db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
     db.collection("worldData").doc("verbPhrases").collection("items").get(),
     db.collection("worldData").doc("lootTables").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
     db.collection("worldData").doc("talents").collection("items").get(),
-    db.collection("worldData").doc("tags").collection("items").get(),
   ]);
   const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const tags = tagsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags };
+  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
 }
 
 // Draws the quest's loot: one loot table per item, picked among those sharing at least one
@@ -150,15 +145,6 @@ const DEFAULT_ACCOMPLISHMENT_CLAUSE = "vous revenez de votre quête";
 const DEFAULT_FAILURE_TEXT = "Vous rentrez bredouille de votre quête.";
 const DEFAULT_FAILURE_CLAUSE = "vous rentrez bredouille de votre quête";
 
-// Talents and quests reference the shared worldData/tags catalog by id, while narrativeSubjects and
-// verbPhrases carry their own free-text `tags` strings (see docs/ARCHITECTURE.md's dual-tag note).
-// The generator matches strings, so ids are resolved to names here instead of migrating either side
-// - which means a tag only bridges the two worlds when both spell it identically, see
-// docs/NARRATIVE-GENERATION.md.
-function resolveTagNames(tagIds, tagsByIdName) {
-  return (tagIds || []).map((id) => tagsByIdName.get(id)).filter(Boolean);
-}
-
 // The talent flourish names a single talent, so the most notable change wins - the rarest one, the
 // same ordering the result popup already uses for its "Amélioration de talent" list.
 function pickNarratedEvolution(evolutions) {
@@ -183,7 +169,7 @@ function preferQuestPhrasesPerSlot({ questVerbPhrases, verbPhrases }) {
 // sheet: matching against every talent they own would let a swordsman's quest borrow the fire
 // imagery of a Pyromancie they never used, which is the wrong-flavor failure the subset rule exists
 // to prevent.
-function buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions, tagsByIdName }) {
+function buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions }) {
   const narratedEvolution = pickNarratedEvolution(talentEvolutions || []);
   const narratedTalent = narratedEvolution
     ? (nextTalents || []).find((t) => t.id === narratedEvolution.talentId) ||
@@ -191,8 +177,8 @@ function buildNarrativeContext({ quest, locationName, talents, nextTalents, tale
     : null;
 
   return {
-    talentTags: resolveTagNames(narratedTalent?.tagIds, tagsByIdName),
-    questTags: resolveTagNames(quest.tagIds, tagsByIdName),
+    talentTags: narratedTalent?.tagIds || [],
+    questTags: quest.tagIds || [],
     talentChange: narratedEvolution?.kind || null,
     talentName: narratedEvolution?.name || null,
     locationName,
@@ -250,7 +236,6 @@ function resolveQuestOutcome({
   lootTables,
   objects,
   talents,
-  tagsByIdName,
   locationName,
   today,
   circumstance,
@@ -290,7 +275,7 @@ function resolveQuestOutcome({
     }));
   }
 
-  const narrativeContext = buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions, tagsByIdName });
+  const narrativeContext = buildNarrativeContext({ quest, locationName, talents, nextTalents, talentEvolutions });
   const narrative = success
     ? narrateQuestSuccess({ quest, questObjectives, narrativeSubjects, verbPhrases, context: narrativeContext })
     : narrateQuestFailure({ quest, questObjectives, narrativeSubjects, verbPhrases, context: narrativeContext });
@@ -316,10 +301,9 @@ function resolveQuestOutcome({
 }
 
 async function resolve({ character, today, context }) {
-  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, tags } = context;
+  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
 
   const questObjectives = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
-  const tagsByIdName = new Map((tags || []).map((tag) => [tag.id, tag.name]));
 
   const outcome = resolveQuestOutcome({
     character,
@@ -330,7 +314,6 @@ async function resolve({ character, today, context }) {
     lootTables,
     objects,
     talents,
-    tagsByIdName,
     locationName,
     today,
     circumstance: `lors de la quête « ${quest.name} »`,
