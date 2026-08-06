@@ -30,12 +30,13 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 18 | Intermède actions — implementation | done | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
 | 19 | Composite quests — spec | done | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
 | 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
-| 21 | Known recipes grant mechanism — spec | spec | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
+| 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 | 22 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 23 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
 | 24 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
+| 25 | Known recipes grant mechanism — implementation | todo | 21 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 
-**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows. #22-23 are intentionally last: real but low-stakes polish with no downstream dependents. #24 trails everything: it only became buildable once #8 shipped the scheduled function it hooks into, and nothing else depends on it.
+**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows. #22-23 are intentionally last: real but low-stakes polish with no downstream dependents. #24 trails everything: it only became buildable once #8 shipped the scheduled function it hooks into, and nothing else depends on it. #25 is appended last, not reordered next to #21, so it doesn't force renumbering rows #22-24 that are already cited by number elsewhere in this doc — its spec is resolved and it's buildable immediately, but it's comparable in scope to #22-23's polish tier, not urgent enough to warrant that churn.
 
 ## Expanded talent system
 
@@ -884,7 +885,8 @@ it, `CraftingTab.jsx` has nothing to list for any character.
 
 ## Known recipes tab (Xerotex)
 
-Status: **implemented** (display only — no code path grants a recipe to a character yet).
+Status: **implemented** (display only). The grant mechanism is now spec'd — see "Grant mechanism"
+below — but not yet built.
 
 The Xerotex page gains a "Recettes" tab listing the recipes a character knows, filterable and
 sortable by rarity, category, tags, ingredients, and results — the same filter/sort logic already
@@ -906,14 +908,65 @@ characters/{characterId}
   knownRecipes: string[]   -- worldData/recettes/items ids the character knows
 ```
 
-**Still open (deliberately deferred)**: no mechanic grants `knownRecipes` yet - there is now a
-crafting action that *consumes* it ([Action d'artisanat](#action-dartisanat)), but nothing that
-*grants* it (a training action, a discovery, a starting background...), so every character's
-`knownRecipes` stays empty until one is designed.
+**Grant mechanism (roadmap #21) — resolved decisions**: two paths, deliberately not three — a
+discovery-based grant (finding a recipe while foraging/crafting) was considered and dropped from
+scope, the same call already made for profession's own initial-assignment design (see "Initial
+assignment" under [Profession (métier) creation](#profession-métier-creation)):
 
-**Implementation scope** (grant mechanism spec, roadmap #21):
-- Read: `functions/src/actions/artisanat.js` (the only current consumer of `knownRecipes`, for what shape a grant needs to satisfy), `functions/src/schema/recette.ts` / `shared/schema/recette.ts`, `functions/src/schema/character.ts` / `shared/schema/character.ts` (`knownRecipes` field), and [Trainers](#trainers) above (a training action is one of the candidate grant mechanisms named above).
-- Update: `docs/TODO.md` only (this entry) — resolve which grant mechanism (training action, discovery, starting background, …) into a buildable spec before any code changes.
+- **Origin**: `worldData/origins/items/{id}` gains `startingRecetteIds: string[]`, granted at
+  character creation alongside `talentIds`/`startingItemIds` — `createCharacter` resolves each id
+  against `worldData/recettes/items` and writes the union straight onto `character.knownRecipes`,
+  plus a `{ id, name }` snapshot onto `character.origin.recettes` (same convention as
+  `origin.talents`/`origin.items`). An id pointing at a deleted recette is silently skipped, same
+  as `talentIds`.
+- **Trainer**: a new action kind, `transmission` (nested under `entrainement`,
+  `RECIPE_LEARNING_ACTION_KIND_ID` in `functions/src/lib/actionKinds.js` ⇄ `src/lib/actionKinds.js`,
+  sibling to `apprentissage`), reuses Entraînement's `trainerTypeId` field and `trainerReachable`
+  gate — same "mediated by a physical trainer" precedent as [Trainers](#trainers)' `sEntrainer` and
+  Profession's own trainer path. `worldData/recettes/items/{id}` gains an optional
+  `trainerTypeId: string` (default `""`; no "trainable" boolean gate needed the way talents have
+  one — an empty id simply never appears at any trainer, the same net effect as an untrainable
+  talent's absent `trainerTypeId`). The player picks from recettes actually taught at that action's
+  own trainer type (`recette.trainerTypeId` matching the action's `trainerTypeId`) via a new
+  `RecettePicker.jsx`, same non-Métier payload-picker pattern as `TalentPicker.jsx`/
+  `ProfessionPicker.jsx`, re-validated server-side in the new `transmission` handler's
+  `prepare()`/`resolve()`, never trusted from the client. Always succeeds once reachability, the
+  picked recette's `trainerTypeId` match, and not-already-known are confirmed — same
+  precondition-gated convention as `sEntrainer.js`/`apprentissage.js`, no roll. No gold cost, same
+  reasoning as `apprentissage.js`: unlike a talent's quality, a known/not-known recette has no
+  progress variable to scale a fee against.
+
+**Data model implications (grant mechanism)**:
+```
+worldData/origins/items/{id}
+  startingRecetteIds: string[]   -- worldData/recettes/items ids granted at creation; NEW field,
+                                  --   defaults to []
+
+worldData/recettes/items/{id}
+  trainerTypeId: string   -- worldData/trainerTypes/items id this recette is taught at via the
+                           --   transmission action kind, or "" for none; NEW field, defaults to ""
+
+characters/{id}
+  knownRecipes: string[]   -- worldData/recettes/items ids the character knows; documented here for
+                            --   the first time - already read by functions/src/actions/artisanat.js
+                            --   but missing from shared/schema/character.ts until now
+  origin.recettes: { id: string, name: string }[]   -- snapshot of startingRecetteIds granted at
+                                                      --   creation, same convention as
+                                                      --   origin.talents/origin.items
+```
+
+**Implementation scope** (roadmap #25, now unblocked):
+- Read: `functions/src/index.ts` (`createCharacter`'s talent/item-granting loop, the pattern
+  `startingRecetteIds` extends), `functions/src/actions/apprentissage.js` and
+  `functions/src/actions/sEntrainer.js` (the two existing trainer-mediated handlers the new
+  `transmission` handler mirrors), `functions/src/lib/actionKinds.js` / `src/lib/actionKinds.js`
+  (where the new kind is added), `shared/schema/origin.ts`, `shared/schema/recette.ts`, and
+  `shared/schema/character.ts` (`knownRecipes` needs adding, not just documenting).
+- Create: `functions/src/actions/transmission.js`, `src/components/actions/RecettePicker.jsx`.
+- Update: `shared/schema/origin.ts` (`startingRecetteIds`), `shared/schema/recette.ts`
+  (`trainerTypeId`), `shared/schema/character.ts` (`knownRecipes`), `functions/src/index.ts`
+  (origin-grant loop), `functions/src/lib/actionKinds.js` ⇄ `src/lib/actionKinds.js`, and the
+  creator UI for both new fields (`OriginsManager.jsx`, `RecettesManager.jsx`).
 - Do not read or open any other file without asking the user first.
 
 ## Interval (12h action cycle)
