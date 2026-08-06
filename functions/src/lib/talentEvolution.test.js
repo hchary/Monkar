@@ -1,8 +1,65 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { evolutionChance, rollTalentEvolutions } = require("./talentEvolution");
+const { evolutionChance, bumpTalentQuality, rollTalentEvolutions } = require("./talentEvolution");
 
 const TODAY = "2026-07-28";
+
+// Shared by rollTalentEvolutions (quest-luck path) and functions/src/actions/sEntrainer.js
+// (training path) - see docs/TODO.md "Trainers".
+describe("bumpTalentQuality", () => {
+  test("bumps quality by exactly 1", () => {
+    const bumped = bumpTalentQuality(
+      { id: "t1", name: "Résistance au feu", quality: 2, rarity: "commun" },
+      { today: TODAY, circumstance: "en s'entraînant" }
+    );
+    assert.equal(bumped.quality, 3);
+  });
+
+  test("caps at 5", () => {
+    const bumped = bumpTalentQuality(
+      { id: "t1", quality: 5, rarity: "legendaire" },
+      { today: TODAY, circumstance: "en s'entraînant" }
+    );
+    assert.equal(bumped.quality, 5);
+  });
+
+  test("a talent with no quality yet starts from 1", () => {
+    const bumped = bumpTalentQuality({ id: "t1", rarity: "commun" }, { today: TODAY, circumstance: "x" });
+    assert.equal(bumped.quality, 2);
+  });
+
+  test("re-applies rarityFloor off the new quality, never lowering an already-higher rarity", () => {
+    const toRare = bumpTalentQuality({ id: "t1", quality: 2, rarity: "commun" }, { today: TODAY, circumstance: "x" });
+    assert.equal(toRare.quality, 3);
+    assert.equal(toRare.rarity, "rare");
+
+    const staysLegendaire = bumpTalentQuality(
+      { id: "t1", quality: 1, rarity: "legendaire" },
+      { today: TODAY, circumstance: "x" }
+    );
+    assert.equal(staysLegendaire.rarity, "legendaire");
+  });
+
+  test("stamps lastChangeDate and lastChangeCircumstance, overwriting any previous value", () => {
+    const bumped = bumpTalentQuality(
+      { id: "t1", quality: 1, rarity: "commun", lastChangeDate: "2020-01-01", lastChangeCircumstance: "avant" },
+      { today: TODAY, circumstance: "Entraînement : Forge" }
+    );
+    assert.equal(bumped.lastChangeDate, TODAY);
+    assert.equal(bumped.lastChangeCircumstance, "Entraînement : Forge");
+  });
+
+  test("preserves every other field on the talent", () => {
+    const bumped = bumpTalentQuality(
+      { id: "t1", name: "Résistance au feu", quality: 1, rarity: "commun", trainable: true, tagIds: ["feu"] },
+      { today: TODAY, circumstance: "x" }
+    );
+    assert.equal(bumped.id, "t1");
+    assert.equal(bumped.name, "Résistance au feu");
+    assert.equal(bumped.trainable, true);
+    assert.deepStrictEqual(bumped.tagIds, ["feu"]);
+  });
+});
 
 describe("evolutionChance", () => {
   test("matches the design's own example: a difficile quest evolves a commun talent at 30%", () => {

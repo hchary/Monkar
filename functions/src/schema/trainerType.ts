@@ -2,8 +2,8 @@
 // trainable talent requires, referenced by talent.trainerTypeId. Authored through
 // src/components/creator/TrainerTypesManager.jsx.
 //
-// Deliberately a stub - the full component (description, region, availability) is specified under
-// "Entraîneurs" in docs/TODO.md and not implemented yet.
+// Still missing a description field - see "Trainer type creation page" in docs/TODO.md, not
+// implemented yet. locationId landed with the "S'entraîner" action (docs/TODO.md "Trainers").
 //
 // The document id is the Firestore key, never a field.
 //

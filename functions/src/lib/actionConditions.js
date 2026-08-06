@@ -157,6 +157,22 @@ const PREDICATES = {
       );
     },
   },
+
+  // Matches the action's own trainerTypeId against the trainer types reachable from the
+  // character's current region. Deliberately absent from CONDITION_TYPES, same reason as
+  // hasProfession: nobody authors this row - the catalog injects it from the action's own
+  // trainerTypeId whenever its kind inherits from Entraînement (see actionCatalog.js's
+  // resolveConditions).
+  //
+  // An absent reachableTrainerTypeIds set fails closed rather than throwing - same convention as
+  // hasInstanceTag's absent instanceTagIds.
+  trainerReachable: {
+    reason: "Aucun entraîneur de ce type n'est accessible depuis votre région.",
+    test(condition, ctx) {
+      const trainerTypeId = requiredString(condition.trainerTypeId);
+      return trainerTypeId != null && !!ctx.reachableTrainerTypeIds?.has(trainerTypeId);
+    },
+  },
 };
 
 // Conditions are ANDed; the first failure decides the message. An unknown type fails closed - a
@@ -164,7 +180,7 @@ const PREDICATES = {
 // grant it. Both copies fail identically, so a stale client can never offer an action the server
 // would refuse.
 //
-// ctx is { character, instanceTagIds }.
+// ctx is { character, instanceTagIds, reachableTrainerTypeIds }.
 function evaluateConditions(conditions, ctx) {
   if (conditions == null) return { ok: true, reason: null };
   if (!Array.isArray(conditions)) return { ok: false, reason: UNKNOWN_CONDITION_REASON };
@@ -183,9 +199,17 @@ function conditionsNeedInstances(conditions) {
   return Array.isArray(conditions) && conditions.some((condition) => condition?.type === "hasInstanceTag");
 }
 
+// Resolving trainer-location reachability costs extra reads on both sides (a region doc plus the
+// trainer type catalog), so callers only pay for it when a condition actually asks - same
+// convention as conditionsNeedInstances.
+function conditionsNeedTrainerReachability(conditions) {
+  return Array.isArray(conditions) && conditions.some((condition) => condition?.type === "trainerReachable");
+}
+
 module.exports = {
   CONDITION_TYPES,
   UNKNOWN_CONDITION_REASON,
   evaluateConditions,
   conditionsNeedInstances,
+  conditionsNeedTrainerReachability,
 };

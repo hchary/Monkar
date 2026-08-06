@@ -13,6 +13,21 @@ function evolutionChance({ difficulty, talentRarity }) {
   return Math.min(100, Math.max(0, percent)) / 100;
 }
 
+// Applies a single quality-up step: +1 capped at 5, with rarityFloor re-applied so rarity only
+// ever rises alongside it, never drops. Shared by the quest-luck path (rollTalentEvolutions below)
+// and the training-driven path (functions/src/actions/sEntrainer.js) - see docs/TODO.md
+// "Trainers"'s note that s'entraîner reuses this exact mechanism rather than a second RNG system.
+function bumpTalentQuality(talent, { today, circumstance }) {
+  const quality = Math.min(5, (talent.quality || 1) + 1);
+  return {
+    ...talent,
+    quality,
+    rarity: rarityFloor(talent.rarity, quality),
+    lastChangeDate: today,
+    lastChangeCircumstance: circumstance,
+  };
+}
+
 // On a successful quest, for every talent sharing a tag with the quest or its (randomly chosen)
 // objective, rolls a chance to bump it (already-owned talents, rank <= objective's rarity) or to
 // unlock it (catalog talents the character doesn't have yet, rank strictly below the objective's
@@ -37,14 +52,7 @@ function rollTalentEvolutions({ characterTalents, catalogTalents, quest, objecti
     if (Math.random() >= evolutionChance({ difficulty, talentRarity: talent.rarity })) return talent;
 
     changed = true;
-    const quality = Math.min(5, (talent.quality || 1) + 1);
-    const evolved = {
-      ...talent,
-      quality,
-      rarity: rarityFloor(talent.rarity, quality),
-      lastChangeDate: today,
-      lastChangeCircumstance: circumstance,
-    };
+    const evolved = bumpTalentQuality(talent, { today, circumstance });
     evolutions.push({ talentId: evolved.id, name: evolved.name, kind: "evolution", quality: evolved.quality, rarity: evolved.rarity });
     return evolved;
   });
@@ -76,4 +84,4 @@ function rollTalentEvolutions({ characterTalents, catalogTalents, quest, objecti
   return { talents: changed ? nextTalents : characterTalents, evolutions };
 }
 
-module.exports = { evolutionChance, rollTalentEvolutions };
+module.exports = { evolutionChance, bumpTalentQuality, rollTalentEvolutions };

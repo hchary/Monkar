@@ -19,7 +19,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 7 | Quest triggers and end-of-action pop-up pages — spec | done | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 8 | Quest triggers and end-of-action pop-up pages — implementation | done | 4, 7 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 9 | Trainers — spec | done | — | [Trainers](#trainers) |
-| 10 | Training-driven talent quality-up ("s'entraîner") | todo | 9 | [Expanded talent system](#expanded-talent-system) |
+| 10 | Training-driven talent quality-up ("s'entraîner") | done | 9 | [Expanded talent system](#expanded-talent-system) |
 | 11 | Profession initial assignment via quest/trainer | todo | 9 | [Profession (métier) creation](#profession-métier-creation) |
 | 12 | Trainer type creation page — description field | todo | — | [Trainer type creation page](#trainer-type-creation-page) |
 | 13 | Tag system unification (tagIds vs free-text tags) | todo | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
@@ -39,12 +39,12 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 
 ## Expanded talent system
 
-Status: **implemented** (data model, catalog, grant flow, and UI). Quality-up progression via a lucky quest roll is now implemented — see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success). The training-driven path is still **not** implemented — see [Trainers](#trainers).
+Status: **implemented** (data model, catalog, grant flow, and UI). Both quality-up progression paths are now implemented: the lucky quest roll (see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)) and the training-driven "s'entraîner" path (see [Trainers](#trainers)).
 
 `character.talents` moved from a flat array of strings to an array of richer objects, granted via `tier.talentGain` in `performAction`. Talents support:
 
 - **Quality**: a value from 1 to 5 (e.g. "Résistance au feu 3").
-- **Trainable flag**: a talent can be marked trainable (shown with an asterisk in the name, e.g. "Résistance au feu*"). Only trainable talents will (eventually) improve through training; others would only improve via a lucky roll on a quest that specifically showcases that talent. Neither progression path is implemented yet (see "Still open").
+- **Trainable flag**: a talent can be marked trainable (shown with an asterisk in the name, e.g. "Résistance au feu*"). Only trainable talents improve through training (see [Trainers](#trainers)); others only improve via a lucky roll on a quest that specifically showcases that talent (see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)).
 - **Rarity**: each talent has a rarity tier, shown as a colored border around a rectangle (background stays the same color as the rest of the UI — only the border changes):
   - Commun → white
   - Peu commun → green
@@ -86,15 +86,9 @@ talentGain: {
 }
 ```
 
-**Implementation scope** (training-driven quality-up path, [Trainers](#trainers) design now settled):
-- Read: `functions/src/lib/talentEvolution.js` (the existing weighted-tier roll this mechanic must reuse, per [Trainers](#trainers)'s note), the `character.talents` shape documented above in this entry, and [Trainers](#trainers) above (the settled design: a "S'entraîner" action type, gated by trainer-location reachability, player-picked target talent, gold cost scaling with the talent's quality/rarity, owned trainable talents only).
-- Update: the new "S'entraîner" action-type handler, plus `functions/src/lib/talentEvolution.js` if the quality-up logic is factored to be shared.
-- Do not read or open any other handler/action file for this entry without asking the user first.
+The training-driven quality-up path is implemented in `functions/src/actions/sEntrainer.js` (the "S'entraîner" action handler, registered under the shared `sEntrainer` handlerId), reusing `bumpTalentQuality` — extracted from `functions/src/lib/talentEvolution.js` so both the quest-luck path and the training path share the exact same "+1 quality, re-apply `rarityFloor`" logic. See [Trainers](#trainers) for the full mechanic (reachability gate, gold cost, talent picker).
 
-**Still open (deliberately deferred)**:
-- The training-driven quality-up mechanic (via a "s'entraîner" action) is now designed (see [Trainers](#trainers)) but not yet built.
-
-The quest-luck quality-up path (tag + rarity based, no per-tier signal needed) is now implemented — see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success). As previously decided, it bumps quality by a flat **+1** per trigger.
+The quest-luck quality-up path (tag + rarity based, no per-tier signal needed) is also implemented — see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success). Both paths bump quality by a flat **+1** per trigger.
 
 Known gap: granting the same talent via `tier.talentGain` more than once (e.g. via two different tiers) still appends a duplicate entry to `character.talents` rather than merging/bumping quality. The quest-luck evolution path itself doesn't have this gap (it updates the existing entry in place, or skips unlocking an id the character already owns).
 
@@ -146,43 +140,49 @@ descendantIds: [string]   -- other worldData/talents/items ids this talent unloc
 
 ## Trainers
 
-Status: **designed, not implemented**. The talent system's "s'entraîner" (train) progression path was deliberately deferred because the trainer concept itself wasn't designed yet — it now is, resolved as follows.
+Status: **implemented**.
 
 A trainer is **location-tied**: each `worldData/trainerTypes/items/{id}` references a single quest location (`locationId`, `worldData/adventureZones/items` — the same "Lieu(x) de quête" catalog quests already draw from, see [Quest creation and editing](#quest-creation-and-editing)). A character can train with that trainer type whenever their current region's `adventureZoneIds` includes that location — the same region-contains-location reachability quests already use, no separate mechanism introduced. NPC- and dedicated-location-catalog options were considered and rejected in favor of reusing the existing location primitive.
 
-Training itself is performed via a **"S'entraîner" action** — a normal action type (per the [Modular action framework](#modular-action-framework)), whose availability is gated by the trainer reachability above, not a bespoke UI flow. Its resolution reuses the existing weighted-tier success roll: a success tier bumps the trained talent's quality by +1 (the flat **+1** per trigger already decided in [Expanded talent system](#expanded-talent-system)), with `rarityFloor` re-applied — the same mechanism [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success) uses, rather than a second RNG system.
+Training itself is performed via a **"S'entraîner" action** (`worldData/actionTypes/items/{id}.kindId: "entrainement"`, `TRAINING_ACTION_KIND_ID` in `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`, nested under `intermede`) — a normal action type (per the [Modular action framework](#modular-action-framework)), registered under the shared `sEntrainer` handlerId (`functions/src/actions/sEntrainer.js`, one handler for every S'entraîner action, same "one handler, several action documents" convention as [Action de récolte](#action-de-récolte)/[Action d'artisanat](#action-dartisanat)). Availability is gated by the trainer reachability above, injected as an implicit `trainerReachable` condition by `actionCatalog.js`'s `resolveConditions` (same convention as the Métier branch's implicit `hasProfession` gate) — not a bespoke UI flow.
+
+Correction to an earlier assumption in this entry: training does **not** reuse a "weighted-tier success roll" — that mechanism was fully retired codebase-wide before this was built (see "Abandoning the paliers system" in `docs/ISSUE-02-ACTION-FRAMEWORK.md`; [Action de récolte](#action-de-récolte)/[Action d'artisanat](#action-dartisanat) confirm neither of the two most recently built non-quest handlers rolls anything). Training instead follows Artisanat's precedent: **precondition-gated, always succeeds** once reachability, ownership of a matching trainable talent, and sufficient gold are all confirmed — no roll, no failure tier. On success, the trained talent's quality is bumped by +1 (the flat **+1** per trigger already decided in [Expanded talent system](#expanded-talent-system)), with `rarityFloor` re-applied — via `bumpTalentQuality`, extracted from `functions/src/lib/talentEvolution.js` so this and [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success) share the exact same mechanism rather than a second RNG system.
 
 The remaining open questions are resolved as:
 
-- **Cost**: consumes the character's daily action slot, plus a **gold cost that scales with the trained talent's current quality/rarity** — training a talent that's already further along costs more. Exact scaling numbers are an implementation detail for whoever builds [Training-driven talent quality-up ("s'entraîner")](#expanded-talent-system).
+- **Cost**: consumes the character's daily action slot, plus a **gold cost that scales with the trained talent's current quality** — training a talent that's already further along costs more. Implemented as `trainingCost(talent) = 50 × talent.quality` (`functions/src/lib/trainingCost.js` ⇄ `src/lib/trainingCost.js`); rarity isn't a separate factor since it's never authored independently of quality for an owned talent (`rarityFloor` re-derives it on every bump), so quality alone already carries the scaling this line asks for.
 - **Eligibility**: training only bumps a **trainable talent the character already owns** — it can never unlock a new one. Unlocking a not-yet-owned talent stays exclusive to the quest-luck path ([Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)).
-- **Which talent gets trained**: when a character owns several trainable talents matching the trainer's type, **the player picks explicitly** — an eligible-talent selector (owned, `trainable: true`, `trainerTypeId` matching this trainer's type) shown before starting the action, not a random or auto-picked choice.
+- **Which talent gets trained**: when a character owns several trainable talents matching the trainer's type, **the player picks explicitly** — `TalentPicker.jsx`, an eligible-talent selector (owned, `trainable: true`, catalog `trainerTypeId` matching this action's own `trainerTypeId`, not already at quality 5) shown in `ActionBrowser.jsx` before starting the action (same non-Métier payload-picker pattern as `MissionPicker.jsx`), never a random or auto-picked choice. Re-validated server-side in `sEntrainer.js`'s `prepare()`/`resolve()`, never trusted from the client.
 
-**Data model implications** (design only, not yet built):
+**Data model implications**:
 ```
 worldData/trainerTypes/items/{id}
   locationId: string   -- worldData/adventureZones/items id, where a character must be able to
                         --   reach (via their region's adventureZoneIds) to train with this
-                        --   trainer type; NEW field, see also Trainer type creation page
+                        --   trainer type
+
+worldData/actionTypes/items/{id}
+  trainerTypeId: string | null   -- worldData/trainerTypes/items id this action trains at; only
+                                  --   meaningful under the Entraînement kind branch
+
+character.lastAction.talentEvolutions: [{ talentId, name, kind: "evolution", quality, rarity }]
+character.lastAction.goldSpent: number
 ```
 
-**Implementation scope**:
-- This was a pure design note; the design above is now settled but nothing is built yet. The `locationId` field lands with [Trainer type creation page](#trainer-type-creation-page) (roadmap #12); the "S'entraîner" action, its availability condition, and the quality-up handler land with [Training-driven talent quality-up ("s'entraîner")](#expanded-talent-system) (roadmap #10, blocked on this row).
-- Do not read or open any other file without asking the user first.
+Implemented in `functions/src/actions/sEntrainer.js`, `functions/src/lib/actionContext.js` (`buildReachableTrainerTypeIds`), `functions/src/lib/actionConditions.js` ⇄ `src/lib/actionConditions.js` (`trainerReachable` predicate), and `src/components/actions/TalentPicker.jsx`. The result pop-up needed no new code: `ActionOutcome.jsx`'s existing "Amélioration de talent" fieldset already renders `lastAction.talentEvolutions` in the shape this handler writes.
 
 ## Trainer type creation page
 
-Talents that are trainable now reference a required trainer type (`trainerTypeId`, a single-select on the talent form in `TalentsManager.jsx`, shown when "Entraînable" is checked). The trainer type catalog itself is only a bare-bones stub: `TrainerTypesManager.jsx` (registered as the "Types d'entraîneur" tab in `CreatorDashboard.jsx`) stores nothing beyond a `name` in `worldData/trainerTypes/items/{id}`.
+Talents that are trainable now reference a required trainer type (`trainerTypeId`, a single-select on the talent form in `TalentsManager.jsx`, shown when "Entraînable" is checked). The trainer type catalog now stores `name` and `locationId` (the latter landed with [Trainers](#trainers)'s implementation, since the "S'entraîner" action can't gate on reachability without it) in `worldData/trainerTypes/items/{id}`; `TrainerTypesManager.jsx` (registered as the "Types d'entraîneur" tab in `CreatorDashboard.jsx`) has a `locationId` single-select against `worldData/adventureZones/items`, same pattern as `QuestsManager.jsx`'s own `locationId` field.
 
-- At minimum, a description field for what kind of trainer this represents (e.g. "Maître d'armes", "Sage ermite").
-- [Trainers](#trainers) above is now designed and settles what else this catalog needs: a `locationId` single-select (`worldData/adventureZones/items`, same "Lieu(x) de quête" catalog quests use) marking where a character must be able to reach in order to train with this trainer type. Add it alongside the description field.
+- Still missing: a description field for what kind of trainer this represents (e.g. "Maître d'armes", "Sage ermite"). That's the only piece of this row still open.
 
 **Implementation scope**:
-- Read: `src/components/creator/TrainerTypesManager.jsx` (the stub form to extend), `functions/src/schema/trainerType.ts` / `shared/schema/trainerType.ts` (schema to add the description and `locationId` fields to), and [Trainers](#trainers) above (the settled design the `locationId` field serves).
+- Read: `src/components/creator/TrainerTypesManager.jsx` (the form to extend), `functions/src/schema/trainerType.ts` / `shared/schema/trainerType.ts` (schema to add the `description` field to).
 - Update: those same files.
 - Do not read or open any other file without asking the user first.
 
-Not implemented yet beyond the name-only stub described above.
+Not implemented yet: the `description` field. `locationId` is done (see above).
 
 ## Quest creation and editing
 
