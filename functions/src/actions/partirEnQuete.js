@@ -45,23 +45,98 @@ function drawQuest(regionQuests, difficultyWeights) {
   return { ...pickRandom(regionQuests), difficulty: null };
 }
 
-async function prepare({ db, character, actionType }) {
-  const questsSnap = await db
-    .collection("worldData")
-    .doc("quests")
-    .collection("items")
-    .where("regionIds", "array-contains", character.region.id)
-    .get();
-  const regionQuests = questsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  if (regionQuests.length === 0) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Aucune quête disponible dans la région, prenez le temps de vous reposer."
-    );
-  }
+// Composite quests (docs/TODO.md "Composite quests (spec needed)"): a chain step beyond the
+// first becomes "pending" the moment it's pushed into character.triggeredQuestIds and
+// character.questChainProgress[chainId] is bumped to its index (see findChainAdvance below,
+// both written together in resolve()). While pending, that exact quest is the only thing
+// "Partir en quête" offers - it bypasses the normal region/difficulty pool entirely. If more
+// than one chain has a step pending at once, the earliest-granted one wins (earliest insertion
+// into triggeredQuestIds).
+function findPendingChainStep({ character, chains }) {
+  const triggeredQuestIds = character.triggeredQuestIds || [];
+  const progressByChainId = character.questChainProgress || {};
 
-  const difficultyWeights = actionType.questDifficultyWeights || DEFAULT_QUEST_DIFFICULTY_WEIGHTS;
-  const quest = drawQuest(regionQuests, difficultyWeights);
+  const candidates = chains
+    .map((chain) => {
+      const questIds = chain.questIds || [];
+      const stepIndex = progressByChainId[chain.id] || 0;
+      if (stepIndex <= 0 || stepIndex >= questIds.length) return null;
+      const questId = questIds[stepIndex];
+      const grantIndex = triggeredQuestIds.indexOf(questId);
+      if (grantIndex === -1) return null;
+      return { chainId: chain.id, questId, grantIndex };
+    })
+    .filter(Boolean);
+
+  if (candidates.length === 0) return null;
+  return candidates.reduce((earliest, candidate) => (candidate.grantIndex < earliest.grantIndex ? candidate : earliest));
+}
+
+// Called after a quest resolves successfully: does this quest belong to a chain, and if so, what
+// does completing it mean for that chain's progress? Always advances progress by one step so a
+// completed final step stops being reported as "pending" by findPendingChainStep above - only the
+// next quest id is conditional on there actually being a next step.
+function findChainAdvance({ questId, chains }) {
+  for (const chain of chains) {
+    const questIds = chain.questIds || [];
+    const stepIndex = questIds.indexOf(questId);
+    if (stepIndex === -1) continue;
+    const nextQuestId = stepIndex < questIds.length - 1 ? questIds[stepIndex + 1] : null;
+    return { chainId: chain.id, nextStepIndex: stepIndex + 1, nextQuestId };
+  }
+  return null;
+}
+
+async function prepare({ db, character, actionType }) {
+  const [chainsSnap, narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] =
+    await Promise.all([
+      db.collection("worldData").doc("questChains").collection("items").get(),
+      db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
+      db.collection("worldData").doc("verbPhrases").collection("items").get(),
+      db.collection("worldData").doc("lootTables").collection("items").get(),
+      db.collection("worldData").doc("objects").collection("items").get(),
+      db.collection("worldData").doc("talents").collection("items").get(),
+    ]);
+  const chains = chainsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  const pendingStep = findPendingChainStep({ character, chains });
+
+  let quest;
+  if (pendingStep) {
+    const questSnap = await db
+      .collection("worldData")
+      .doc("quests")
+      .collection("items")
+      .doc(pendingStep.questId)
+      .get();
+    if (!questSnap.exists) {
+      throw new HttpsError("failed-precondition", "La suite de cette quête n'existe plus.");
+    }
+    const questData = { id: questSnap.id, ...questSnap.data() };
+    quest = { ...questData, difficulty: pickRandom(questData.difficulties || []) };
+  } else {
+    const questsSnap = await db
+      .collection("worldData")
+      .doc("quests")
+      .collection("items")
+      .where("regionIds", "array-contains", character.region.id)
+      .get();
+    const regionQuests = questsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (regionQuests.length === 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Aucune quête disponible dans la région, prenez le temps de vous reposer."
+      );
+    }
+
+    const difficultyWeights = actionType.questDifficultyWeights || DEFAULT_QUEST_DIFFICULTY_WEIGHTS;
+    quest = drawQuest(regionQuests, difficultyWeights);
+  }
 
   let locationName = null;
   if (quest.locationId) {
@@ -74,20 +149,7 @@ async function prepare({ db, character, actionType }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
-    db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
-    db.collection("worldData").doc("verbPhrases").collection("items").get(),
-    db.collection("worldData").doc("lootTables").collection("items").get(),
-    db.collection("worldData").doc("objects").collection("items").get(),
-    db.collection("worldData").doc("talents").collection("items").get(),
-  ]);
-  const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
+  return { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, chains };
 }
 
 // Draws the quest's loot: one loot table per item, picked among those sharing at least one
@@ -316,7 +378,7 @@ function resolveQuestOutcome({
 }
 
 async function resolve({ character, today, context }) {
-  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
+  const { quest, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents, chains } = context;
 
   const questObjectives = narrativeSubjects.filter((s) => (quest.objectiveIds || []).includes(s.id));
 
@@ -376,6 +438,18 @@ async function resolve({ character, today, context }) {
     if (outcome.woundResult.died) updates.alive = false;
   }
 
+  // Composite quests (docs/TODO.md "Composite quests (spec needed)"): a successful step
+  // advances its chain and, unless it was the chain's last step, grants the next one through the
+  // same triggeredQuestIds arrayUnion convention questTriggers.js's scheduled sweep already uses
+  // for a normal trigger match - reusing the whole reveal/notification pipeline for free.
+  if (outcome.success) {
+    const advance = findChainAdvance({ questId: quest.id, chains: chains || [] });
+    if (advance) {
+      updates.questChainProgress = { ...(character.questChainProgress || {}), [advance.chainId]: advance.nextStepIndex };
+      if (advance.nextQuestId) updates.triggeredQuestIds = FieldValue.arrayUnion(advance.nextQuestId);
+    }
+  }
+
   const logFields = {
     success: outcome.success,
     narrativeText: outcome.narrativeText,
@@ -412,5 +486,7 @@ module.exports = {
   preferQuestPhrasesPerSlot,
   drawQuestLoot,
   resolveQuestOutcome,
+  findPendingChainStep,
+  findChainAdvance,
   DEFAULT_QUEST_DIFFICULTY_WEIGHTS,
 };
