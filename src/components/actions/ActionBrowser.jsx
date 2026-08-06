@@ -5,6 +5,7 @@ import { ACTION_CATEGORIES } from "../../lib/actionCategories";
 import { normalizeActionType, evaluateAvailability } from "../../lib/actionCatalog";
 import MissionPicker from "./MissionPicker";
 import TalentPicker from "./TalentPicker";
+import ProfessionPicker from "./ProfessionPicker";
 
 // hasInstanceTag needs the tag set of everything the character owns, resolved through the object
 // catalog exactly like the server's buildConditionContext (functions/src/lib/actionContext.js) -
@@ -178,6 +179,13 @@ export default function ActionBrowser({ character, actionTypes, onStart, submitt
                 ) : activeAction.handlerId === "sEntrainer" ? (
                   <TalentPicker
                     character={character}
+                    activeAction={activeAction}
+                    onStart={(payload) => onStart(activeAction.id, payload)}
+                    submitting={submitting}
+                    availabilityOk={activeAction.availability.ok}
+                  />
+                ) : activeAction.handlerId === "apprentissage" ? (
+                  <ProfessionPicker
                     activeAction={activeAction}
                     onStart={(payload) => onStart(activeAction.id, payload)}
                     submitting={submitting}

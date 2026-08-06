@@ -27,6 +27,7 @@ const ACTION_KINDS = [
   { value: "recolte", label: "Récolte", parentId: "metier" },
   { value: "artisanat", label: "Artisanat", parentId: "metier" },
   { value: "entrainement", label: "Entraînement", parentId: "intermede" },
+  { value: "apprentissage", label: "Apprentissage", parentId: "entrainement" },
 ];
 
 // The kind whose descendants are reserved to characters practising one of the action's
@@ -51,6 +52,13 @@ const CRAFTING_ACTION_KIND_ID = "artisanat";
 // shows the "Type d'entraîneur" field) and the catalog (which injects the implicit
 // trainerReachable condition) ask the same question.
 const TRAINING_ACTION_KIND_ID = "entrainement";
+
+// The kind whose descendants assign a character's first profession instead of a rolled tier -
+// filed under Entraînement (same trainer-reachability gate, same trainerTypeId field) since both
+// are mediated by a physical trainer; distinguished by also being reserved to characters who
+// don't yet practise a profession (the implicit "professionless" condition, see
+// actionCatalog.js's resolveConditions). Same convention as TRAINING_ACTION_KIND_ID.
+const PROFESSION_LEARNING_ACTION_KIND_ID = "apprentissage";
 
 function findActionKind(kindId) {
   return ACTION_KINDS.find((kind) => kind.value === kindId) || null;
@@ -100,6 +108,7 @@ module.exports = {
   HARVEST_ACTION_KIND_ID,
   CRAFTING_ACTION_KIND_ID,
   TRAINING_ACTION_KIND_ID,
+  PROFESSION_LEARNING_ACTION_KIND_ID,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,

@@ -20,7 +20,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 8 | Quest triggers and end-of-action pop-up pages — implementation | done | 4, 7 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
 | 9 | Trainers — spec | done | — | [Trainers](#trainers) |
 | 10 | Training-driven talent quality-up ("s'entraîner") | done | 9 | [Expanded talent system](#expanded-talent-system) |
-| 11 | Profession initial assignment via quest/trainer | todo | 9 | [Profession (métier) creation](#profession-métier-creation) |
+| 11 | Profession initial assignment via quest/trainer | done | 9 | [Profession (métier) creation](#profession-métier-creation) |
 | 12 | Trainer type creation page — description field | todo | — | [Trainer type creation page](#trainer-type-creation-page) |
 | 13 | Tag system unification (tagIds vs free-text tags) | todo | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
 | 14 | Location tags | todo | — | [Location tags](#location-tags) |
@@ -635,21 +635,46 @@ worldData/professions/items/{id}
   actionIds: string[]       -- worldData/actionTypes/items ids
 ```
 
+**Initial assignment (roadmap #11)**: **implemented**, via two paths, deliberately not three —
+a quest-driven grant was considered and dropped from scope, leaving:
+
+- **Origin** (pre-existing): at character creation, `createCharacter` (`functions/src/index.ts`)
+  resolves the drawn origin's linked profession and sets `professionId`/`professionLevel: 1`/
+  `knownProfessions` together with the legacy `profession` string, all in one write.
+- **Trainer** (new): a character practising no profession at all (`professionId` unset) can learn
+  one at a trainer. A new action kind, `apprentissage` (nested under `entrainement` in
+  `functions/src/lib/actionKinds.js` ⇄ `src/lib/actionKinds.js`, `PROFESSION_LEARNING_ACTION_KIND_ID`)
+  reuses Entraînement's existing `trainerTypeId` field and `trainerReachable` gate — filed there
+  rather than as a Métier subtype, since it's mediated by a trainer location, not gated by an
+  already-held profession — and additionally injects an implicit `professionless` condition
+  (`actionCatalog.js`'s `resolveConditions`, same "nobody authors this row" convention as
+  `hasProfession`/`trainerReachable`). Registered under the shared `apprentissage` handlerId
+  (`functions/src/actions/apprentissage.js`, one handler for every such action, same "one handler,
+  several action documents" convention as [Trainers](#trainers)' `sEntrainer`). The player picks
+  from the professions actually taught at that action's own trainer type (`profession.trainerTypeIds`
+  matching the action's `trainerTypeId`) via `ProfessionPicker.jsx`, re-validated server-side in
+  `prepare()`/`resolve()`, never trusted from the client. Grants at level 1 via
+  `src/lib/professions.js`'s `withProfessionChange` (the same helper `switchKnownProfession`
+  reuses), and — per the reconciliation note under "Character link" below — also sets the legacy
+  `character.profession` string, kept in step with what the origin path already does. No gold cost:
+  unlike training a talent's quality (which scales against the talent's current quality), there is
+  no equivalent progress variable to scale an initiation fee against.
+
 **Still open (deliberately deferred)**:
 - No consumer reads `minReputation` or `evolutionId` yet — reputation-gated profession change and
   the evolution trigger are not implemented.
-- How a character is first assigned a profession via a quest or a trainer is not implemented.
-  Assignment at character creation, from the drawn origin's linked profession, is now handled by
-  `createCharacter` (functions/src/index.js) — see "Character link" below.
+- A quest-driven initial-assignment path (granting a profession as a quest reward, mirroring
+  `tier.talentGain`) was explicitly not built in this pass — only origin and trainer exist. Revisit
+  as its own entry if a quest-driven grant turns out to be wanted later.
 
 **Implementation scope**:
-- **Initial assignment via quest/trainer (roadmap #11)**: read `functions/src/index.ts`'s `createCharacter` (today's only assignment path, at character creation from the drawn origin), `src/lib/professions.js` (`withProfessionChange`, the existing swap-in helper this should reuse), `functions/src/schema/profession.ts` / `shared/schema/profession.ts`, and [Trainers](#trainers) above (the now-settled trainer design: a location-tied "S'entraîner" action) for how a trainer-driven assignment would hook in.
 - **Evolution consumer (roadmap #23, misc polish)**: read `src/lib/professions.js`, `functions/src/schema/profession.ts` / `shared/schema/profession.ts` (the unread `evolutionId` field), and `src/components/ProfessionTab.jsx` (where a reached-evolution notice would surface). Update whichever of those ends up hosting the evolution trigger.
 - Do not read or open any other file for this entry without asking the user first.
 
 ### Character link
 
-Status: **implemented**, except quest/trainer initial assignment (see "Still open" above).
+Status: **implemented**, including trainer-driven initial assignment (see "Initial assignment"
+above). A quest-driven initial-assignment path remains deliberately unbuilt, see "Still open" above.
 
 A character has at most one active profession plus a mastery level (`professionLevel`, an integer
 1-5, starting at 1 whenever a profession is (re)assigned), and a history of every profession it has
@@ -673,11 +698,14 @@ characters/{id}
                                      -- every profession ever held, with its last known level
 ```
 
-Deliberately left untouched: `character.profession` (the legacy free-text string copied from the
-rolled background) and the `profession` action condition in `actionConditions.js` still key off that
-string, not off `professionId` — reconciling the two remains part of the undecided initial-assignment
-mechanic above. The newer `hasProfession` condition, which gates Métier actions, does read
-`professionId`; both predicates coexist.
+`character.profession` (the legacy free-text string copied from the rolled background) is kept in
+step with `professionId` by every path that sets the latter — origin at character creation, and now
+the trainer-driven `apprentissage` handler too — so the `profession` action condition in
+`actionConditions.js`, which still keys off that string, keeps working for characters assigned
+either way. `switchKnownProfession` (a later switch between professions already known) does not
+touch it, so it can still drift from `professionId` after a switch — left as is, since nothing reads
+`character.profession` as anything other than the origin-time trade today. The newer `hasProfession`
+condition, which gates Métier actions, reads `professionId` directly; both predicates coexist.
 
 ## Action kinds and Métier actions
 

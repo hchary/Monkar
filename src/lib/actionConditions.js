@@ -173,6 +173,19 @@ const PREDICATES = {
       return trainerTypeId != null && !!ctx.reachableTrainerTypeIds?.has(trainerTypeId);
     },
   },
+
+  // A character already practising a profession can't take up another this way - switching
+  // between professions already known stays switchKnownProfession's job (functions/src/index.ts),
+  // and learning a further, not-yet-known profession while already practising one is out of scope
+  // for this mechanic. Deliberately absent from CONDITION_TYPES, same reason as hasProfession/
+  // trainerReachable: nobody authors this row - the catalog injects it from the action's own kind
+  // whenever it inherits from Apprentissage (see actionCatalog.js's resolveConditions).
+  professionless: {
+    reason: "Vous exercez déjà un métier.",
+    test(condition, ctx) {
+      return !ctx.character?.professionId;
+    },
+  },
 };
 
 // Conditions are ANDed; the first failure decides the message. An unknown type fails closed - a

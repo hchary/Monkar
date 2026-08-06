@@ -31,10 +31,12 @@ export const ActionTypeDocumentSchema = z.object({
     .string()
     .describe(
       "The kind this action is an instance of, from ACTION_KINDS (functions/src/lib/actionKinds.js): " +
-        "aventure | intermede | metier | social | recolte | artisanat | entrainement. The kind tree is " +
-        "what gives an action its inherited behaviour - anything under `metier` is profession-gated, " +
-        "under `recolte` draws loot, under `artisanat` resolves a recette, under `entrainement` is " +
-        "gated by trainer-location reachability. Absent falls back to the legacy categoryId."
+        "aventure | intermede | metier | social | recolte | artisanat | entrainement | apprentissage. The " +
+        "kind tree is what gives an action its inherited behaviour - anything under `metier` is " +
+        "profession-gated, under `recolte` draws loot, under `artisanat` resolves a recette, under " +
+        "`entrainement` is gated by trainer-location reachability, under `apprentissage` (itself under " +
+        "`entrainement`) additionally requires the character not already practise a profession. Absent " +
+        "falls back to the legacy categoryId."
     ),
   categoryId: z
     .string()
@@ -49,8 +51,9 @@ export const ActionTypeDocumentSchema = z.object({
     .default(null)
     .describe(
       'Names an entry in ACTION_HANDLERS (functions/src/index.js): "partirEnQuete" | "recolte" | ' +
-        '"artisanat". There is no generic resolution path - an action whose handlerId is null or names ' +
-        "an unregistered handler is refused before the transaction opens."
+        '"artisanat" | "rumeur" | "mission" | "sEntrainer" | "apprentissage". There is no generic ' +
+        "resolution path - an action whose handlerId is null or names an unregistered handler is " +
+        "refused before the transaction opens."
     ),
   professionIds: z
     .array(z.string())
@@ -116,9 +119,11 @@ export const ActionTypeDocumentSchema = z.object({
     .default(null)
     .describe(
       "worldData/trainerTypes/items id this action trains at. Only meaningful under the " +
-        "Entraînement branch; written as null for every other kind. Matched against an owned " +
-        "talent's own catalog trainerTypeId by the 'sEntrainer' handler, and turned into the " +
-        "implicit trainerReachable condition by resolveConditions."
+        "Entraînement branch (including its Apprentissage subtype); written as null for every " +
+        "other kind. Matched against an owned talent's own catalog trainerTypeId by the " +
+        "'sEntrainer' handler, or against a profession's own catalog trainerTypeIds by the " +
+        "'apprentissage' handler, and turned into the implicit trainerReachable condition by " +
+        "resolveConditions."
     ),
   rumorHarvestCount: z
     .number()

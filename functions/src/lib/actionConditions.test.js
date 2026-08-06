@@ -187,6 +187,20 @@ describe("evaluateConditions - trainerReachable", () => {
   });
 });
 
+// The gate behind every Apprentissage action. Injected by the catalog whenever the action's kind
+// inherits from PROFESSION_LEARNING_ACTION_KIND_ID (see actionCatalog.js's resolveConditions),
+// same reason as hasProfession/trainerReachable for not being offered by CONDITION_TYPES.
+describe("evaluateConditions - professionless", () => {
+  test("a character already practising a profession fails it", () => {
+    assert.equal(check({ type: "professionless" }), false);
+  });
+
+  test("a character practising nothing passes it", () => {
+    const noProfession = { ...CHARACTER, professionId: null };
+    assert.equal(check({ type: "professionless" }, ctx({ character: noProfession })), true);
+  });
+});
+
 describe("evaluateConditions - notWounded", () => {
   test("passes only while the character carries no wound", () => {
     assert.equal(check({ type: "notWounded" }), true);

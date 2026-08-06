@@ -119,6 +119,13 @@ describe("normalizeActionType", () => {
     assert.deepStrictEqual(normalizeActionType(once), once);
     assert.equal(once.availability.conditions.filter((c) => c.type === "trainerReachable").length, 1);
   });
+
+  test("is idempotent for an Apprentissage action too - both implicit gates aren't injected twice", () => {
+    const once = normalizeActionType({ label: "Apprentissage", kindId: "apprentissage", trainerTypeId: "maitre-armes" });
+    assert.deepStrictEqual(normalizeActionType(once), once);
+    assert.equal(once.availability.conditions.filter((c) => c.type === "trainerReachable").length, 1);
+    assert.equal(once.availability.conditions.filter((c) => c.type === "professionless").length, 1);
+  });
 });
 
 // An action carries a kindId and its category falls out of the kind's root - the four categories
@@ -221,6 +228,47 @@ describe("resolveConditions - the implicit trainer-reachability gate", () => {
       trainerTypeId: "maitre-armes",
     });
     assert.deepStrictEqual(conditions, [{ type: "hasProfession", professionIds: ["forgeron"] }]);
+  });
+});
+
+// "Une action d'Apprentissage n'est disponible qu'à un personnage n'exerçant encore aucun
+// métier" - expressed the same way as the other implicit gates: injected by the catalog whenever
+// the action's kind inherits from Apprentissage, never authored by hand. Apprentissage nests
+// under Entraînement, so an Apprentissage action also gets the trainer-reachability gate above.
+describe("resolveConditions - the implicit professionless gate", () => {
+  test("an Apprentissage action is gated on trainer reachability and on having no profession", () => {
+    const conditions = resolveConditions({ kindId: "apprentissage", trainerTypeId: "maitre-armes" });
+    assert.deepStrictEqual(conditions, [
+      { type: "trainerReachable", trainerTypeId: "maitre-armes" },
+      { type: "professionless" },
+    ]);
+  });
+
+  test("the gate is appended to the authored conditions, not substituted for them", () => {
+    const conditions = resolveConditions({
+      kindId: "apprentissage",
+      trainerTypeId: "maitre-armes",
+      availability: { conditions: [{ type: "notWounded" }] },
+    });
+    assert.deepStrictEqual(conditions, [
+      { type: "notWounded" },
+      { type: "trainerReachable", trainerTypeId: "maitre-armes" },
+      { type: "professionless" },
+    ]);
+  });
+
+  test("actions outside the Apprentissage branch are left alone, including plain Entraînement", () => {
+    for (const kindId of ["aventure", "intermede", "social", "metier", "entrainement"]) {
+      assert.ok(!resolveConditions({ kindId, trainerTypeId: "maitre-armes" }).some((c) => c.type === "professionless"));
+    }
+  });
+
+  test("an Apprentissage action is unavailable to a character who already practises a profession", () => {
+    const actionType = { kindId: "apprentissage", trainerTypeId: "maitre-armes" };
+    const ctx = { character: { professionId: "forgeron" }, instanceTagIds: new Set(), reachableTrainerTypeIds: new Set(["maitre-armes"]) };
+    const result = evaluateAvailability(actionType, ctx);
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "Vous exercez déjà un métier.");
   });
 });
 

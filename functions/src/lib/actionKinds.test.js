@@ -6,6 +6,7 @@ const {
   HARVEST_ACTION_KIND_ID,
   CRAFTING_ACTION_KIND_ID,
   TRAINING_ACTION_KIND_ID,
+  PROFESSION_LEARNING_ACTION_KIND_ID,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,
@@ -50,6 +51,11 @@ describe("the registry itself", () => {
     assert.equal(findActionKind(TRAINING_ACTION_KIND_ID).parentId, "intermede");
   });
 
+  test("the profession-learning kind is one of them, nested under the training kind", () => {
+    assert.ok(findActionKind(PROFESSION_LEARNING_ACTION_KIND_ID));
+    assert.equal(findActionKind(PROFESSION_LEARNING_ACTION_KIND_ID).parentId, TRAINING_ACTION_KIND_ID);
+  });
+
   test("every kind resolves to a root category", () => {
     for (const kind of ACTION_KINDS) {
       assert.ok(actionKindCategoryId(kind.value), `"${kind.value}" has no category`);
@@ -87,6 +93,12 @@ describe("actionKindInheritsFrom", () => {
   test("the training kind inherits from intermède, not from métier", () => {
     assert.equal(actionKindInheritsFrom(TRAINING_ACTION_KIND_ID, "intermede"), true);
     assert.equal(actionKindInheritsFrom(TRAINING_ACTION_KIND_ID, PROFESSION_ACTION_KIND_ID), false);
+  });
+
+  test("the profession-learning kind inherits from the training kind and from intermède", () => {
+    assert.equal(actionKindInheritsFrom(PROFESSION_LEARNING_ACTION_KIND_ID, TRAINING_ACTION_KIND_ID), true);
+    assert.equal(actionKindInheritsFrom(PROFESSION_LEARNING_ACTION_KIND_ID, "intermede"), true);
+    assert.equal(actionKindInheritsFrom(PROFESSION_LEARNING_ACTION_KIND_ID, PROFESSION_ACTION_KIND_ID), false);
   });
 
   // Récolte is the first real multi-level fixture: a Métier subtype must inherit the profession
@@ -130,12 +142,18 @@ describe("actionKindsInTreeOrder", () => {
     assert.equal(flattened.length, ACTION_KINDS.length);
     assert.deepStrictEqual(
       flattened.map((kind) => kind.value),
-      ["aventure", "intermede", "entrainement", "metier", "recolte", "artisanat", "social"]
+      ["aventure", "intermede", "entrainement", "apprentissage", "metier", "recolte", "artisanat", "social"]
     );
     const subtypes = ["recolte", "artisanat", "entrainement"];
     for (const value of subtypes) {
       assert.equal(flattened.find((kind) => kind.value === value).depth, 1);
     }
-    assert.ok(flattened.filter((kind) => !subtypes.includes(kind.value)).every((kind) => kind.depth === 0));
+    // apprentissage nests one level deeper still, under entrainement itself.
+    assert.equal(flattened.find((kind) => kind.value === "apprentissage").depth, 2);
+    assert.ok(
+      flattened
+        .filter((kind) => !subtypes.includes(kind.value) && kind.value !== "apprentissage")
+        .every((kind) => kind.depth === 0)
+    );
   });
 });
