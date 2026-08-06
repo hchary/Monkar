@@ -6,11 +6,17 @@ import { z } from "zod";
 // re-exports this alongside the collection-level documentation the project's schema convention
 // requires).
 //
-// Still missing a description field - see "Trainer type creation page" in docs/TODO.md, not
-// implemented yet. locationId landed with the "S'entraîner" action (docs/TODO.md "Trainers").
+// locationId landed with the "S'entraîner" action (docs/TODO.md "Trainers").
 
 export const TrainerTypeDocumentSchema = z.object({
   name: z.string().describe('Trainer type display name, e.g. "Maître d\'armes".'),
+  description: z
+    .string()
+    .default("")
+    .describe(
+      'Free-text French description of what kind of trainer this represents, e.g. "Maître ' +
+        'd\'armes" or "Sage ermite". Shown in the trainer type list in TrainerTypesManager.jsx.'
+    ),
   locationId: z
     .string()
     .default("")

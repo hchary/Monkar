@@ -21,7 +21,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 9 | Trainers — spec | done | — | [Trainers](#trainers) |
 | 10 | Training-driven talent quality-up ("s'entraîner") | done | 9 | [Expanded talent system](#expanded-talent-system) |
 | 11 | Profession initial assignment via quest/trainer | done | 9 | [Profession (métier) creation](#profession-métier-creation) |
-| 12 | Trainer type creation page — description field | todo | — | [Trainer type creation page](#trainer-type-creation-page) |
+| 12 | Trainer type creation page — description field | done | — | [Trainer type creation page](#trainer-type-creation-page) |
 | 13 | Tag system unification (tagIds vs free-text tags) | todo | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
 | 14 | Location tags | todo | — | [Location tags](#location-tags) |
 | 15 | Aventure exploration mechanics — spec | spec | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
@@ -173,16 +173,16 @@ Implemented in `functions/src/actions/sEntrainer.js`, `functions/src/lib/actionC
 
 ## Trainer type creation page
 
-Talents that are trainable now reference a required trainer type (`trainerTypeId`, a single-select on the talent form in `TalentsManager.jsx`, shown when "Entraînable" is checked). The trainer type catalog now stores `name` and `locationId` (the latter landed with [Trainers](#trainers)'s implementation, since the "S'entraîner" action can't gate on reachability without it) in `worldData/trainerTypes/items/{id}`; `TrainerTypesManager.jsx` (registered as the "Types d'entraîneur" tab in `CreatorDashboard.jsx`) has a `locationId` single-select against `worldData/adventureZones/items`, same pattern as `QuestsManager.jsx`'s own `locationId` field.
+Status: **implemented**.
 
-- Still missing: a description field for what kind of trainer this represents (e.g. "Maître d'armes", "Sage ermite"). That's the only piece of this row still open.
+Talents that are trainable now reference a required trainer type (`trainerTypeId`, a single-select on the talent form in `TalentsManager.jsx`, shown when "Entraînable" is checked). The trainer type catalog stores `name`, `description`, and `locationId` in `worldData/trainerTypes/items/{id}`; `TrainerTypesManager.jsx` (registered as the "Types d'entraîneur" tab in `CreatorDashboard.jsx`) has a `locationId` single-select against `worldData/adventureZones/items`, same pattern as `QuestsManager.jsx`'s own `locationId` field, plus a plain `description` textarea (free-text French, e.g. "Maître d'armes", "Sage ermite") shown under the trainer type's name in the list, same textarea pattern as `ProfessionsManager.tsx`'s own `description` field.
 
-**Implementation scope**:
-- Read: `src/components/creator/TrainerTypesManager.jsx` (the form to extend), `functions/src/schema/trainerType.ts` / `shared/schema/trainerType.ts` (schema to add the `description` field to).
-- Update: those same files.
-- Do not read or open any other file without asking the user first.
-
-Not implemented yet: the `description` field. `locationId` is done (see above).
+**Data model implications**:
+```
+worldData/trainerTypes/items/{id}
+  description: string   -- free-text French description of what kind of trainer this
+                         --   represents; NEW field, defaults to ""
+```
 
 ## Quest creation and editing
 
