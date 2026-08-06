@@ -81,6 +81,9 @@ export default function TagsManager() {
     const referencingAdventureZones = await getDocs(
       query(collection(db, "worldData", "adventureZones", "items"), where("tagIds", "array-contains", selectedTag.id))
     );
+    const referencingActionTypes = await getDocs(
+      query(collection(db, "worldData", "actionTypes", "items"), where("tagIds", "array-contains", selectedTag.id))
+    );
     await Promise.all([
       ...referencingQuests.docs.map((questDoc) =>
         updateDoc(questDoc.ref, { tagIds: (questDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
@@ -112,6 +115,11 @@ export default function TagsManager() {
       ),
       ...referencingAdventureZones.docs.map((zoneDoc) =>
         updateDoc(zoneDoc.ref, { tagIds: (zoneDoc.data().tagIds || []).filter((id) => id !== selectedTag.id) })
+      ),
+      ...referencingActionTypes.docs.map((actionTypeDoc) =>
+        updateDoc(actionTypeDoc.ref, {
+          tagIds: (actionTypeDoc.data().tagIds || []).filter((id) => id !== selectedTag.id),
+        })
       ),
     ]);
     await deleteDoc(doc(db, "worldData", "tags", "items", selectedTag.id));

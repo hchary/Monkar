@@ -194,6 +194,7 @@ const emptyForm = {
   kindId: ACTION_KINDS[0].value,
   description: "",
   professionIds: [],
+  tagIds: [],
   order: 0,
   enabled: true,
   handlerId: "",
@@ -265,6 +266,7 @@ export default function ActionsManager() {
       kindId: resolveKindId(actionType) || ACTION_KINDS[0].value,
       description: actionType.description || "",
       professionIds: actionType.professionIds || [],
+      tagIds: actionType.tagIds || [],
       order: Number.isFinite(Number(actionType.order)) ? Number(actionType.order) : 0,
       enabled: actionType.enabled !== false,
       handlerId: actionType.handlerId || "",
@@ -341,6 +343,13 @@ export default function ActionsManager() {
     }));
   }
 
+  function toggleTagId(id) {
+    setForm((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((x) => x !== id) : [...prev.tagIds, id],
+    }));
+  }
+
   function toggleLootTagId(id) {
     setForm((prev) => ({
       ...prev,
@@ -387,6 +396,7 @@ export default function ActionsManager() {
         kindId: form.kindId,
         description: form.description,
         professionIds,
+        tagIds: form.tagIds,
         order: Number(form.order) || 0,
         enabled: form.enabled,
         handlerId: form.handlerId || null,
@@ -472,6 +482,9 @@ export default function ActionsManager() {
               <strong>{actionType.label}</strong>
               {actionType.enabled === false && " (désactivée)"} — {actionKindLabel(kindId) || "sans type"}
               <div>{actionType.description}</div>
+              <div>
+                Tags : {(actionType.tagIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") || "aucun"}
+              </div>
               {isMetier && (
                 <div>
                   Métiers associés :{" "}
@@ -561,6 +574,17 @@ export default function ActionsManager() {
             placeholder="Description (affichée sur l'onglet de l'action)"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+
+          <MultiSelectModalField
+            legend="Tags"
+            options={sortedTags}
+            selectedIds={form.tagIds}
+            onToggle={toggleTagId}
+            createLink={`/creator?section=${encodeURIComponent("Tag")}`}
+            matchesFilter={matchesTag}
+            filterPlaceholder="Filtrer par nom..."
+            buttonLabel="Ajouter des tags"
           />
 
           {isProfessionAction && (

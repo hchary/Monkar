@@ -31,7 +31,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 19 | Composite quests — spec | done | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
 | 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
-| 22 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
+| 22 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 23 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
 | 24 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
 | 25 | Known recipes grant mechanism — implementation | todo | 21 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
@@ -716,6 +716,19 @@ character sheet's Métier tab reads the profession's. There is no Cloud Function
 `worldData` (it is creator-write per `firestore.rules`), so this runs in the creator's browser; a
 concurrent delete fails the whole batch rather than half-committing.
 
+**Action tags** (roadmap #22, one of the bundled items — **implemented**): `worldData/actionTypes/items/{id}`
+now carries a `tagIds: string[]` field, referencing `worldData/tags/items` via the same
+`MultiSelectModalField.jsx` picker mechanism already used by quests, objects, loot tables, talents,
+locations, and recettes. Generic and unconditional — unlike `lootTagIds`/`recipeCategoryIds`, it
+isn't scoped to a single kind branch, so every action type carries it regardless of kind.
+`ActionsManager.jsx`'s create/edit form gained the picker right after the description field, and its
+list rows show the resolved tag names, same pattern as `ObjectsManager.jsx`/`QuestLocationsManager.jsx`.
+`TagsManager.jsx`'s cascade-delete cleanup now also strips a deleted tag's id from `actionTypes.tagIds`,
+alongside the collections it already covered. No consumer reads it yet — this entry only closes the
+"the field doesn't exist" gap, per the note it always carried that a consumer (filtering in the action
+browser? matching against the procedural narrative generator's tag vocabulary, per
+[Procedural narrative generation](#procedural-narrative-generation)?) is still undecided.
+
 **Data model implications**:
 ```
 worldData/actionTypes/items/{id}
@@ -725,6 +738,8 @@ worldData/actionTypes/items/{id}
                            --   documents keep theirs and it still reads correctly.
   professionIds: string[]  -- NEW, worldData/professions/items ids; only meaningful for kinds
                            --   inheriting from "metier", cleared when the kind moves elsewhere
+  tagIds: string[]         -- NEW, worldData/tags/items ids; generic, unconditional, defaults to [];
+                           --   no consumer yet
 ```
 
 **Still open (deliberately deferred)**:
@@ -744,17 +759,10 @@ worldData/actionTypes/items/{id}
   and Artisanat only ever touch `instances`. Since the retired paliers system stopped rolling
   gold/reputation/wound changes entirely (`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7), which action
   grants how much of what is undecided content, not a missing architecture piece.
-- Action types have no `tagIds` field of their own yet, unlike every other catalog collection
-  (quests, objects, loot tables, talents, recettes). Adding it is a small, low-risk change following
-  the exact same `worldData/tags/items` + `MultiSelectModalField` pattern already used everywhere
-  else - but no consumer is specified yet (filtering in the action browser? matching against the
-  procedural narrative generator's tag vocabulary, per
-  [Procedural narrative generation](#procedural-narrative-generation)?), so it's listed here rather
-  than just added.
-
-**Implementation scope** (roadmap #22 — bundles several independent small polish items):
-- Read: `src/lib/actionKinds.js` / `functions/src/lib/actionKinds.js` (`ACTION_KINDS` tree, to extend with a new Métier subtype), `functions/src/actions/recolte.js` and `functions/src/actions/artisanat.js` (precedent for how a Métier subtype adds its own handler + fields), `src/components/creator/ActionsManager.jsx` (the creator form each subtype extends, and where a `tagIds` field would go), `functions/src/lib/actionCatalog.js` (`resolveConditions`, where the `hasProfession` gate is injected), and `functions/src/schema/actionType.ts` / `shared/schema/actionType.ts`.
-- Update: whichever of the above the specific polish item touches. This row bundles several independent items (a new Métier subtype, an action `tagIds` field, gold/reputation/region content on an existing handler) — confirm with the user which one to pick up first rather than doing all of them in one pass.
+**Implementation scope** (roadmap #22 — bundles several independent small polish items; the action
+`tagIds` field is now done, see above — the remaining two are still open):
+- Read: `src/lib/actionKinds.js` / `functions/src/lib/actionKinds.js` (`ACTION_KINDS` tree, to extend with a new Métier subtype), `functions/src/actions/recolte.js` and `functions/src/actions/artisanat.js` (precedent for how a Métier subtype adds its own handler + fields), `functions/src/lib/actionCatalog.js` (`resolveConditions`, where the `hasProfession` gate is injected), and `functions/src/schema/actionType.ts` / `shared/schema/actionType.ts`.
+- Update: whichever of the above the specific polish item touches. This row still bundles two independent items (a new Métier subtype, gold/reputation/region content on an existing handler) — confirm with the user which one to pick up first rather than doing both in one pass.
 - Do not read or open any other file without asking the user first.
 
 ## Action de récolte
