@@ -16,6 +16,7 @@ export default function TrainerTypesManager() {
   const [trainerTypes, setTrainerTypes] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [locationId, setLocationId] = useState("");
   const [filterText, setFilterText] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -36,6 +37,7 @@ export default function TrainerTypesManager() {
   function startEdit(trainerType) {
     setEditingId(trainerType.id);
     setName(trainerType.name || "");
+    setDescription(trainerType.description || "");
     setLocationId(trainerType.locationId || "");
     setPanelOpen(true);
   }
@@ -43,6 +45,7 @@ export default function TrainerTypesManager() {
   function resetForm() {
     setEditingId(null);
     setName("");
+    setDescription("");
     setLocationId("");
   }
 
@@ -52,16 +55,13 @@ export default function TrainerTypesManager() {
       ? doc(db, "worldData", "trainerTypes", "items", editingId)
       : doc(collection(db, "worldData", "trainerTypes", "items"));
 
-    await setDoc(ref, { name, locationId });
+    await setDoc(ref, { name, description, locationId });
     resetForm();
   }
 
   return (
     <div className="creator-section">
       <h2>Types d'entraîneur</h2>
-      <p>
-        Stub minimal : voir la TODO "Entraîneurs" pour la version complète (description...).
-      </p>
 
       <fieldset>
         <legend>Filtres</legend>
@@ -75,6 +75,7 @@ export default function TrainerTypesManager() {
         {filteredTrainerTypes.map((trainerType) => (
           <li key={trainerType.id}>
             <strong>{trainerType.name}</strong>
+            {trainerType.description && <div>{trainerType.description}</div>}
             <div>Lieu : {locations.find((l) => l.id === trainerType.locationId)?.name || "aucun"}</div>
             <button type="button" onClick={() => startEdit(trainerType)}>
               Modifier
@@ -96,6 +97,12 @@ export default function TrainerTypesManager() {
         <summary>{editingId ? "Modifier le type d'entraîneur" : "Nouveau type d'entraîneur"}</summary>
         <form onSubmit={handleSubmit}>
           <input placeholder="Nom" value={name} onChange={(e) => setName(e.target.value)} required />
+
+          <textarea
+            placeholder="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
 
           <fieldset>
             <legend>Lieu</legend>

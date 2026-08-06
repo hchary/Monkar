@@ -1,5 +1,6 @@
 # Project rules
 
+- When running the /next-todo command, only prompt to the user the name of the issue started, the possible questions/authorizations you have or need and the final status. Use simple, short, efficient sentences.
 - Never commit agent rules, skills, or commands (`.claude/agents/`, `.claude/skills/`, `.claude/commands/`) to this repository. These are local tooling, not project source.
 - All documentation (README, code comments, commit messages, this file) must be written in English. Only functional/domain names (game name, character names, factions, regions, action names, and other in-world terms) should be in French.
 - Every game component persisted as a Firestore document must have a schema file in `functions/src/schema/`, named after the component in singular camelCase (`origin.js` for `worldData/origins/items`, `actionLog.js` for `actionsLog`). This is the canonical contract for the collection: read it before touching a component's fields, rather than inferring the shape from a creator form or an object literal.
