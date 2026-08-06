@@ -290,6 +290,16 @@ Once a quest is drawn, if `quest.locationId` is set its `worldData/adventureZone
 
 `drawQuestLoot` draws one loot table per item (count set by the quest's difficulty via `LOOT_COUNT_BY_DIFFICULTY`), among those sharing a tag with the quest or a randomly-picked objective and matching that objective's rarity, then a uniform item draw within that table; items with no matching table/objective are silently skipped (a content gap, not an error).
 
+### Composite quests: chained `worldData/questChains/items`
+
+`worldData/questChains/items/{id}` (no creator UI, authored directly in the Firestore console) holds an ordered `questIds: string[]`, step 1 first. Step 1 is just an ordinary quest, discoverable however quests normally are; a chain only starts mattering once step 1 resolves successfully.
+
+`prepare` calls `findPendingChainStep({ character, chains })` before running its normal region query: it looks for a chain whose `character.questChainProgress[chainId]` names a step index beyond 0 that is also present in `character.triggeredQuestIds` (i.e. a step already granted but not yet resolved). If found, that exact `worldData/quests/items` document is fetched by id — **bypassing the `regionIds` filter entirely** — and a difficulty is picked uniformly at random from the step's own `difficulties` array, instead of running the weighted region draw. While a step is pending this way, "Partir en quête" offers only that step; if more than one chain has a step pending, the earliest-granted one wins (earliest index in `triggeredQuestIds`).
+
+`resolve` calls `findChainAdvance({ questId: quest.id, chains })` after a successful resolution (of *any* quest, whether it was drawn normally or was a pending chain step): if the resolved quest belongs to a chain, `character.questChainProgress[chainId]` is bumped to the next step index, and — unless it was the chain's last step — the next step's quest id is pushed into `character.triggeredQuestIds` via the same `arrayUnion` convention `sweepQuestTriggers` uses for a normal trigger match (see below), reusing that entire reveal/notification pipeline for free. A failed step advances nothing, so the same step stays pending and is offered again next time. Progress is still bumped (with no next quest id to grant) when the *last* step succeeds, so a finished chain's final quest stops being reported as pending.
+
+`mission.js` is untouched by any of this — composite quests only ever apply to the hand-authored `worldData/quests/items` catalog `partirEnQuete.js` draws from, never to missions' on-the-fly generated offers.
+
 ### `partirExplorer.js`: multiple encounters in one action
 
 A second, sibling Aventure-branch handler (`docs/TODO.md` "Aventure exploration mechanics") — not a replacement for `partirEnQuete.js`, registered under its own `partirExplorer` handlerId. `prepare` draws one `worldData/adventureZones/items` entry at random from the character's region's `adventureZoneIds` (an empty list is a content gap, not a failure - the action still runs with `location: null`) and fetches the same catalogs `partirEnQuete.js`/`mission.js` already fetch.

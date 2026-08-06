@@ -29,7 +29,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 17 | Intermède actions — spec | done | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
 | 18 | Intermède actions — implementation | done | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
 | 19 | Composite quests — spec | done | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
-| 20 | Composite quests — implementation | todo | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
+| 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | spec | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 | 22 | Métier action-kind polish (subtypes, action `tagIds`, reputation/gold/location content) | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 23 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
@@ -1518,7 +1518,7 @@ mechanism.
 
 ## Composite quests (spec needed)
 
-Status: **designed, not implemented**. A composite quest is a sequence of quests, where each step
+Status: **implemented** — see the paired [Composite quests (implementation)](#composite-quests-implementation) entry below for what shipped. A composite quest is a sequence of quests, where each step
 beyond the first is revealed only once the previous step is completed. Quests already grant
 meaningfully better rewards than missions (gear, talent evolution — see
 [Quest loot draw](#quest-loot-draw) and
@@ -1603,22 +1603,24 @@ characters/{id}
   (`questChainProgress`), and the `functions/src/schema/quest.ts`/`character.ts` re-exports.
 - Do not read or open any other file without asking the user first.
 
-Not implemented yet — see the paired
-[Composite quests (implementation)](#composite-quests-implementation) entry below.
+See the paired [Composite quests (implementation)](#composite-quests-implementation) entry below
+for what shipped.
 
 ## Composite quests (implementation)
 
-Status: todo, unblocked. Builds exactly the shape
+Status: **implemented**. Builds exactly the shape
 [Composite quests (spec needed)](#composite-quests-spec-needed) above decided: a new
-`worldData/questChains/items` catalog, a `character.questChainProgress` counter, and the
-chain-step branch in `partirEnQuete.js`'s `prepare()`/`resolve()`.
+`worldData/questChains/items` catalog (`shared/schema/questChain.ts` ⇄
+`functions/src/schema/questChain.ts`, no creator UI, authored directly in the Firestore console),
+a `character.questChainProgress` counter (`shared/schema/character.ts`), and the chain-step branch
+in `partirEnQuete.js`'s `prepare()`/`resolve()` (`findPendingChainStep`/`findChainAdvance`) — see
+[docs/ARCHITECTURE.md](ARCHITECTURE.md)'s "Composite quests" section for the full mechanism.
+`mission.js` is untouched, per the spec's own scoping.
 
 **Implementation scope**: see
 [Composite quests (spec needed)](#composite-quests-spec-needed)'s own "Implementation scope"
 above — the same file list applies here, since the spec pass already scoped exactly what building
 it touches.
-
-Not implemented yet.
 
 ## Mission and quest resolution algorithm
 
