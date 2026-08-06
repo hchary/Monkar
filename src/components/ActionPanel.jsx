@@ -42,9 +42,14 @@ export default function ActionPanel({ character }) {
     setError("");
     try {
       const performAction = httpsCallable(functions, "performAction");
-      await performAction({ actionTypeId, ...payload });
+      const result = await performAction({ actionTypeId, ...payload });
+      // Intermède-budget actions (docs/TODO.md "Intermède actions") never write lastAction, so
+      // CommercePicker.jsx reads its confirmation off this return value instead of the character
+      // snapshot - every other caller here ignores it.
+      return result.data;
     } catch (err) {
       setError(err.message);
+      return null;
     } finally {
       setSubmitting(false);
     }
@@ -85,7 +90,25 @@ export default function ActionPanel({ character }) {
         [TEST] Avancer le temps d'un Interval
       </button>
 
-      {state === "running" && <ActionCountdown character={character} now={now} />}
+      {state === "running" && (
+        <>
+          <ActionCountdown character={character} now={now} />
+          {/* A running main action doesn't lock Intermède budget actions (docs/TODO.md
+              "Intermède actions": "capped at 3 total", decoupled from lastAction/completesAt) - the
+              player can still spend it while their main action counts down. */}
+          <div className="intermede-during-action">
+            <h2>Intermède</h2>
+            <ActionBrowser
+              character={character}
+              actionTypes={actionTypes}
+              onStart={handleStart}
+              submitting={submitting}
+              error={error}
+              budgetActionsOnly
+            />
+          </div>
+        </>
+      )}
 
       {state === "idle" && (
         <>

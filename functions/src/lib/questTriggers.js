@@ -30,9 +30,11 @@ function evaluateQuestTriggersForCharacter({ character, triggerableQuests, insta
     .map((quest) => quest.id);
 }
 
-// Full sweep: every living character against every quest carrying a trigger. Run once per
-// Interval tick (see functions/src/index.ts's scheduled `sweepQuestTriggers` export) rather than
-// on any individual character's own completesAt clock, per docs/TODO.md's cadence decision.
+// Full sweep: every living character against every quest carrying a trigger, plus (as a sibling
+// pass, not a separate concern) resetting each character's Intermède budget counter
+// (docs/TODO.md "Intermède actions"). Run once per Interval tick (see functions/src/index.ts's
+// scheduled `sweepQuestTriggers` export) rather than on any individual character's own completesAt
+// clock, per docs/TODO.md's cadence decision.
 async function sweepQuestTriggers({ db }) {
   const [questsSnap, charactersSnap] = await Promise.all([
     db.collection("worldData").doc("quests").collection("items").get(),
@@ -59,6 +61,7 @@ async function sweepQuestTriggers({ db }) {
 
   for (const characterDoc of charactersSnap.docs) {
     const character = characterDoc.data();
+    const updates = {};
 
     let instanceTagIds = new Set();
     if (needsInstances) {
@@ -69,9 +72,16 @@ async function sweepQuestTriggers({ db }) {
     }
 
     const newlyTriggeredIds = evaluateQuestTriggersForCharacter({ character, triggerableQuests, instanceTagIds });
-    if (newlyTriggeredIds.length === 0) continue;
+    if (newlyTriggeredIds.length > 0) updates.triggeredQuestIds = FieldValue.arrayUnion(...newlyTriggeredIds);
 
-    await characterDoc.ref.update({ triggeredQuestIds: FieldValue.arrayUnion(...newlyTriggeredIds) });
+    // Sibling reset pass for docs/TODO.md "Intermède actions"'s per-Interval budget - piggybacked
+    // on this same scheduled tick rather than a second cron schedule, per that entry's own
+    // decision.
+    if ((character.intermedeActionsThisInterval || 0) !== 0) updates.intermedeActionsThisInterval = 0;
+
+    if (Object.keys(updates).length === 0) continue;
+
+    await characterDoc.ref.update(updates);
     charactersUpdated += 1;
   }
 

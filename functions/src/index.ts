@@ -23,6 +23,7 @@ const mission = require("./actions/mission");
 const sEntrainer = require("./actions/sEntrainer");
 const apprentissage = require("./actions/apprentissage");
 const partirExplorer = require("./actions/partirExplorer");
+const faireDuCommerce = require("./actions/faireDuCommerce");
 
 initializeApp();
 const db = getFirestore();
@@ -58,6 +59,7 @@ const ACTION_HANDLERS: Record<string, any> = {
   sEntrainer,
   apprentissage,
   partirExplorer,
+  faireDuCommerce,
 };
 
 const CreateCharacterInput = z.object({
@@ -189,19 +191,23 @@ exports.performAction = onCall(async (request: any) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Login required.");
 
-  const { actionTypeId, recetteId, missionId, talentId, professionId } = request.data;
+  const { actionTypeId, recetteId, missionId, talentId, professionId, instanceId } = request.data;
   if (!actionTypeId) throw new HttpsError("invalid-argument", "actionTypeId is required.");
 
-  await runActionPipeline({
+  const { response } = await runActionPipeline({
     db,
     uid,
     actionTypeId,
     actionHandlers: ACTION_HANDLERS,
     today: todayUTC(),
-    payload: { recetteId, missionId, talentId, professionId },
+    payload: { recetteId, missionId, talentId, professionId, instanceId },
   });
 
-  return { ok: true };
+  // Intermède-budget actions (docs/TODO.md "Intermède actions") never write lastAction, so they
+  // have no result pop-up to read a confirmation from - the handler's response is echoed straight
+  // back to the caller instead. Every other handler leaves this undefined, so { ok: true } is
+  // unchanged for them.
+  return response ? { ok: true, response } : { ok: true };
 });
 
 // Closes the loop on a finished action: runs whatever the action deferred until the player

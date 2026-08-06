@@ -38,6 +38,7 @@ const KNOWN_HANDLER_IDS = [
   "sEntrainer",
   "apprentissage",
   "partirExplorer",
+  "faireDuCommerce",
 ];
 
 // Matches an action's label or description - for use as MultiSelectModalField's matchesFilter,

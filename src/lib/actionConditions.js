@@ -186,6 +186,20 @@ const PREDICATES = {
       return !ctx.character?.professionId;
     },
   },
+
+  // Gates every kind drawing from the shared per-Interval Intermède budget (docs/TODO.md
+  // "Intermède actions"), capped at 3 and shared across both Intermède windows. Deliberately
+  // absent from CONDITION_TYPES, same reason as hasProfession/trainerReachable/professionless:
+  // nobody authors this row - the catalog injects it from the action's own kind whenever it
+  // inherits from a budget kind (see actionKinds.js's actionUsesIntermedeBudget and
+  // actionCatalog.js's resolveConditions). Reads straight off the character document - no extra
+  // fetch needed, unlike hasInstanceTag/trainerReachable.
+  hasIntermedeBudget: {
+    reason: "Vous avez déjà effectué vos 3 actions d'Intermède pour cet Interval.",
+    test(condition, ctx) {
+      return numberOrZero(ctx.character?.intermedeActionsThisInterval) < 3;
+    },
+  },
 };
 
 // Conditions are ANDed; the first failure decides the message. An unknown type fails closed - a

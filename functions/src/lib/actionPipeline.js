@@ -14,6 +14,7 @@ const { stampLifecycle } = require("./actionEffects");
 const { isActionRunning } = require("./actionLifecycle");
 const { normalizeActionType, evaluateAvailability } = require("./actionCatalog");
 const { buildConditionContext } = require("./actionContext");
+const { actionUsesIntermedeBudget } = require("./actionKinds");
 
 async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today, payload = {} }) {
   const charSnap = await db
@@ -24,6 +25,7 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
     .get();
   if (charSnap.empty) throw new HttpsError("failed-precondition", "No living character found for this user.");
   const characterRef = charSnap.docs[0].ref;
+  const characterId = characterRef.id;
   const character = charSnap.docs[0].data();
 
   const actionTypeSnap = await db.collection("worldData").doc("actionTypes").collection("items").doc(actionTypeId).get();
@@ -40,7 +42,7 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
   const conditionContext = await buildConditionContext({
     db,
     character,
-    characterId: characterRef.id,
+    characterId,
     conditions: actionType.availability.conditions,
   });
   const availability = evaluateAvailability(actionType, conditionContext);
@@ -51,11 +53,20 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
     throw new HttpsError("failed-precondition", "Cette action n'a pas de gestionnaire configuré.");
   }
 
+  // Intermède-budget actions (docs/TODO.md "Intermède actions") never occupy the character's main
+  // action slot: they're bonus actions, repeatable up to the shared per-Interval cap regardless of
+  // whatever the main action is doing, so neither the once-per-Interval lock nor the lastAction
+  // envelope stamped by stampLifecycle applies to them - see actionKinds.js's
+  // actionUsesIntermedeBudget.
+  const usesIntermedeBudget = actionUsesIntermedeBudget(actionType.kindId);
+
   // Pre-transaction prep (e.g. drawing a quest) can throw a friendly precondition error -
   // deliberately outside the transaction so it never consumes the day's lock.
   const context = handler.prepare
-    ? await handler.prepare({ db, character, actionType, actionTypeId, payload })
+    ? await handler.prepare({ db, character, characterId, actionType, actionTypeId, payload })
     : undefined;
+
+  let response;
 
   await db.runTransaction(async (tx) => {
     const characterDoc = await tx.get(characterRef);
@@ -64,16 +75,18 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
 
     // An action occupies its character until it completes, which is what makes "one action per
     // day" and "an action lasts 24h" one rule instead of two clocks that drift apart at the day
-    // boundary - see docs/ISSUE-02-ACTION-FRAMEWORK.md §3.6.
-    if (isActionRunning(freshCharacter, now.toMillis())) {
+    // boundary - see docs/ISSUE-02-ACTION-FRAMEWORK.md §3.6. Intermède-budget actions are exempt -
+    // see above.
+    if (!usesIntermedeBudget && isActionRunning(freshCharacter, now.toMillis())) {
       throw new HttpsError("already-exists", "Action already in progress.");
     }
 
-    const { updates, logFields } = await handler.resolve({
+    const result = await handler.resolve({
       tx,
       db,
       character: freshCharacter,
       characterRef,
+      characterId,
       actionType,
       actionTypeId,
       today,
@@ -81,11 +94,16 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
       payload,
     });
 
-    tx.update(characterRef, stampLifecycle(updates, { actionType, now }));
+    const { updates, logFields } = result;
+    response = result.response;
+
+    // Intermède-budget actions skip the lifecycle envelope entirely - their updates land as-is,
+    // never touching lastAction/completesAt.
+    tx.update(characterRef, usesIntermedeBudget ? updates : stampLifecycle(updates, { actionType, now }));
 
     const logRef = db.collection("actionsLog").doc();
     tx.set(logRef, {
-      characterId: characterRef.id,
+      characterId,
       ownerUid: uid,
       actionTypeId,
       date: today,
@@ -93,6 +111,8 @@ async function runActionPipeline({ db, uid, actionTypeId, actionHandlers, today,
       ...logFields,
     });
   });
+
+  return { response };
 }
 
 module.exports = { runActionPipeline };
