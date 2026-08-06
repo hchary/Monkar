@@ -31,9 +31,10 @@ export const ActionTypeDocumentSchema = z.object({
     .string()
     .describe(
       "The kind this action is an instance of, from ACTION_KINDS (functions/src/lib/actionKinds.js): " +
-        "aventure | intermede | metier | social | recolte | artisanat. The kind tree is what gives an " +
-        "action its inherited behaviour - anything under `metier` is profession-gated, under `recolte` " +
-        "draws loot, under `artisanat` resolves a recette. Absent falls back to the legacy categoryId."
+        "aventure | intermede | metier | social | recolte | artisanat | entrainement. The kind tree is " +
+        "what gives an action its inherited behaviour - anything under `metier` is profession-gated, " +
+        "under `recolte` draws loot, under `artisanat` resolves a recette, under `entrainement` is " +
+        "gated by trainer-location reachability. Absent falls back to the legacy categoryId."
     ),
   categoryId: z
     .string()
@@ -109,6 +110,16 @@ export const ActionTypeDocumentSchema = z.object({
       "Ids in worldData/tags/items - a recette qualifies when its own categoryIds overlaps this list. " +
         "Only meaningful under the Artisanat branch; forced to [] for every other kind."
     ),
+  trainerTypeId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      "worldData/trainerTypes/items id this action trains at. Only meaningful under the " +
+        "Entraînement branch; written as null for every other kind. Matched against an owned " +
+        "talent's own catalog trainerTypeId by the 'sEntrainer' handler, and turned into the " +
+        "implicit trainerReachable condition by resolveConditions."
+    ),
   rumorHarvestCount: z
     .number()
     .default(1)
@@ -155,6 +166,7 @@ const DEFAULTED_KEYS = [
   "lootTagIds",
   "rarity",
   "recipeCategoryIds",
+  "trainerTypeId",
   "rumorHarvestCount",
   "missionRollCount",
 ] as const;

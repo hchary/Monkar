@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { ACTION_CATEGORIES } from "../../lib/actionCategories";
 import { normalizeActionType, evaluateAvailability } from "../../lib/actionCatalog";
 import MissionPicker from "./MissionPicker";
+import TalentPicker from "./TalentPicker";
 
 // hasInstanceTag needs the tag set of everything the character owns, resolved through the object
 // catalog exactly like the server's buildConditionContext (functions/src/lib/actionContext.js) -
@@ -44,6 +45,39 @@ function useInstanceTagIds(characterId, ownerUid) {
   }, [ownedObjectIds, objectTagsById]);
 }
 
+// trainerReachable needs every worldData/trainerTypes/items entry reachable from the character's
+// current region, resolved through the region doc exactly like the server's
+// buildReachableTrainerTypeIds (functions/src/lib/actionContext.js) - duplicated here as
+// component state rather than a mirrored module, same convention as useInstanceTagIds above.
+function useReachableTrainerTypeIds(regionId) {
+  const [adventureZoneIds, setAdventureZoneIds] = useState([]);
+  const [trainerTypes, setTrainerTypes] = useState([]);
+
+  useEffect(() => {
+    if (!regionId) {
+      setAdventureZoneIds([]);
+      return;
+    }
+    return onSnapshot(doc(db, "worldData", "regions", "items", regionId), (snap) => {
+      setAdventureZoneIds(snap.exists() ? snap.data().adventureZoneIds || [] : []);
+    });
+  }, [regionId]);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, "worldData", "trainerTypes", "items"), (snap) => {
+      setTrainerTypes(snap.docs.map((d) => ({ id: d.id, locationId: d.data().locationId || "" })));
+    });
+  }, []);
+
+  return useMemo(() => {
+    const reachable = new Set();
+    for (const trainerType of trainerTypes) {
+      if (adventureZoneIds.includes(trainerType.locationId)) reachable.add(trainerType.id);
+    }
+    return reachable;
+  }, [trainerTypes, adventureZoneIds]);
+}
+
 // R7/R8/R9: two nested tab rows - categories, then that category's actions - reusing the
 // `.tab-list` / `.tab-content` styling already used by `.character-tabs`, so the wrapping flex
 // layout that keeps that panel usable under 720px (F12) applies here for free.
@@ -54,7 +88,8 @@ function useInstanceTagIds(characterId, ownerUid) {
 // unmetBehaviour.
 export default function ActionBrowser({ character, actionTypes, onStart, submitting, error }) {
   const instanceTagIds = useInstanceTagIds(character.id, character.ownerUid);
-  const ctx = { character, instanceTagIds };
+  const reachableTrainerTypeIds = useReachableTrainerTypeIds(character.region?.id);
+  const ctx = { character, instanceTagIds, reachableTrainerTypeIds };
 
   const categories = useMemo(() => {
     const normalized = actionTypes.map((a) => ({ ...normalizeActionType(a), id: a.id })).filter((a) => a.enabled);
@@ -67,7 +102,7 @@ export default function ActionBrowser({ character, actionTypes, onStart, submitt
         .filter((a) => a.availability.ok || a.availability.behaviour === "disable")
         .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
     }));
-  }, [actionTypes, character, instanceTagIds]);
+  }, [actionTypes, character, instanceTagIds, reachableTrainerTypeIds]);
 
   const [activeCategoryId, setActiveCategoryId] = useState(null);
   const [activeActionId, setActiveActionId] = useState(null);
@@ -136,6 +171,14 @@ export default function ActionBrowser({ character, actionTypes, onStart, submitt
                 {activeAction.handlerId === "mission" ? (
                   <MissionPicker
                     character={character}
+                    onStart={(payload) => onStart(activeAction.id, payload)}
+                    submitting={submitting}
+                    availabilityOk={activeAction.availability.ok}
+                  />
+                ) : activeAction.handlerId === "sEntrainer" ? (
+                  <TalentPicker
+                    character={character}
+                    activeAction={activeAction}
                     onStart={(payload) => onStart(activeAction.id, payload)}
                     submitting={submitting}
                     availabilityOk={activeAction.availability.ok}

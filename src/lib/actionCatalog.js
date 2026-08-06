@@ -11,7 +11,12 @@
 
 import { DEFAULT_DURATION_HOURS } from "./actionLifecycle";
 import { evaluateConditions } from "./actionConditions";
-import { PROFESSION_ACTION_KIND_ID, actionKindCategoryId, actionKindInheritsFrom } from "./actionKinds";
+import {
+  PROFESSION_ACTION_KIND_ID,
+  TRAINING_ACTION_KIND_ID,
+  actionKindCategoryId,
+  actionKindInheritsFrom,
+} from "./actionKinds";
 
 // Every action runs for 24h unless its catalog entry says otherwise. Nonsense values (absent,
 // zero, negative, non-numeric) fall back to the default rather than producing an action that
@@ -48,19 +53,42 @@ export function resolveRecipeCategoryIds(actionType) {
     : [];
 }
 
-// The conditions actually evaluated for an action: the authored ones, plus - for anything
-// inheriting from Métier - the profession gate implied by its "Métiers associés" field. That gate
-// is not an authored row: it is what being a Métier action *means* ("disponible uniquement pour
-// les personnages possédant le métier associé"), so it can't be forgotten or contradicted by the
-// condition editor, and a subtype (Artisanat, Récolte…) inherits it without restating it.
+// worldData/trainerTypes/items id this action trains at - only meaningful for kinds inheriting
+// TRAINING_ACTION_KIND_ID, same convention as resolveRecipeCategoryIds/resolveProfessionIds for
+// their own branches.
+export function resolveTrainerTypeId(actionType) {
+  return typeof actionType?.trainerTypeId === "string" && actionType.trainerTypeId !== ""
+    ? actionType.trainerTypeId
+    : null;
+}
+
+// The conditions actually evaluated for an action: the authored ones, plus whatever a kind
+// implies. Anything inheriting from Métier gets the profession gate implied by its "Métiers
+// associés" field; anything inheriting from Entraînement gets the trainer-reachability gate
+// implied by its own trainerTypeId. Neither gate is an authored row: each is what belonging to
+// that kind *means*, so it can't be forgotten or contradicted by the condition editor, and a
+// subtype inherits it without restating it.
 //
-// Re-injection is guarded so normalizing an already-normalized document is idempotent; nothing
-// else can produce a hasProfession row, since it isn't offered by CONDITION_TYPES.
+// Each injection is individually guarded so normalizing an already-normalized document is
+// idempotent; nothing else can produce a hasProfession/trainerReachable row, since neither is
+// offered by CONDITION_TYPES.
 export function resolveConditions(actionType) {
   const authored = Array.isArray(actionType?.availability?.conditions) ? actionType.availability.conditions : [];
-  if (!actionKindInheritsFrom(resolveKindId(actionType), PROFESSION_ACTION_KIND_ID)) return authored;
-  if (authored.some((condition) => condition?.type === "hasProfession")) return authored;
-  return [...authored, { type: "hasProfession", professionIds: resolveProfessionIds(actionType) }];
+  const kindId = resolveKindId(actionType);
+  let conditions = authored;
+
+  if (actionKindInheritsFrom(kindId, PROFESSION_ACTION_KIND_ID) && !authored.some((c) => c?.type === "hasProfession")) {
+    conditions = [...conditions, { type: "hasProfession", professionIds: resolveProfessionIds(actionType) }];
+  }
+
+  if (
+    actionKindInheritsFrom(kindId, TRAINING_ACTION_KIND_ID) &&
+    !authored.some((c) => c?.type === "trainerReachable")
+  ) {
+    conditions = [...conditions, { type: "trainerReachable", trainerTypeId: resolveTrainerTypeId(actionType) }];
+  }
+
+  return conditions;
 }
 
 export function normalizeActionType(actionType) {
@@ -74,6 +102,7 @@ export function normalizeActionType(actionType) {
     categoryId: resolveCategoryId(actionType),
     professionIds: resolveProfessionIds(actionType),
     recipeCategoryIds: resolveRecipeCategoryIds(actionType),
+    trainerTypeId: resolveTrainerTypeId(actionType),
     description: actionType?.description || "",
     order: Number.isFinite(Number(actionType?.order)) ? Number(actionType.order) : 0,
     // Absent means enabled: an action authored before this field existed must keep working.

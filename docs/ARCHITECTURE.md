@@ -84,6 +84,9 @@ worldData/actionTypes/items/{id}
   questDifficultyWeights: [{ difficulty, weight }]  -- "partir-en-quete" only, optional; defaults to
                                              -- facile 55 / moyen 30 / difficile 10 / tres_difficile 4 / epique 1
                                              -- when absent, see "Quest drawing" below
+  trainerTypeId: string | null      -- worldData/trainerTypes/items id this action trains at; only
+                                     -- meaningful when kindId inherits from "entrainement" (the
+                                     -- "S'entraîner" action, handlerId "sEntrainer")
   -- there used to be a `tiers: [...]` field here (a per-action weighted roll deciding
   -- success/failure, gold, wounds, death, narrativeText) - retired; each handler now decides its
   -- own outcome and gains directly in code. A `tiers` array left over on an old document is inert.
@@ -159,6 +162,12 @@ worldData/talents/items/{id}
   effect: string                   -- French, shown in the character sheet tooltip
   favoredQuestIds: [string]        -- worldData/quests/items ids, purely informational for now
   trainerTypeId: string            -- worldData/trainerTypes/items id, only meaningful when trainable
+
+worldData/trainerTypes/items/{id}
+  name: string                     -- e.g. "Maître d'armes"
+  locationId: string               -- worldData/adventureZones/items id, where a character must be
+                                    -- able to reach (via their region's adventureZoneIds) to train
+                                    -- with this trainer type - see the "S'entraîner" action below
 
 worldData/adventureZones/items/{id}   -- displayed as "Lieu(x) de quête" in the UI; the collection id
   name: string                        -- itself keeps its original name to avoid a data migration
@@ -301,7 +310,7 @@ No longer a placeholder — it's a client-side CRUD UI, gated by `ProtectedRoute
 - **`TagsManager.jsx`**: CRUD for the standalone `worldData/tags/items` label catalog (name only), alphabetically sorted, editable via a popup dialog (edit or delete). Deleting a tag first strips its id from every quest's, narrative subject's, object's, loot table's, and recette's `tagIds` (and a recette's `categoryIds`, since it draws from the same catalog) — via a `tagIds`/`categoryIds` `array-contains` query against each collection — before deleting the tag doc, since `QuestsManager.jsx`, `QuestObjectivesManager.jsx`, `ObjectsManager.jsx`, `TablesDeTirageManager.jsx`, and `RecettesManager.jsx` are the consumers that reference tag ids. `ObjectsManager.jsx` similarly strips a deleted object's id from every loot table's `itemIds` and every recette's `ingredients`/`results` entries before deleting the object (the latter can't use an `array-contains` query since each entry is a `{objectId, qty}` map, not a bare id, so it fetches all recettes and filters client-side instead).
 - **`MultiSelectModalField.jsx`**: a shared, catalog-agnostic multi-select control — a `<dialog>` popup with a text-filtered checkbox list and selected-item chips, used wherever a form needs to pick several items out of a potentially large catalog. Its search behavior isn't hardcoded: a `matchesFilter(option, query)` prop decides what the popup's text filter actually matches against (defaults to a plain name match), and its trigger button label defaults to "Choisir" but can be overridden via `buttonLabel` (e.g. `QuestsManager.jsx`'s and `QuestObjectivesManager.jsx`'s tags fields use "Ajouter tags"). Each catalog's own manager exports a matching function shaped for its data — `matchesQuestObjective` (`QuestObjectivesManager.jsx`, matches name or tag), `matchesVerbPhrase` (`TextGenerationManager.jsx`, matches template text/cible/tag), `matchesRegion` (`RegionsManager.jsx`, matches name or description), `matchesQuest` (`QuestsManager.jsx`), `matchesTalent` (`TalentsManager.jsx`), `matchesTag` (`TagsManager.jsx`), `matchesObject` (`ObjectsManager.jsx`, matches name/description/rarity), `matchesOrigin` (`OriginsManager.jsx`, matches name/description), `matchesRecette` (`RecettesManager.jsx`, matches name/rarity) — so any future `MultiSelectModalField` usage against that catalog reuses the same filter instead of redefining it. `matchesQuest`/`matchesTalent` are exported ahead of any consumer, ready for e.g. `TalentsManager.jsx`'s `favoredQuestIds` field to switch over later.
 - **`QuantitySelectField.jsx`**: like `MultiSelectModalField.jsx`, but each selected option carries a quantity — `entries: [{ objectId, qty }]` instead of a plain id array, with a number input on each chip (`onQtyChange`) alongside the remove button (`onToggle`, reused for both adding via the popup checkbox list and removing via the chip). Currently only used by `RecettesManager.jsx`'s `ingredients`/`results` fields.
-- **`TrainerTypesManager.jsx`**: name-only stub for `worldData/trainerTypes/items` — see [docs/TODO.md](TODO.md) for what it still needs.
+- **`TrainerTypesManager.jsx`**: CRUD for `worldData/trainerTypes/items` (`name` + a `locationId` single-select against `worldData/adventureZones/items`) — still missing a description field, see [docs/TODO.md](TODO.md).
 - **`CharactersOverview.jsx`**: lists every character (any `alive` state) and, on click, shows the full character sheet plus its complete `actionsLog` history. Reads all of `characters`/`actionsLog` unfiltered, which the rules permit for the creator role — see the `actionsLog` list-query note above for why a *player's own* history tab needs an `ownerUid` filter but the creator's doesn't (the rule's `isCreator()` branch doesn't depend on `resource.data`, so it authorizes any query shape once true).
 
 ## Procedural quest-result text

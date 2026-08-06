@@ -77,6 +77,7 @@ export default function ActionOutcome({ lastAction, showLoot, character }) {
             </li>
           )}
           {lastAction.reputationGain > 0 && <li>Réputation : +{lastAction.reputationGain}</li>}
+          {lastAction.goldSpent > 0 && <li>Or dépensé : {lastAction.goldSpent}</li>}
           {lastAction.legendary && <li className="legendary">Exploit légendaire !</li>}
         </ul>
       )}

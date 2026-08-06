@@ -5,6 +5,7 @@ const {
   PROFESSION_ACTION_KIND_ID,
   HARVEST_ACTION_KIND_ID,
   CRAFTING_ACTION_KIND_ID,
+  TRAINING_ACTION_KIND_ID,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,
@@ -44,6 +45,11 @@ describe("the registry itself", () => {
     assert.equal(findActionKind(CRAFTING_ACTION_KIND_ID).parentId, PROFESSION_ACTION_KIND_ID);
   });
 
+  test("the training kind is one of them, nested under the intermède kind", () => {
+    assert.ok(findActionKind(TRAINING_ACTION_KIND_ID));
+    assert.equal(findActionKind(TRAINING_ACTION_KIND_ID).parentId, "intermede");
+  });
+
   test("every kind resolves to a root category", () => {
     for (const kind of ACTION_KINDS) {
       assert.ok(actionKindCategoryId(kind.value), `"${kind.value}" has no category`);
@@ -76,6 +82,11 @@ describe("actionKindInheritsFrom", () => {
     assert.equal(actionKindInheritsFrom("aventure", PROFESSION_ACTION_KIND_ID), false);
     assert.equal(actionKindInheritsFrom("intermede", PROFESSION_ACTION_KIND_ID), false);
     assert.equal(actionKindInheritsFrom("social", PROFESSION_ACTION_KIND_ID), false);
+  });
+
+  test("the training kind inherits from intermède, not from métier", () => {
+    assert.equal(actionKindInheritsFrom(TRAINING_ACTION_KIND_ID, "intermede"), true);
+    assert.equal(actionKindInheritsFrom(TRAINING_ACTION_KIND_ID, PROFESSION_ACTION_KIND_ID), false);
   });
 
   // Récolte is the first real multi-level fixture: a Métier subtype must inherit the profession
@@ -119,9 +130,9 @@ describe("actionKindsInTreeOrder", () => {
     assert.equal(flattened.length, ACTION_KINDS.length);
     assert.deepStrictEqual(
       flattened.map((kind) => kind.value),
-      ["aventure", "intermede", "metier", "recolte", "artisanat", "social"]
+      ["aventure", "intermede", "entrainement", "metier", "recolte", "artisanat", "social"]
     );
-    const subtypes = ["recolte", "artisanat"];
+    const subtypes = ["recolte", "artisanat", "entrainement"];
     for (const value of subtypes) {
       assert.equal(flattened.find((kind) => kind.value === value).depth, 1);
     }

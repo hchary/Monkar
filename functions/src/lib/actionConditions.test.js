@@ -5,6 +5,7 @@ const {
   UNKNOWN_CONDITION_REASON,
   evaluateConditions,
   conditionsNeedInstances,
+  conditionsNeedTrainerReachability,
 } = require("./actionConditions");
 
 const CHARACTER = {
@@ -162,6 +163,30 @@ describe("evaluateConditions - hasInstanceTag", () => {
   });
 });
 
+// The gate behind every Entraînement action. Injected by the catalog from the action's own
+// trainerTypeId (see actionCatalog.js's resolveConditions), which is why it isn't offered by
+// CONDITION_TYPES either, same as hasProfession.
+describe("evaluateConditions - trainerReachable", () => {
+  test("matches a trainerTypeId present in the reachable set", () => {
+    const context = ctx({ reachableTrainerTypeIds: new Set(["maitre-armes"]) });
+    assert.equal(check({ type: "trainerReachable", trainerTypeId: "maitre-armes" }, context), true);
+    assert.equal(check({ type: "trainerReachable", trainerTypeId: "sage-ermite" }, context), false);
+  });
+
+  // A caller that skipped the extra reads cannot prove reachability, so it must not assume it.
+  test("fails closed when the reachable set was never loaded", () => {
+    assert.equal(
+      check({ type: "trainerReachable", trainerTypeId: "maitre-armes" }, { character: CHARACTER }),
+      false
+    );
+  });
+
+  test("a missing trainerTypeId fails closed", () => {
+    const context = ctx({ reachableTrainerTypeIds: new Set(["maitre-armes"]) });
+    assert.equal(check({ type: "trainerReachable" }, context), false);
+  });
+});
+
 describe("evaluateConditions - notWounded", () => {
   test("passes only while the character carries no wound", () => {
     assert.equal(check({ type: "notWounded" }), true);
@@ -245,5 +270,24 @@ describe("conditionsNeedInstances", () => {
     assert.equal(conditionsNeedInstances([{ type: "hasTalent", talentId: "peche" }]), false);
     assert.equal(conditionsNeedInstances([]), false);
     assert.equal(conditionsNeedInstances(undefined), false);
+  });
+});
+
+describe("conditionsNeedTrainerReachability", () => {
+  test("is true only when a condition actually reads trainer reachability", () => {
+    assert.equal(conditionsNeedTrainerReachability([{ type: "trainerReachable", trainerTypeId: "x" }]), true);
+    assert.equal(
+      conditionsNeedTrainerReachability([
+        { type: "minReputation", value: 1 },
+        { type: "trainerReachable", trainerTypeId: "x" },
+      ]),
+      true
+    );
+  });
+
+  test("is false for condition sets that never touch trainer reachability", () => {
+    assert.equal(conditionsNeedTrainerReachability([{ type: "minReputation", value: 1 }]), false);
+    assert.equal(conditionsNeedTrainerReachability([]), false);
+    assert.equal(conditionsNeedTrainerReachability(undefined), false);
   });
 });

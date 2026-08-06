@@ -26,6 +26,7 @@ export const ACTION_KINDS = [
   { value: "social", label: "Social", parentId: null },
   { value: "recolte", label: "Récolte", parentId: "metier" },
   { value: "artisanat", label: "Artisanat", parentId: "metier" },
+  { value: "entrainement", label: "Entraînement", parentId: "intermede" },
 ];
 
 // The kind whose descendants are reserved to characters practising one of the action's
@@ -44,6 +45,12 @@ export const HARVEST_ACTION_KIND_ID = "recolte";
 // HARVEST_ACTION_KIND_ID - both the creator UI (which shows the "Catégories de recettes" field)
 // and the "artisanat" handler ask the same question.
 export const CRAFTING_ACTION_KIND_ID = "artisanat";
+
+// The kind whose descendants are gated by trainer-location reachability instead of a rolled tier.
+// Same convention as HARVEST_ACTION_KIND_ID/CRAFTING_ACTION_KIND_ID: both the creator UI (which
+// shows the "Type d'entraîneur" field) and the catalog (which injects the implicit
+// trainerReachable condition) ask the same question.
+export const TRAINING_ACTION_KIND_ID = "entrainement";
 
 export function findActionKind(kindId) {
   return ACTION_KINDS.find((kind) => kind.value === kindId) || null;

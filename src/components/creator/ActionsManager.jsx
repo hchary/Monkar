@@ -6,6 +6,7 @@ import {
   PROFESSION_ACTION_KIND_ID,
   HARVEST_ACTION_KIND_ID,
   CRAFTING_ACTION_KIND_ID,
+  TRAINING_ACTION_KIND_ID,
   actionKindInheritsFrom,
   actionKindLabel,
   actionKindsInTreeOrder,
@@ -28,7 +29,7 @@ import MultiSelectModalField from "./MultiSelectModalField";
 // "Abandoning the paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md). Kept in step with that
 // registry by hand, since the creator UI can't see the server's registry - the closest thing to
 // compile-time safety a Firestore-authored catalog can have (F2).
-const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte", "artisanat", "rumeur", "mission"];
+const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte", "artisanat", "rumeur", "mission", "sEntrainer"];
 
 // Matches an action's label or description - for use as MultiSelectModalField's matchesFilter,
 // and as this manager's own free-text search.
@@ -195,6 +196,7 @@ const emptyForm = {
   lootTagIds: [],
   rarity: RARITIES[0].value,
   recipeCategoryIds: [],
+  trainerTypeId: "",
   rumorHarvestCount: 1,
   missionRollCount: 3,
 };
@@ -213,6 +215,8 @@ export default function ActionsManager() {
   const regions = useItems("regions");
   const professions = useItems("professions");
   const sortedProfessions = [...professions].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+  const trainerTypes = useItems("trainerTypes");
+  const sortedTrainerTypes = [...trainerTypes].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   useEffect(() => {
     return onSnapshot(collection(db, "worldData", "actionTypes", "items"), (snap) => {
@@ -264,6 +268,7 @@ export default function ActionsManager() {
       lootTagIds: actionType.lootTagIds || [],
       rarity: actionType.rarity || RARITIES[0].value,
       recipeCategoryIds: actionType.recipeCategoryIds || [],
+      trainerTypeId: actionType.trainerTypeId || "",
       rumorHarvestCount: Number.isFinite(Number(actionType.rumorHarvestCount)) ? Number(actionType.rumorHarvestCount) : 1,
       missionRollCount: Number.isFinite(Number(actionType.missionRollCount)) ? Number(actionType.missionRollCount) : 3,
     });
@@ -306,6 +311,8 @@ export default function ActionsManager() {
   const isHarvestAction = actionKindInheritsFrom(form.kindId, HARVEST_ACTION_KIND_ID);
   // Only the Artisanat branch carries recipe categories - same convention as isHarvestAction.
   const isCraftingAction = actionKindInheritsFrom(form.kindId, CRAFTING_ACTION_KIND_ID);
+  // Only the Entraînement branch carries a trainer type link - same convention as isHarvestAction.
+  const isTrainingAction = actionKindInheritsFrom(form.kindId, TRAINING_ACTION_KIND_ID);
   // Gated by handlerId rather than kindId, unlike the three fields above: intermede/aventure each
   // host several unrelated action archetypes (docs/TODO.md "Intermède actions", "Aventure
   // exploration mechanics"), so kindId alone can't tell a Rumeur action apart from a sibling one.
@@ -334,6 +341,10 @@ export default function ActionsManager() {
         ? prev.recipeCategoryIds.filter((x) => x !== id)
         : [...prev.recipeCategoryIds, id],
     }));
+  }
+
+  function setTrainerTypeId(id) {
+    setForm((prev) => ({ ...prev, trainerTypeId: id }));
   }
 
   async function handleSubmit(e) {
@@ -378,6 +389,7 @@ export default function ActionsManager() {
         lootTagIds: isHarvestAction ? form.lootTagIds : [],
         rarity: isHarvestAction ? form.rarity : null,
         recipeCategoryIds: isCraftingAction ? form.recipeCategoryIds : [],
+        trainerTypeId: isTrainingAction ? form.trainerTypeId || null : null,
         rumorHarvestCount: isRumeurAction ? Number(form.rumorHarvestCount) || 1 : 1,
         missionRollCount: isRumeurAction ? Number(form.missionRollCount) || 3 : 3,
       },
@@ -439,6 +451,7 @@ export default function ActionsManager() {
           const isMetier = actionKindInheritsFrom(kindId, PROFESSION_ACTION_KIND_ID);
           const isHarvest = actionKindInheritsFrom(kindId, HARVEST_ACTION_KIND_ID);
           const isCrafting = actionKindInheritsFrom(kindId, CRAFTING_ACTION_KIND_ID);
+          const isTraining = actionKindInheritsFrom(kindId, TRAINING_ACTION_KIND_ID);
           return (
             <li key={actionType.id}>
               <strong>{actionType.label}</strong>
@@ -465,6 +478,14 @@ export default function ActionsManager() {
                   Catégories de recettes :{" "}
                   {(actionType.recipeCategoryIds || []).map((id) => tags.find((t) => t.id === id)?.name || id).join(", ") ||
                     <span className="error">aucune — l'action ne pourra fabriquer aucune recette</span>}
+                </div>
+              )}
+              {isTraining && (
+                <div>
+                  Type d'entraîneur :{" "}
+                  {trainerTypes.find((t) => t.id === actionType.trainerTypeId)?.name || (
+                    <span className="error">aucun</span>
+                  )}
                 </div>
               )}
               {actionType.handlerId === "rumeur" && (
@@ -597,6 +618,27 @@ export default function ActionsManager() {
               {form.recipeCategoryIds.length === 0 && (
                 <p className="error">
                   Sans catégorie de recettes, cette action ne pourra fabriquer aucune recette.
+                </p>
+              )}
+            </>
+          )}
+
+          {isTrainingAction && (
+            <>
+              <label>
+                Type d'entraîneur
+                <select value={form.trainerTypeId} onChange={(e) => setTrainerTypeId(e.target.value)}>
+                  <option value="">Aucun</option>
+                  {sortedTrainerTypes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!form.trainerTypeId && (
+                <p className="error">
+                  Sans type d'entraîneur, cette action ne sera accessible depuis aucune région.
                 </p>
               )}
             </>

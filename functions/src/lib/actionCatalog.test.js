@@ -113,6 +113,12 @@ describe("normalizeActionType", () => {
     assert.deepStrictEqual(normalizeActionType(once), once);
     assert.equal(once.availability.conditions.filter((c) => c.type === "hasProfession").length, 1);
   });
+
+  test("is idempotent for an Entraînement action too - the implicit gate isn't injected twice", () => {
+    const once = normalizeActionType({ label: "S'entraîner", kindId: "entrainement", trainerTypeId: "maitre-armes" });
+    assert.deepStrictEqual(normalizeActionType(once), once);
+    assert.equal(once.availability.conditions.filter((c) => c.type === "trainerReachable").length, 1);
+  });
 });
 
 // An action carries a kindId and its category falls out of the kind's root - the four categories
@@ -181,6 +187,40 @@ describe("resolveConditions - the implicit profession gate", () => {
     const ctx = { character, instanceTagIds: new Set() };
     assert.equal(evaluateAvailability({ kindId: "metier", professionIds: [] }, ctx).ok, false);
     assert.equal(evaluateAvailability({ kindId: "metier" }, ctx).ok, false);
+  });
+});
+
+// "Une action d'Entraînement n'est disponible que là où son entraîneur est accessible" -
+// expressed the same way as the profession gate: injected by the catalog from the action's own
+// trainerTypeId, never authored by hand.
+describe("resolveConditions - the implicit trainer-reachability gate", () => {
+  test("an Entraînement action is gated on its own trainerTypeId", () => {
+    const conditions = resolveConditions({ kindId: "entrainement", trainerTypeId: "maitre-armes" });
+    assert.deepStrictEqual(conditions, [{ type: "trainerReachable", trainerTypeId: "maitre-armes" }]);
+  });
+
+  test("the gate is appended to the authored conditions, not substituted for them", () => {
+    const conditions = resolveConditions({
+      kindId: "entrainement",
+      trainerTypeId: "maitre-armes",
+      availability: { conditions: [{ type: "notWounded" }] },
+    });
+    assert.deepStrictEqual(conditions, [
+      { type: "notWounded" },
+      { type: "trainerReachable", trainerTypeId: "maitre-armes" },
+    ]);
+  });
+
+  test("actions outside the Entraînement branch are left alone, even a Métier action with a stray trainerTypeId", () => {
+    for (const kindId of ["aventure", "intermede", "social"]) {
+      assert.deepStrictEqual(resolveConditions({ kindId, trainerTypeId: "maitre-armes" }), []);
+    }
+    const conditions = resolveConditions({
+      kindId: "metier",
+      professionIds: ["forgeron"],
+      trainerTypeId: "maitre-armes",
+    });
+    assert.deepStrictEqual(conditions, [{ type: "hasProfession", professionIds: ["forgeron"] }]);
   });
 });
 
