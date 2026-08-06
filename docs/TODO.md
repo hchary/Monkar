@@ -23,7 +23,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 11 | Profession initial assignment via quest/trainer | done | 9 | [Profession (métier) creation](#profession-métier-creation) |
 | 12 | Trainer type creation page — description field | done | — | [Trainer type creation page](#trainer-type-creation-page) |
 | 13 | Tag system unification (tagIds vs free-text tags) | done | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
-| 14 | Location tags | todo | — | [Location tags](#location-tags) |
+| 14 | Location tags | done | — | [Location tags](#location-tags) |
 | 15 | Aventure exploration mechanics — spec | spec | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
 | 16 | Aventure exploration mechanics — implementation | todo | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
 | 17 | Intermède actions — spec | spec | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
@@ -477,45 +477,39 @@ tags satisfied", so a multi-tagged phrase is harder to draw than it was. See
 
 ## Location tags
 
+Status: **implemented** (field and creator UI only — see "Still open" below).
+
 `worldData/adventureZones/items` (displayed as "Lieux de quête" in the creator UI,
-`QuestLocationsManager.jsx`) currently has no tags at all — just `name` and `description`. This
-is one of the two things explicitly deferred as a non-goal in
+`QuestLocationsManager.jsx`) now carries a `tagIds: string[]` field, referencing
+`worldData/tags/items` via the same `MultiSelectModalField.jsx` picker mechanism already used by
+quests, objects, loot tables, and talents (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). This
+closes one of the two things explicitly deferred as a non-goal in
 [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) (the multi-slot narrative grammar
 engine spec), which wants a way to select an "opening"/stakes-setting narrative fragment
 flavored by where the quest takes place (e.g. a forest, a coastal village, ruins) — the same way
 it already plans to flavor fragments by the character's talent tags and the quest's own tags.
 
-- **Tags field**: add `tagIds: string[]` to `worldData/adventureZones/items/{id}`, referencing
-  `worldData/tags/items` — the same shared tag catalog and the same `MultiSelectModalField.jsx`
-  picker mechanism already used by quests, objects, loot tables, and talents (see
-  [docs/ARCHITECTURE.md](ARCHITECTURE.md)).
-- **Creator UI**: add the `tagIds` multi-select field to `QuestLocationsManager.jsx`'s
-  create/edit form, alphabetically sorted like the other `tagIds` pickers.
-- **Consumption**: these `tagIds` would be resolved to tag names via the same "tag vocabulary
-  bridge" pattern specified in [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)
-  (resolving `tagIds` → `worldData/tags/items/{id}.name` at generation time, feeding into the
-  grammar engine's context tag set alongside talent tags and quest tags), so the "opening" slot
-  can be authored/matched by location flavor too, not just quest/talent flavor.
-- This is a natural follow-up to the grammar engine issue, not a prerequisite for it — that
-  engine's "opening" slot works fine without location tags (falls back to quest-tag-only or
-  generic matching); this feature just adds a third tag source once the core engine is live.
+`QuestLocationsManager.jsx`'s create/edit form gained the `tagIds` multi-select (alphabetically
+sorted, same as the other `tagIds` pickers), and its list rows show the resolved tag names, same
+pattern as `ObjectsManager.jsx`. `TagsManager.jsx`'s cascade-delete cleanup now also strips a
+deleted tag's id from `adventureZones.tagIds`, alongside the collections it already covered.
 
 **Data model implications**:
 ```
 worldData/adventureZones/items/{id}
   tagIds: string[]   -- worldData/tags/items ids, same mechanism as quests/objects/loot
-                      --   tables/talents; NEW field, rest of the shape unchanged
+                      --   tables/talents; NEW field, defaults to []
 ```
 
-Not implemented yet. Depends conceptually on
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md)'s tag-vocabulary-bridge pattern
-landing first for the `tagIds` → context-tags resolution to have a consumer, though the field
-itself could be added to `QuestLocationsManager.jsx` independently of that.
-
-**Implementation scope**:
-- Read: `src/components/creator/QuestLocationsManager.jsx` (the create/edit form to add `tagIds` to), `functions/src/schema/adventureZone.ts` / `shared/schema/adventureZone.ts` (schema to extend), `docs/ISSUE-01-GRAMMAR-ENGINE.md` (the tag-vocabulary-bridge pattern this entry's consumption step must follow), and `functions/src/textGeneration.js` (where the "opening" slot resolution would consume the new tags, once the bridge pattern lands).
-- Update: `src/components/creator/QuestLocationsManager.jsx`, `functions/src/schema/adventureZone.ts`, `shared/schema/adventureZone.ts`, and `functions/src/textGeneration.js` only if the tag-vocabulary bridge has already landed by the time this is picked up (otherwise the field can ship alone, per the note above).
-- Do not read or open any other file without asking the user first.
+**Still open (deliberately deferred)**: nothing consumes these `tagIds` yet. The original plan was
+to resolve them to tag names via the "tag vocabulary bridge" pattern in
+[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md), but that bridge was actually retired
+codebase-wide by [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) —
+`functions/src/textGeneration.js` now reads `tagIds` straight through instead of resolving through
+a name bridge. Wiring location `tagIds` into the "opening" slot's context tag set (alongside quest
+and talent tags) is future work with no scheduled owner; the field ships alone for now, per the
+note this entry always carried that it isn't a prerequisite for the grammar engine's opening slot,
+which already works without it.
 
 ## Tag system unification (tagIds vs free-text tags)
 
