@@ -120,6 +120,14 @@ export const CharacterDocumentSchema = z.object({
   woundsLight: z.number().default(0),
   woundsSevere: z.number().default(0),
   woundsPermanent: z.number().default(0),
+  fatigue: z
+    .number()
+    .default(0)
+    .describe(
+      "Accumulates +1 per encounter round resolved by the 'partirExplorer' handler " +
+        "(functions/src/actions/partirExplorer.js), regardless of that round's success/failure. Nothing " +
+        "reads or recovers it yet - see docs/TODO.md 'Aventure exploration mechanics'."
+    ),
   lastActionDate: z.string().nullable().default(null).describe("YYYY-MM-DD of the last performed action."),
   lastActionAt: z
     .unknown()
@@ -162,6 +170,7 @@ const DEFAULTED_KEYS = [
   "woundsLight",
   "woundsSevere",
   "woundsPermanent",
+  "fatigue",
   "lastActionDate",
   "lastActionAt",
   "lastAction",

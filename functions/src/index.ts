@@ -22,6 +22,7 @@ const rumeur = require("./actions/rumeur");
 const mission = require("./actions/mission");
 const sEntrainer = require("./actions/sEntrainer");
 const apprentissage = require("./actions/apprentissage");
+const partirExplorer = require("./actions/partirExplorer");
 
 initializeApp();
 const db = getFirestore();
@@ -56,6 +57,7 @@ const ACTION_HANDLERS: Record<string, any> = {
   mission,
   sEntrainer,
   apprentissage,
+  partirExplorer,
 };
 
 const CreateCharacterInput = z.object({

@@ -51,7 +51,7 @@ export const ActionTypeDocumentSchema = z.object({
     .default(null)
     .describe(
       'Names an entry in ACTION_HANDLERS (functions/src/index.js): "partirEnQuete" | "recolte" | ' +
-        '"artisanat" | "rumeur" | "mission" | "sEntrainer" | "apprentissage". There is no generic ' +
+        '"artisanat" | "rumeur" | "mission" | "sEntrainer" | "apprentissage" | "partirExplorer". There is no generic ' +
         "resolution path - an action whose handlerId is null or names an unregistered handler is " +
         "refused before the transaction opens."
     ),
@@ -146,6 +146,16 @@ export const ActionTypeDocumentSchema = z.object({
     .record(z.string(), z.unknown())
     .optional()
     .describe("Out of scope for the creator form, which preserves it via merge:true. Not read by the current quest handler."),
+  encounterCount: z
+    .number()
+    .default(1)
+    .describe(
+      "How many encounter rounds the 'partirExplorer' handler resolves per action occurrence - each " +
+        "round is a full resolveQuestOutcome call (score roll, narration, loot, talent evolution, " +
+        "wound) against a synthetic pseudo-quest, looped sequentially and stopped early if a round's " +
+        "wound kills the character. Only meaningful when handlerId is \"partirExplorer\", same gating " +
+        "convention as rumorHarvestCount/missionRollCount."
+    ),
   tiers: z
     .array(z.unknown())
     .optional()
@@ -174,6 +184,7 @@ const DEFAULTED_KEYS = [
   "trainerTypeId",
   "rumorHarvestCount",
   "missionRollCount",
+  "encounterCount",
 ] as const;
 
 export const DEFAULTS = ActionTypeDocumentSchema.pick(
