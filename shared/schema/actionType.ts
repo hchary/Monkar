@@ -64,6 +64,15 @@ export const ActionTypeDocumentSchema = z.object({
         "for any kind outside the Métier branch. Turned into an implicit hasProfession condition by " +
         "resolveConditions - it is never an authored row."
     ),
+  tagIds: z
+    .array(z.string())
+    .default([])
+    .describe(
+      "Ids in worldData/tags/items, same catalog and MultiSelectModalField picker every other tagged " +
+        "collection uses (quests, objects, loot tables, talents, locations, recettes). Generic and " +
+        "unconditional - unlike lootTagIds/recipeCategoryIds, it isn't scoped to a single kind branch. " +
+        "No consumer reads it yet (docs/TODO.md 'Action kinds and Métier actions')."
+    ),
   order: z.number().default(0).describe("Sort position within its category in the action browser."),
   enabled: z
     .boolean()
@@ -173,6 +182,7 @@ const DEFAULTED_KEYS = [
   "description",
   "handlerId",
   "professionIds",
+  "tagIds",
   "order",
   "enabled",
   "durationHours",
