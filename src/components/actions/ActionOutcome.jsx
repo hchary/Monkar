@@ -1,6 +1,11 @@
 import { RARITIES } from "../creator/TalentsManager";
+import { DIFFICULTIES } from "../creator/QuestsManager";
 
 const WOUND_LABELS = { light: "légère", severe: "grave", permanent: "permanente" };
+
+function difficultyLabel(value) {
+  return DIFFICULTIES.find((d) => d.value === value)?.label || value || "?";
+}
 
 // The narrative recap of a resolved action: what happened, what it granted or cost. Shared
 // between the completed-action dialog and the idle-state recap below the browser - previously
@@ -32,6 +37,8 @@ export default function ActionOutcome({ lastAction, showLoot, character }) {
         </p>
       )}
 
+      {lastAction.location && <p className="quest-info">Exploration : {lastAction.location.name}</p>}
+
       {lastAction.score != null && (
         <fieldset className="action-loot-box">
           <legend>Résolution</legend>
@@ -46,6 +53,23 @@ export default function ActionOutcome({ lastAction, showLoot, character }) {
             </p>
           )}
           {lastAction.success && lastAction.reputationGained > 0 && <p>Réputation gagnée : +{lastAction.reputationGained}</p>}
+        </fieldset>
+      )}
+
+      {lastAction.rounds?.length > 0 && (
+        <fieldset className="action-loot-box">
+          <legend>Rencontres</legend>
+          <ul className="instance-list">
+            {lastAction.rounds.map((round, index) => (
+              <li key={index} className={`difficulty-text-${round.difficulty}`}>
+                {difficultyLabel(round.difficulty)} — {round.success ? "Succès" : "Échec"} (jet {round.score}/
+                {round.threshold})
+                {round.wound && ` — Blessure ${WOUND_LABELS[round.wound] || round.wound}`}
+                {round.reputationGained > 0 && ` — +${round.reputationGained} réputation`}
+              </li>
+            ))}
+          </ul>
+          {lastAction.totalReputationGained > 0 && <p>Réputation totale gagnée : +{lastAction.totalReputationGained}</p>}
         </fieldset>
       )}
 

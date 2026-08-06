@@ -29,7 +29,16 @@ import MultiSelectModalField from "./MultiSelectModalField";
 // "Abandoning the paliers system" in docs/ISSUE-02-ACTION-FRAMEWORK.md). Kept in step with that
 // registry by hand, since the creator UI can't see the server's registry - the closest thing to
 // compile-time safety a Firestore-authored catalog can have (F2).
-const KNOWN_HANDLER_IDS = ["partirEnQuete", "recolte", "artisanat", "rumeur", "mission", "sEntrainer"];
+const KNOWN_HANDLER_IDS = [
+  "partirEnQuete",
+  "recolte",
+  "artisanat",
+  "rumeur",
+  "mission",
+  "sEntrainer",
+  "apprentissage",
+  "partirExplorer",
+];
 
 // Matches an action's label or description - for use as MultiSelectModalField's matchesFilter,
 // and as this manager's own free-text search.
@@ -199,6 +208,7 @@ const emptyForm = {
   trainerTypeId: "",
   rumorHarvestCount: 1,
   missionRollCount: 3,
+  encounterCount: 1,
 };
 
 export default function ActionsManager() {
@@ -271,6 +281,7 @@ export default function ActionsManager() {
       trainerTypeId: actionType.trainerTypeId || "",
       rumorHarvestCount: Number.isFinite(Number(actionType.rumorHarvestCount)) ? Number(actionType.rumorHarvestCount) : 1,
       missionRollCount: Number.isFinite(Number(actionType.missionRollCount)) ? Number(actionType.missionRollCount) : 3,
+      encounterCount: Number.isFinite(Number(actionType.encounterCount)) ? Number(actionType.encounterCount) : 1,
     });
     setPanelOpen(true);
   }
@@ -317,6 +328,8 @@ export default function ActionsManager() {
   // host several unrelated action archetypes (docs/TODO.md "Intermède actions", "Aventure
   // exploration mechanics"), so kindId alone can't tell a Rumeur action apart from a sibling one.
   const isRumeurAction = form.handlerId === "rumeur";
+  // Same gating convention as isRumeurAction - only meaningful for the "partirExplorer" handler.
+  const isPartirExplorerAction = form.handlerId === "partirExplorer";
 
   function toggleProfessionId(id) {
     setForm((prev) => ({
@@ -392,6 +405,7 @@ export default function ActionsManager() {
         trainerTypeId: isTrainingAction ? form.trainerTypeId || null : null,
         rumorHarvestCount: isRumeurAction ? Number(form.rumorHarvestCount) || 1 : 1,
         missionRollCount: isRumeurAction ? Number(form.missionRollCount) || 3 : 3,
+        encounterCount: isPartirExplorerAction ? Number(form.encounterCount) || 1 : 1,
       },
       { merge: true }
     );
@@ -493,6 +507,9 @@ export default function ActionsManager() {
                   Rumeurs récoltées : {actionType.rumorHarvestCount ?? 1} — Missions générées :{" "}
                   {actionType.missionRollCount ?? 3}
                 </div>
+              )}
+              {actionType.handlerId === "partirExplorer" && (
+                <div>Rencontres par exploration : {actionType.encounterCount ?? 1}</div>
               )}
               <div>
                 Gestionnaire : {actionType.handlerId || "aucun"}
@@ -667,6 +684,25 @@ export default function ActionsManager() {
               <p>
                 À chaque résolution : récolte jusqu'à ce nombre de rumeurs rares ou plus de la région actuelle, et
                 génère ce nombre de missions (remplaçant celles non réclamées).
+              </p>
+            </>
+          )}
+
+          {isPartirExplorerAction && (
+            <>
+              <label>
+                Nombre de rencontres
+                <input
+                  type="number"
+                  min="1"
+                  value={form.encounterCount}
+                  onChange={(e) => setForm({ ...form, encounterCount: e.target.value })}
+                />
+              </label>
+              <p>
+                À chaque résolution : tire un lieu au hasard dans la région actuelle, puis résout ce nombre de
+                rencontres à la suite (chacune un jet complet façon "Partir en quête"), en s'arrêtant plus tôt si une
+                blessure tue le personnage.
               </p>
             </>
           )}

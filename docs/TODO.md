@@ -25,7 +25,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 13 | Tag system unification (tagIds vs free-text tags) | done | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
 | 14 | Location tags | done | — | [Location tags](#location-tags) |
 | 15 | Aventure exploration mechanics — spec | done | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
-| 16 | Aventure exploration mechanics — implementation | todo | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
+| 16 | Aventure exploration mechanics — implementation | done | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
 | 17 | Intermède actions — spec | spec | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
 | 18 | Intermède actions — implementation | todo | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
 | 19 | Composite quests — spec | spec | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
@@ -1321,39 +1321,69 @@ below — now unblocked by this entry's decisions.
 
 ## Aventure exploration mechanics (implementation)
 
-Status: **todo**, unblocked — [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed)
-above has resolved every open question. No design work remains, only the build.
+Status: **implemented**. Built exactly to the shape [Aventure exploration mechanics (spec
+needed)](#aventure-exploration-mechanics-spec-needed) above decided.
 
-Per that entry's decisions, expected shape:
-- New `functions/src/actions/partirExplorer.js`, registered under a new `partirExplorer` handlerId
-  in `ACTION_HANDLERS` (`functions/src/index.js`), as a second Aventure-branch action alongside
-  "Partir en quête" and "Mission" — not a replacement.
-- Draws one `worldData/adventureZones/items` entry from the character's region's
-  `adventureZoneIds` (mirrors `mission.js`'s own `locationId` draw), then calls
-  `partirEnQuete.js`'s exported `resolveQuestOutcome` up to `actionType.encounterCount` times in a
-  loop, each round against a synthetic pseudo-quest (`difficulty` from `questDifficultyWeights`,
-  `tagIds` from the drawn location, `objectiveIds` the "objectif de quête" pool filtered by that
-  location's `tagIds`), threading each round's `nextTalents`/wound counters into the next round's
-  `character` argument, and stopping early on `woundResult.died`.
-- New `encounterCount` field on `worldData/actionTypes/items` (author-set, no creator UI needed —
-  same "authored directly in Firestore" convention as `tier.talentGain`, or a plain number input in
-  `ActionsManager.jsx` next to `rumorHarvestCount` if that's a cheap addition while touching that
-  form).
-- A `fatigue` field on `characters/{id}` — new, doesn't exist today, `+1` per resolved round.
-- `lastAction` for this handler: flattened `loot`/`talentEvolutions` arrays across every round (so
-  `ActionOutcome.jsx`'s existing "Butin obtenu"/"Amélioration de talent" fieldsets need no changes),
-  plus a new `rounds: [{ objectiveId, difficulty, score, threshold, success, wound,
-  reputationGained }]` array and a summed `totalReputationGained` — the round-by-round detail these
-  need is genuinely new UI, not a reuse of the existing single-score "Résolution" fieldset.
-- No new encounter-table catalog — the spec entry decided against one in favor of reusing the
-  existing quest-objective pool.
+`functions/src/actions/partirExplorer.js`, registered under a new `partirExplorer` handlerId in
+`ACTION_HANDLERS` (`functions/src/index.ts`), is a second Aventure-branch action alongside "Partir
+en quête" and "Mission" — not a replacement. `prepare()` draws one `worldData/adventureZones/items`
+entry from the character's region's `adventureZoneIds` (a content gap — an empty `adventureZoneIds`
+— leaves `location` null rather than failing the action) and fetches the same catalogs
+`partirEnQuete.js`/`mission.js` already fetch. `resolve()` then calls `partirEnQuete.js`'s exported
+`resolveQuestOutcome` up to `actionType.encounterCount` times in a loop, each round against a
+synthetic pseudo-quest (`difficulty` rolled independently per round from
+`actionType.questDifficultyWeights` — falling back to the same `DEFAULT_QUEST_DIFFICULTY_WEIGHTS`
+`partirEnQuete.js` exports — `tagIds` from the drawn location, and objectives drawn from the
+"objectif de quête" pool, filtered by overlap with the location's own `tagIds` when it has any).
+Each round threads its `nextTalents` and updated wound counters into the next round's `character`
+argument, and the loop stops immediately once a round's wound kills the character
+(`outcome.woundResult.died`), leaving fewer than `encounterCount` rounds recorded. `resolveQuestOutcome`
+was extended to also return the objective it drew, so each round can record its own `objectiveId`
+without a second, redundant draw.
 
-**Implementation scope**:
-- Read: `functions/src/actions/partirEnQuete.js` (`resolveQuestOutcome`, the engine this reuses verbatim), `functions/src/actions/mission.js` (the closest precedent for a second Aventure-branch handler reusing that same engine, and its `locationId`-from-region draw), `functions/src/lib/actionKinds.js` / `src/lib/actionKinds.js` (registering the new handler), `functions/src/schema/character.ts` / `shared/schema/character.ts` (adding `fatigue`, alongside `woundsLight`/`woundsSevere`/`woundsPermanent`), `functions/src/schema/actionType.js` (adding `encounterCount`), and `src/components/actions/ActionOutcome.jsx` (the new per-round "Rencontres" section).
-- Update: the files above, plus `functions/src/index.js` (handler registration) and `docs/ARCHITECTURE.md` if this adds a system worth documenting there.
-- Do not read or open any other file without asking the user first.
+`encounterCount` was added to `worldData/actionTypes/items` (`shared/schema/actionType.ts`), gated
+by `handlerId === "partirExplorer"` the same way `rumorHarvestCount`/`missionRollCount` are gated by
+`handlerId === "rumeur"` — including a plain number input in `ActionsManager.jsx`, added next to the
+existing rumeur fields since it was a cheap addition while already touching that form. `fatigue` was
+added to `characters/{id}` (`shared/schema/character.ts`), `+1` per round actually resolved (not
+`encounterCount`, so an early wound-death doesn't over-count) — nothing reads or recovers it yet, per
+the spec entry's own "Still open" note.
 
-Not implemented yet.
+`lastAction` for this handler flattens `loot`/`talentEvolutions` across every round (so
+`ActionOutcome.jsx`'s existing "Butin obtenu"/"Amélioration de talent" fieldsets needed no changes),
+plus a new `rounds: [{ objectiveId, difficulty, score, threshold, success, wound, reputationGained }]`
+array and a summed `totalReputationGained`. `ActionOutcome.jsx` gained a "Rencontres" fieldset
+listing each round (difficulty label and color reused from `QuestsManager.jsx`'s `DIFFICULTIES`,
+wound label reused from the existing "Résolution" fieldset's `WOUND_LABELS`) — genuinely new UI, not
+a reuse of the existing single-score fieldset, which stays gated on `lastAction.score != null` and
+so never renders for this handler. The top-level `lastAction.success` (which colors the "Succès"/
+"Échec" line `DefaultResult.jsx` already renders unchanged) is `true` when at least one round
+succeeded — a judgment call the spec entry left to this one, since no single boolean can capture a
+multi-round outcome exactly.
+
+**Data model implications**:
+```
+worldData/actionTypes/items/{id}
+  encounterCount: number   -- how many rounds partirExplorer resolves per occurrence; only
+                            --   meaningful when handlerId is "partirExplorer", defaults to 1
+
+characters/{id}
+  fatigue: number           -- +1 per encounter round resolved by partirExplorer; defaults to 0,
+                             --   write-only for now (see "Still open" above)
+
+characters/{id}.lastAction (partirExplorer shape)
+  location: { id, name } | null
+  rounds: [{ objectiveId, difficulty, score, threshold, success, wound, reputationGained }]
+  totalReputationGained: number
+  loot / talentEvolutions: flattened across every round, same shape as partirEnQuete.js/mission.js
+```
+
+Tested in `functions/src/actions/partirExplorer.test.js`: multi-round resolution, reputation/loot
+summed and flattened across rounds, the wound-death early stop (fewer than `encounterCount` rounds
+recorded), and the no-location content-gap fallback.
+
+Escalating difficulty across rounds and fatigue-as-a-gate remain deliberately unbuilt, exactly as
+the spec entry's own "Still open" section already flagged.
 
 ## Intermède actions (spec needed)
 

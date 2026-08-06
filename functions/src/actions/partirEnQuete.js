@@ -297,7 +297,22 @@ function resolveQuestOutcome({
     rarityOffset: success ? 0 : 2,
   });
 
-  return { score, threshold, success, wound, woundResult, reputationGained, loot, talentEvolutions, nextTalents, narrativeText };
+  return {
+    score,
+    threshold,
+    success,
+    wound,
+    woundResult,
+    reputationGained,
+    loot,
+    talentEvolutions,
+    nextTalents,
+    narrativeText,
+    // The single objective this resolution rolled against (threshold/wound adjustments and talent
+    // evolution) - exposed so a multi-round caller (partirExplorer.js) can record which objective
+    // each of its rounds drew, without a second, wasteful pickRandomLoot call.
+    objective,
+  };
 }
 
 async function resolve({ character, today, context }) {
@@ -397,4 +412,5 @@ module.exports = {
   preferQuestPhrasesPerSlot,
   drawQuestLoot,
   resolveQuestOutcome,
+  DEFAULT_QUEST_DIFFICULTY_WEIGHTS,
 };
