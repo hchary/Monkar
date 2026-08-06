@@ -27,7 +27,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 15 | Aventure exploration mechanics — spec | done | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
 | 16 | Aventure exploration mechanics — implementation | done | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
 | 17 | Intermède actions — spec | done | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
-| 18 | Intermède actions — implementation | todo | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
+| 18 | Intermède actions — implementation | done | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
 | 19 | Composite quests — spec | spec | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
 | 20 | Composite quests — implementation | todo | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | spec | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
@@ -1461,27 +1461,60 @@ designed).
 
 ## Intermède actions (implementation)
 
-Status: **not implemented**. Unblocked by
-[Intermède actions (spec needed)](#intermède-actions-spec-needed) above, but scoped down to what
-it actually resolved: the per-Interval cap-tracking mechanism, plus "faire du commerce" (sell
-only). "envoyer un message" and "placer une annonce" stay out of scope — both need prerequisites
-(the still-undesigned messaging feature
-[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
+Status: **implemented**, scoped down to what
+[Intermède actions (spec needed)](#intermède-actions-spec-needed) actually resolved: the
+per-Interval cap-tracking mechanism, plus "faire du commerce" (sell only). "envoyer un message" and
+"placer une annonce" stay out of scope — both need prerequisites (the still-undesigned messaging
+feature [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
 reserves a page for, and a not-yet-existing player-announcement discoverable-hook mechanism for
-[Aventure exploration mechanics](#aventure-exploration-mechanics-implementation)) that this spec
-pass deliberately didn't invent.
+[Aventure exploration mechanics](#aventure-exploration-mechanics-implementation)) that this pass
+deliberately didn't build.
 
-**Implementation scope**:
-- Build: the `character.intermedeActionsThisInterval` counter and its reset (piggybacked on
-  `sweepQuestTriggers`'s scheduled tick), the implicit Intermède-budget condition, and a "faire du
-  commerce" sell-only handler (new `kindId` under `intermede`, new handlerId) including the
-  mythic-rarity-triggers-rumor-sighting side effect.
-- Do not build "envoyer un message" or "placer une annonce" in this pass — see "Still open" above.
-- Do not read or open any file for this entry without asking the user first — confirm the full
-  file list (handlers, schema, UI) with the user when this row is actually picked up for
-  implementation.
+A blocking architecture gap surfaced while implementing this that the spec entry hadn't
+anticipated: every action type up to now (`runActionPipeline` in
+`functions/src/lib/actionPipeline.js`) unconditionally checks the once-per-Interval
+`isActionRunning` lock and unconditionally overwrites `character.lastAction` via `stampLifecycle`
+— including "S'entraîner"/"Apprentissage", which sit under the `intermede` root kind in
+`actionKinds.js` but consume the *main* lock, not this budget. Resolved by making the bypass
+kind-scoped rather than root-scoped: a new `commerce` kind (`parentId: "intermede"`, sibling to
+`entrainement`), and `actionKinds.js`'s `actionUsesIntermedeBudget(kindId)` — currently just
+`["commerce"]`, the list "envoyer un message"/"placer une annonce" will join once built — which
+`runActionPipeline` checks to skip *both* the lock check and the `stampLifecycle` envelope for
+these kinds specifically, leaving `entrainement`/`apprentissage` unaffected. A second gap: since a
+budget action never writes `lastAction`, it has no result pop-up to show its outcome through —
+resolved by having `performAction` thread the handler's `resolve()` return value back to the
+caller under a `response` key (`{ ok: true, response }`, additive — every other handler leaves it
+undefined), which `CommercePicker.jsx` reads directly instead of watching the character snapshot.
+See [docs/ARCHITECTURE.md](ARCHITECTURE.md)'s "Intermède-budget actions" section for the full
+mechanism.
 
-Not implemented yet.
+**Built**:
+- `character.intermedeActionsThisInterval` (default 0, `shared/schema/character.ts`), incremented
+  by the handler on success, reset to 0 as a sibling pass inside `sweepQuestTriggers`
+  (`functions/src/lib/questTriggers.js`) — not a second cron schedule.
+- The implicit `hasIntermedeBudget` condition (`functions/src/lib/actionConditions.js` ⇄
+  `src/lib/actionConditions.js`), injected by `resolveConditions` (`actionCatalog.js`) for any kind
+  `actionUsesIntermedeBudget` recognizes, checked against `< 3`.
+- `faireDuCommerce.js` (`functions/src/actions/faireDuCommerce.js`, registered under the shared
+  `faireDuCommerce` handlerId): the player sells one owned Instance (picked client-side via the new
+  `CommercePicker.jsx`, re-validated server-side, never trusted from the client) for gold, priced
+  by a fixed per-rarity table (`functions/src/lib/salePrice.js` ⇄ `src/lib/salePrice.js`, same
+  mirrored-module convention as `trainingCost.js` — a starting-balance table, not a formula, since
+  an object has no "quality" of its own to scale against like a talent does): commun 10, peu commun
+  25, rare 50, très rare 100, légendaire 250, mythique 600, divin 1500, unique 4000.
+- **Mythic-sale rumor side effect**: selling an object of rarity "mythique" or above authors a new
+  `worldData/rumors/items` entry on the fly (there being no hand-authored rumor to copy from for a
+  sale, unlike `RumorsManager.jsx`'s own flow) with generated French flavor text naming the object
+  and the seller's region, plus the matching
+  `worldData/regions/items/{regionId}/rumorSightings/{rumorId}` entry — same shape
+  `RumorsManager.jsx` itself seeds — at the seller's current region only, skipping the normal
+  hop-by-hop propagation decay.
+- UI: `ActionBrowser.jsx` gained a `budgetActionsOnly` mode (Intermède-budget actions only, no
+  category tabs) so `ActionPanel.jsx` can still offer "Faire du commerce" while the character's
+  main action is counting down, plus an inline "X/3 restantes cet Interval" indicator on the
+  Intermède tab.
+
+**Not built** (see "Still open" under the spec entry): "envoyer un message", "placer une annonce".
 
 ## Composite quests (spec needed)
 

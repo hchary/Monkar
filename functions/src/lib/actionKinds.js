@@ -28,6 +28,7 @@ const ACTION_KINDS = [
   { value: "artisanat", label: "Artisanat", parentId: "metier" },
   { value: "entrainement", label: "Entraînement", parentId: "intermede" },
   { value: "apprentissage", label: "Apprentissage", parentId: "entrainement" },
+  { value: "commerce", label: "Commerce", parentId: "intermede" },
 ];
 
 // The kind whose descendants are reserved to characters practising one of the action's
@@ -60,6 +61,17 @@ const TRAINING_ACTION_KIND_ID = "entrainement";
 // actionCatalog.js's resolveConditions). Same convention as TRAINING_ACTION_KIND_ID.
 const PROFESSION_LEARNING_ACTION_KIND_ID = "apprentissage";
 
+// The kinds whose actions draw from the shared per-Interval Intermède budget
+// (character.intermedeActionsThisInterval, capped at 3, see docs/TODO.md "Intermède actions")
+// instead of the character's main action lock (lastAction.completesAt) - they resolve instantly
+// and can be repeated any number of times up to that cap, independent of whatever the main action
+// slot is doing. actionPipeline.js reads this to skip both the once-per-Interval lock check and
+// the stampLifecycle/lastAction envelope for these kinds specifically. Only "commerce" exists
+// today; "envoyer un message" and "placer une annonce" will join this list once their own
+// prerequisites (the still-undesigned messaging feature and player-announcement discoverable-hook
+// mechanism) are designed and built - see docs/TODO.md's "Still open" note.
+const INTERMEDE_BUDGET_ACTION_KIND_IDS = ["commerce"];
+
 function findActionKind(kindId) {
   return ACTION_KINDS.find((kind) => kind.value === kindId) || null;
 }
@@ -80,6 +92,12 @@ function actionKindAncestry(kindId) {
 // Inheritance, including the reflexive case: a Métier action is itself "of kind Métier".
 function actionKindInheritsFrom(kindId, ancestorKindId) {
   return actionKindAncestry(kindId).includes(ancestorKindId);
+}
+
+// Whether an action of this kind draws from the shared Intermède budget - see
+// INTERMEDE_BUDGET_ACTION_KIND_IDS above.
+function actionUsesIntermedeBudget(kindId) {
+  return INTERMEDE_BUDGET_ACTION_KIND_IDS.some((budgetKindId) => actionKindInheritsFrom(kindId, budgetKindId));
 }
 
 // A kind's category is its root ancestor, which is why the four roots share the four category
@@ -109,9 +127,11 @@ module.exports = {
   CRAFTING_ACTION_KIND_ID,
   TRAINING_ACTION_KIND_ID,
   PROFESSION_LEARNING_ACTION_KIND_ID,
+  INTERMEDE_BUDGET_ACTION_KIND_IDS,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,
+  actionUsesIntermedeBudget,
   actionKindCategoryId,
   actionKindLabel,
   actionKindsInTreeOrder,

@@ -142,9 +142,19 @@ describe("actionKindsInTreeOrder", () => {
     assert.equal(flattened.length, ACTION_KINDS.length);
     assert.deepStrictEqual(
       flattened.map((kind) => kind.value),
-      ["aventure", "intermede", "entrainement", "apprentissage", "metier", "recolte", "artisanat", "social"]
+      [
+        "aventure",
+        "intermede",
+        "entrainement",
+        "apprentissage",
+        "commerce",
+        "metier",
+        "recolte",
+        "artisanat",
+        "social",
+      ]
     );
-    const subtypes = ["recolte", "artisanat", "entrainement"];
+    const subtypes = ["recolte", "artisanat", "entrainement", "commerce"];
     for (const value of subtypes) {
       assert.equal(flattened.find((kind) => kind.value === value).depth, 1);
     }

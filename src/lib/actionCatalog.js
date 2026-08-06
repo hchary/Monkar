@@ -17,6 +17,7 @@ import {
   PROFESSION_LEARNING_ACTION_KIND_ID,
   actionKindCategoryId,
   actionKindInheritsFrom,
+  actionUsesIntermedeBudget,
 } from "./actionKinds";
 
 // Every action runs for 24h unless its catalog entry says otherwise. Nonsense values (absent,
@@ -73,8 +74,8 @@ export function resolveTrainerTypeId(actionType) {
 // inherits it without restating it.
 //
 // Each injection is individually guarded so normalizing an already-normalized document is
-// idempotent; nothing else can produce a hasProfession/trainerReachable/professionless row, since
-// none of them is offered by CONDITION_TYPES.
+// idempotent; nothing else can produce a hasProfession/trainerReachable/professionless/
+// hasIntermedeBudget row, since none of them is offered by CONDITION_TYPES.
 export function resolveConditions(actionType) {
   const authored = Array.isArray(actionType?.availability?.conditions) ? actionType.availability.conditions : [];
   const kindId = resolveKindId(actionType);
@@ -96,6 +97,12 @@ export function resolveConditions(actionType) {
     !authored.some((c) => c?.type === "professionless")
   ) {
     conditions = [...conditions, { type: "professionless" }];
+  }
+
+  // Every kind drawing from the shared Intermède budget (docs/TODO.md "Intermède actions") gets
+  // this gate implicitly - same "nobody authors this row" convention as the three above.
+  if (actionUsesIntermedeBudget(kindId) && !authored.some((c) => c?.type === "hasIntermedeBudget")) {
+    conditions = [...conditions, { type: "hasIntermedeBudget" }];
   }
 
   return conditions;

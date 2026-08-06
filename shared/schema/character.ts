@@ -128,6 +128,19 @@ export const CharacterDocumentSchema = z.object({
         "(functions/src/actions/partirExplorer.js), regardless of that round's success/failure. Nothing " +
         "reads or recovers it yet - see docs/TODO.md 'Aventure exploration mechanics'."
     ),
+  intermedeActionsThisInterval: z
+    .number()
+    .default(0)
+    .describe(
+      "Bonus Intermède actions performed so far this Interval (docs/TODO.md 'Intermède actions'), " +
+        "capped at 3 and shared across both Intermède windows. Incremented by handlers whose kind " +
+        "draws from this budget (functions/src/lib/actionKinds.js's actionUsesIntermedeBudget, e.g. " +
+        "'faireDuCommerce'), gated by the implicit 'hasIntermedeBudget' condition " +
+        "(actionConditions.js). Reset to 0 by the scheduled sweepQuestTriggers tick " +
+        "(functions/src/lib/questTriggers.js), as a sibling pass to quest triggers rather than a " +
+        "second cron schedule. Fully decoupled from lastAction/lastActionDate: actions drawing from " +
+        "this budget never touch the main action lock (functions/src/lib/actionPipeline.js)."
+    ),
   lastActionDate: z.string().nullable().default(null).describe("YYYY-MM-DD of the last performed action."),
   lastActionAt: z
     .unknown()
@@ -171,6 +184,7 @@ const DEFAULTED_KEYS = [
   "woundsSevere",
   "woundsPermanent",
   "fatigue",
+  "intermedeActionsThisInterval",
   "lastActionDate",
   "lastActionAt",
   "lastAction",

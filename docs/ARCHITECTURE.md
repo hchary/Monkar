@@ -65,6 +65,9 @@ characters/{characterId}
   lastActionDate: string | null    -- "YYYY-MM-DD" UTC, the once-per-day lock
   lastActionAt: Timestamp | null   -- precise instant, used for the 24h reveal delay
   lastAction: { ... } | null       -- full result of the last action, see performAction below
+  intermedeActionsThisInterval: number  -- bonus Intermède actions used this Interval, capped at 3,
+                                    -- reset by sweepQuestTriggers - see "Intermède-budget actions"
+                                    -- below; fully decoupled from lastAction/lastActionDate above
   createdAt: server timestamp
 
 actionsLog/{logId}                 -- permanent history, independent of lastAction
@@ -271,6 +274,12 @@ Given an `actionTypeId`, `performAction`:
 
 The transaction is what actually prevents a double-action race (e.g. two tabs clicking at once) — the lock check and the write happen atomically. `rollWeighted`/`rarityFloor`/`RARITY_ORDER` (shared by `createCharacter`'s background roll and by quest handlers) live in `functions/src/lib/rolls.js`.
 
+### Intermède-budget actions: bypassing the main lock
+
+Some actions (docs/TODO.md "Intermède actions") are bonus actions, repeatable up to 3 times per Interval, independent of the character's one main action per Interval. `functions/src/lib/actionKinds.js`'s `actionUsesIntermedeBudget(kindId)` marks which kinds these are (today: `commerce`, the "Faire du commerce" sell handler); `runActionPipeline` (`functions/src/lib/actionPipeline.js`) checks it before touching the character document and, when true, skips both the once-per-Interval `isActionRunning` lock check and the `stampLifecycle` envelope that would otherwise overwrite `lastAction`/`completesAt` — the handler's `updates` land on the character document as-is. Availability is instead gated by the implicit `hasIntermedeBudget` condition (`functions/src/lib/actionConditions.js`), checked against `character.intermedeActionsThisInterval < 3` and incremented by the handler itself on success; the counter resets to 0 every Interval tick as a sibling pass inside `sweepQuestTriggers` (see below).
+
+Since these actions never write `lastAction`, they have no result pop-up to surface their outcome through. `performAction` instead threads back whatever the handler's `resolve()` returns under a `response` key (`{ ok: true, response }`), and the client-side picker (`CommercePicker.jsx`) reads its confirmation directly off `performAction`'s own return value rather than off the character snapshot. `ActionBrowser.jsx`'s `budgetActionsOnly` mode lets `ActionPanel.jsx` keep offering these actions even while the character's main action is still counting down.
+
 ### `partirEnQuete.js`: drawing a quest
 
 `prepare` queries `worldData/quests/items` `where regionIds array-contains character.region.id` to get the region's full quest catalog. If it's empty, it throws `failed-precondition` with *"Aucune quête disponible dans la région, prenez le temps de vous reposer."* — the player isn't locked out for the day and can retry once the creator adds quests for that region.
@@ -291,7 +300,7 @@ A second, sibling Aventure-branch handler (`docs/TODO.md` "Aventure exploration 
 
 The first scheduled (non-request-triggered) Cloud Function in the project — every other mechanic (loot draw, talent evolution, rumor harvest, mission generation, quest resolution) resolves lazily on a player action instead. Registered in `functions/src/index.ts` via `onSchedule({ schedule: "0 0,12 * * *", timeZone: "UTC" }, ...)`, so it ticks on fixed Interval boundaries (00:00 and 12:00 UTC) independent of any individual character's own `completesAt` clock.
 
-Each tick calls `sweepQuestTriggers` (`functions/src/lib/questTriggers.js`): loads every `worldData/quests/items` document carrying a `trigger.conditions` array (see docs/TODO.md's "Quest triggers and end-of-action pop-up pages"), and every living character, then for each character evaluates every not-yet-triggered quest's `trigger.conditions` through the same `evaluateConditions` used to gate action availability (`functions/src/lib/actionConditions.js`). A match adds the quest's id to `character.triggeredQuestIds` (via `arrayUnion`, so a character never loses a quest already granted, even if it later stops meeting the trigger). The instance-tag lookup that `hasInstanceTag` conditions need is only ever queried when at least one triggerable quest actually uses that condition type, same "pay only when asked" guard as `actionContext.js`'s `buildConditionContext`.
+Each tick calls `sweepQuestTriggers` (`functions/src/lib/questTriggers.js`): loads every `worldData/quests/items` document carrying a `trigger.conditions` array (see docs/TODO.md's "Quest triggers and end-of-action pop-up pages"), and every living character, then for each character evaluates every not-yet-triggered quest's `trigger.conditions` through the same `evaluateConditions` used to gate action availability (`functions/src/lib/actionConditions.js`). A match adds the quest's id to `character.triggeredQuestIds` (via `arrayUnion`, so a character never loses a quest already granted, even if it later stops meeting the trigger). The instance-tag lookup that `hasInstanceTag` conditions need is only ever queried when at least one triggerable quest actually uses that condition type, same "pay only when asked" guard as `actionContext.js`'s `buildConditionContext`. The same per-character loop also resets `character.intermedeActionsThisInterval` to 0 whenever it's nonzero (docs/TODO.md "Intermède actions") — a sibling pass sharing this tick rather than a second cron schedule.
 
 A newly triggered quest is not pushed to the client in any way — it is simply readable the next time the player's own `ActionResultDialog.jsx` opens, on a dedicated page (see "Quest result pop-up" pattern below and docs/TODO.md). There is no server-side "unseen" flag; the client tracks which triggered quest ids it has already shown per character in `localStorage`, since `triggeredQuestIds` itself is a permanent, ever-growing list.
 

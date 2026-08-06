@@ -3,9 +3,11 @@ import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { ACTION_CATEGORIES } from "../../lib/actionCategories";
 import { normalizeActionType, evaluateAvailability } from "../../lib/actionCatalog";
+import { actionUsesIntermedeBudget } from "../../lib/actionKinds";
 import MissionPicker from "./MissionPicker";
 import TalentPicker from "./TalentPicker";
 import ProfessionPicker from "./ProfessionPicker";
+import CommercePicker from "./CommercePicker";
 
 // hasInstanceTag needs the tag set of everything the character owns, resolved through the object
 // catalog exactly like the server's buildConditionContext (functions/src/lib/actionContext.js) -
@@ -87,7 +89,14 @@ function useReachableTrainerTypeIds(regionId) {
 // as the authority, through the mirrored evaluator (src/lib/actionConditions.js). An action whose
 // conditions fail is hidden or shown disabled with its unmetMessage, per the action's own
 // unmetBehaviour.
-export default function ActionBrowser({ character, actionTypes, onStart, submitting, error }) {
+//
+// `budgetActionsOnly` (docs/TODO.md "Intermède actions") restricts the browser to Intermède-budget
+// actions (e.g. "Faire du commerce") only, hiding both the category tab list and every other
+// action - used by ActionPanel.jsx to let a character with a running main action still spend
+// unused Intermède budget, without offering actions that would still hit the main-action lock
+// server-side (entrainement/apprentissage are structurally under "intermede" too, but consume that
+// lock like any other action - see actionKinds.js's actionUsesIntermedeBudget).
+export default function ActionBrowser({ character, actionTypes, onStart, submitting, error, budgetActionsOnly = false }) {
   const instanceTagIds = useInstanceTagIds(character.id, character.ownerUid);
   const reachableTrainerTypeIds = useReachableTrainerTypeIds(character.region?.id);
   const ctx = { character, instanceTagIds, reachableTrainerTypeIds };
@@ -95,15 +104,18 @@ export default function ActionBrowser({ character, actionTypes, onStart, submitt
   const categories = useMemo(() => {
     const normalized = actionTypes.map((a) => ({ ...normalizeActionType(a), id: a.id })).filter((a) => a.enabled);
 
-    return ACTION_CATEGORIES.map((category) => ({
-      ...category,
-      actions: normalized
-        .filter((a) => a.categoryId === category.value)
-        .map((a) => ({ ...a, availability: evaluateAvailability(a, ctx) }))
-        .filter((a) => a.availability.ok || a.availability.behaviour === "disable")
-        .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
-    }));
-  }, [actionTypes, character, instanceTagIds, reachableTrainerTypeIds]);
+    return ACTION_CATEGORIES.filter((category) => !budgetActionsOnly || category.value === "intermede").map(
+      (category) => ({
+        ...category,
+        actions: normalized
+          .filter((a) => a.categoryId === category.value)
+          .filter((a) => !budgetActionsOnly || actionUsesIntermedeBudget(a.kindId))
+          .map((a) => ({ ...a, availability: evaluateAvailability(a, ctx) }))
+          .filter((a) => a.availability.ok || a.availability.behaviour === "disable")
+          .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
+      })
+    );
+  }, [actionTypes, character, instanceTagIds, reachableTrainerTypeIds, budgetActionsOnly]);
 
   const [activeCategoryId, setActiveCategoryId] = useState(null);
   const [activeActionId, setActiveActionId] = useState(null);
@@ -131,20 +143,29 @@ export default function ActionBrowser({ character, actionTypes, onStart, submitt
 
   return (
     <div className="action-browser">
-      <div className="tab-list">
-        {ACTION_CATEGORIES.map((category) => (
-          <button
-            key={category.value}
-            type="button"
-            className={category.value === activeCategory?.value ? "selected" : ""}
-            onClick={() => setActiveCategoryId(category.value)}
-          >
-            {category.label}
-          </button>
-        ))}
-      </div>
+      {!budgetActionsOnly && (
+        <div className="tab-list">
+          {ACTION_CATEGORIES.map((category) => (
+            <button
+              key={category.value}
+              type="button"
+              className={category.value === activeCategory?.value ? "selected" : ""}
+              onClick={() => setActiveCategoryId(category.value)}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="tab-content">
+        {activeCategory?.value === "intermede" && (
+          <p className="intermede-budget">
+            {Math.max(0, 3 - (character.intermedeActionsThisInterval || 0))}/3 actions d'Intermède restantes cet
+            Interval
+          </p>
+        )}
+
         {activeCategory?.actions.length === 0 && (
           <p className="empty-state">Aucune action disponible dans cette catégorie pour l'instant.</p>
         )}
@@ -187,6 +208,13 @@ export default function ActionBrowser({ character, actionTypes, onStart, submitt
                 ) : activeAction.handlerId === "apprentissage" ? (
                   <ProfessionPicker
                     activeAction={activeAction}
+                    onStart={(payload) => onStart(activeAction.id, payload)}
+                    submitting={submitting}
+                    availabilityOk={activeAction.availability.ok}
+                  />
+                ) : activeAction.handlerId === "faireDuCommerce" ? (
+                  <CommercePicker
+                    character={character}
                     onStart={(payload) => onStart(activeAction.id, payload)}
                     submitting={submitting}
                     availabilityOk={activeAction.availability.ok}
