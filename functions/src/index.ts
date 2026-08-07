@@ -17,7 +17,7 @@ import { withAuthAndSchema } from "./lib/callableHandler";
 import { CharacterDocumentSchema, DEFAULTS as CHARACTER_DEFAULTS } from "./schema/character";
 const recolte = require("./actions/recolte");
 const artisanat = require("./actions/artisanat");
-const rumeur = require("./actions/rumeur");
+const recherche = require("./actions/recherche");
 const mission = require("./actions/mission");
 const sEntrainer = require("./actions/sEntrainer");
 const apprentissage = require("./actions/apprentissage");
@@ -55,7 +55,7 @@ async function getOwnCharacterSnap(uid: string) {
 const ACTION_HANDLERS: Record<string, any> = {
   recolte,
   artisanat,
-  rumeur,
+  recherche,
   mission,
   sEntrainer,
   apprentissage,

@@ -15,7 +15,6 @@ import ProfessionsManager from "../components/creator/ProfessionsManager";
 import TablesDeTirageManager from "../components/creator/TablesDeTirageManager";
 import ActionsManager from "../components/creator/ActionsManager";
 import RecettesManager from "../components/creator/RecettesManager";
-import RumorsManager from "../components/creator/RumorsManager";
 import MissionActionsManager from "../components/creator/MissionActionsManager";
 import MissionSubjectsManager from "../components/creator/MissionSubjectsManager";
 
@@ -34,7 +33,6 @@ const GROUPS = [
     name: "Quêtes",
     tabs: {
       "Lieux de quête": QuestLocationsManager,
-      Rumeurs: RumorsManager,
     },
   },
   {

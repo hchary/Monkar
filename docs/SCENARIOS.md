@@ -49,13 +49,14 @@ quest objectives for the subject-action system") — use "Mission" or "Partir ex
 
 ## 3 — Aventure mission launch UX polish — roadmap #3
 
-**Setup**: perform a "Rumeur" action first (scenario 5) so `character.missionJournal` has at
-least one entry.
+**Setup**: perform a "Se renseigner" action first (scenario 5) so `character.missionJournal` has
+at least one entry.
 
 **Steps**: open the Aventure tab.
 
 **Expected**: your pending missions appear inside a titled `<fieldset>` labelled
-"Missions en cours" — visually distinct from "Partir explorer" and "Rumeur", not a bare list.
+"Missions en cours" — visually distinct from "Partir explorer" and "Se renseigner", not a bare
+list.
 
 ## 4 — Interval (12h action cycle) — roadmap #4
 
@@ -70,23 +71,18 @@ least one entry.
 - The debug button reads `[TEST] Avancer le temps d'un Interval`.
 - A freshly started action with no custom `durationHours` counts down from **12h**, not 24h.
 
-## 5 — Rumor and mission system — roadmap #5, #6
+## 5 — Mission generation ("Se renseigner") — roadmap #5, #6
 
-**Setup**: none, beyond at least one authored `worldData/rumors/items` entry whose
-`originRegionIds` includes your character's region (creator → "Rumeurs" tab).
+**Setup**: none.
 
 **Steps**:
-1. Start the "Rumeur" action (Aventure tab) and advance time.
-2. Open the result pop-up, then check the character's "Rumeurs" tab and the Aventure tab's
-   mission list.
+1. Start the "Se renseigner" action (Aventure tab) and advance time.
+2. Open the result pop-up, then check the Aventure tab's mission list.
 
 **Expected**:
 - `character.missionJournal` now holds up to 3 new missions (overwriting any unclaimed ones from
   before).
-- Any region rumor sighting at "rare" rarity or above was harvested into `character.rumorJournal`
-  (visible in the "Rumeurs" character tab).
-- The rumor banner at the bottom of the screen shows sightings rare-or-above for your current
-  region.
+- The result pop-up lists the missions just generated, each with its name and difficulty.
 - Running a "Mission" from the journal resolves through the same score/wound/loot pipeline as a
   quest (scenario 1), then disappears from the journal.
 
@@ -217,5 +213,3 @@ an earlier run).
   per-rarity price (commun 10 … unique 4000).
 - The "X/3 restantes cet Interval" indicator decrements each time and the action becomes
   unavailable after the 3rd sale, without touching your main action's own lock/countdown.
-- Selling an object of rarity "mythique" or higher creates a new rumor sighting at your current
-  region only (visible in the rumor banner), skipping normal hop-by-hop propagation.

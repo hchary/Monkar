@@ -32,7 +32,7 @@ import MultiSelectModalField from "./MultiSelectModalField";
 const KNOWN_HANDLER_IDS = [
   "recolte",
   "artisanat",
-  "rumeur",
+  "recherche",
   "mission",
   "sEntrainer",
   "apprentissage",
@@ -207,7 +207,6 @@ const emptyForm = {
   rarity: RARITIES[0].value,
   recipeCategoryIds: [],
   trainerTypeId: "",
-  rumorHarvestCount: 1,
   missionRollCount: 3,
   encounterCount: 1,
 };
@@ -281,7 +280,6 @@ export default function ActionsManager() {
       rarity: actionType.rarity || RARITIES[0].value,
       recipeCategoryIds: actionType.recipeCategoryIds || [],
       trainerTypeId: actionType.trainerTypeId || "",
-      rumorHarvestCount: Number.isFinite(Number(actionType.rumorHarvestCount)) ? Number(actionType.rumorHarvestCount) : 1,
       missionRollCount: Number.isFinite(Number(actionType.missionRollCount)) ? Number(actionType.missionRollCount) : 3,
       encounterCount: Number.isFinite(Number(actionType.encounterCount)) ? Number(actionType.encounterCount) : 1,
     });
@@ -328,9 +326,10 @@ export default function ActionsManager() {
   const isTrainingAction = actionKindInheritsFrom(form.kindId, TRAINING_ACTION_KIND_ID);
   // Gated by handlerId rather than kindId, unlike the three fields above: intermede/aventure each
   // host several unrelated action archetypes (docs/TODO.md "Intermède actions", "Aventure
-  // exploration mechanics"), so kindId alone can't tell a Rumeur action apart from a sibling one.
-  const isRumeurAction = form.handlerId === "rumeur";
-  // Same gating convention as isRumeurAction - only meaningful for the "partirExplorer" handler.
+  // exploration mechanics"), so kindId alone can't tell a Se renseigner action apart from a
+  // sibling one.
+  const isRechercheAction = form.handlerId === "recherche";
+  // Same gating convention as isRechercheAction - only meaningful for the "partirExplorer" handler.
   const isPartirExplorerAction = form.handlerId === "partirExplorer";
 
   function toggleProfessionId(id) {
@@ -413,8 +412,7 @@ export default function ActionsManager() {
         rarity: isHarvestAction ? form.rarity : null,
         recipeCategoryIds: isCraftingAction ? form.recipeCategoryIds : [],
         trainerTypeId: isTrainingAction ? form.trainerTypeId || null : null,
-        rumorHarvestCount: isRumeurAction ? Number(form.rumorHarvestCount) || 1 : 1,
-        missionRollCount: isRumeurAction ? Number(form.missionRollCount) || 3 : 3,
+        missionRollCount: isRechercheAction ? Number(form.missionRollCount) || 3 : 3,
         encounterCount: isPartirExplorerAction ? Number(form.encounterCount) || 1 : 1,
       },
       { merge: true }
@@ -515,11 +513,8 @@ export default function ActionsManager() {
                   )}
                 </div>
               )}
-              {actionType.handlerId === "rumeur" && (
-                <div>
-                  Rumeurs récoltées : {actionType.rumorHarvestCount ?? 1} — Missions générées :{" "}
-                  {actionType.missionRollCount ?? 3}
-                </div>
+              {actionType.handlerId === "recherche" && (
+                <div>Missions générées : {actionType.missionRollCount ?? 3}</div>
               )}
               {actionType.handlerId === "partirExplorer" && (
                 <div>Rencontres par exploration : {actionType.encounterCount ?? 1}</div>
@@ -685,17 +680,8 @@ export default function ActionsManager() {
             </>
           )}
 
-          {isRumeurAction && (
+          {isRechercheAction && (
             <>
-              <label>
-                Nombre de rumeurs récoltées
-                <input
-                  type="number"
-                  min="0"
-                  value={form.rumorHarvestCount}
-                  onChange={(e) => setForm({ ...form, rumorHarvestCount: e.target.value })}
-                />
-              </label>
               <label>
                 Nombre de missions générées
                 <input
@@ -706,8 +692,7 @@ export default function ActionsManager() {
                 />
               </label>
               <p>
-                À chaque résolution : récolte jusqu'à ce nombre de rumeurs rares ou plus de la région actuelle, et
-                génère ce nombre de missions (remplaçant celles non réclamées).
+                À chaque résolution : génère ce nombre de missions (remplaçant celles non réclamées).
               </p>
             </>
           )}

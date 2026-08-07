@@ -4,7 +4,7 @@ import { z } from "zod";
 // authored directly in the Firestore console, same convention as missionSubject.trigger and
 // tier.talentGain (see docs/TODO.md "Composite quests" and "Retiring quests and quest objectives
 // for the subject-action system"). Read by functions/src/lib/questChains.js, called from
-// functions/src/actions/rumeur.js (to offer a pending step ahead of the normal mission-generation
+// functions/src/actions/recherche.js (to offer a pending step ahead of the normal mission-generation
 // draw) and functions/src/actions/mission.js (to advance a chain on a matching mission's success).
 
 const QuestChainStepSchema = z.object({

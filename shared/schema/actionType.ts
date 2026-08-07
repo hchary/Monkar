@@ -51,7 +51,7 @@ export const ActionTypeDocumentSchema = z.object({
     .default(null)
     .describe(
       'Names an entry in ACTION_HANDLERS (functions/src/index.js): "partirEnQuete" | "recolte" | ' +
-        '"artisanat" | "rumeur" | "mission" | "sEntrainer" | "apprentissage" | "partirExplorer". There is no generic ' +
+        '"artisanat" | "recherche" | "mission" | "sEntrainer" | "apprentissage" | "partirExplorer". There is no generic ' +
         "resolution path - an action whose handlerId is null or names an unregistered handler is " +
         "refused before the transaction opens."
     ),
@@ -136,20 +136,22 @@ export const ActionTypeDocumentSchema = z.object({
     ),
   rumorHarvestCount: z
     .number()
-    .default(1)
+    .optional()
     .describe(
-      "How many rare-or-above worldData/regions/items/{regionId}/rumorSightings entries the 'rumeur' " +
-        "handler copies into character.rumorJournal per resolution. Only meaningful when handlerId is " +
-        "\"rumeur\"; gated by handlerId rather than kindId since intermede hosts several unrelated " +
-        "action archetypes, unlike the Récolte/Artisanat branches."
+      "LEGACY/dead: how many rare-or-above worldData/regions/items/{regionId}/rumorSightings entries " +
+        "the former 'rumeur' handler (renamed 'recherche', functions/src/actions/recherche.js) copied " +
+        "into character.rumorJournal per resolution, before its rumor-harvesting half was removed. No " +
+        "longer read or written by any code (ActionsManager.jsx's form dropped the field); kept here " +
+        "only so existing documents carrying it stay schema-valid."
     ),
   missionRollCount: z
     .number()
     .default(3)
     .describe(
-      'How many missions the "rumeur" handler generates into character.missionJournal per resolution, ' +
-        'replacing whatever was still sitting there unclaimed. Only meaningful when handlerId is "rumeur", ' +
-        "same gating convention as rumorHarvestCount."
+      'How many missions the "recherche" handler generates into character.missionJournal per resolution, ' +
+        'replacing whatever was still sitting there unclaimed. Only meaningful when handlerId is "recherche", ' +
+        "gated by handlerId rather than kindId since intermede hosts several unrelated action archetypes, " +
+        "unlike the Récolte/Artisanat branches."
     ),
   questDifficultyWeights: z
     .record(z.string(), z.unknown())
@@ -163,7 +165,7 @@ export const ActionTypeDocumentSchema = z.object({
         "round is a full resolveQuestOutcome call (score roll, narration, loot, talent evolution, " +
         "wound) against a synthetic pseudo-quest, looped sequentially and stopped early if a round's " +
         "wound kills the character. Only meaningful when handlerId is \"partirExplorer\", same gating " +
-        "convention as rumorHarvestCount/missionRollCount."
+        "convention as missionRollCount."
     ),
   tiers: z
     .array(z.unknown())
@@ -192,7 +194,6 @@ const DEFAULTED_KEYS = [
   "rarity",
   "recipeCategoryIds",
   "trainerTypeId",
-  "rumorHarvestCount",
   "missionRollCount",
   "encounterCount",
 ] as const;

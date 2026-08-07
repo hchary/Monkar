@@ -1081,11 +1081,9 @@ fieldset label {
   font-style: italic;
 }
 
-/* Stacks RumorBanner above ClimateBanner as one fixed footer (docs/TODO.md "Rumor and mission
-   system": "a dedicated banner ... above the existing visual banner") - each child banner is a
-   plain flow element inside here rather than independently fixed, so their heights (the rumor
-   banner's is content-driven, the climate banner's is aspect-ratio-driven) stack correctly at any
-   viewport width instead of needing a hardcoded offset between two fixed elements. */
+/* Fixed footer pinning ClimateBanner to the bottom of the viewport - a plain flow element inside
+   here rather than independently fixed, so its aspect-ratio-driven height stacks correctly at any
+   viewport width instead of needing a hardcoded offset. */
 .bottom-banners {
   position: fixed;
   left: 50%;
@@ -1096,25 +1094,6 @@ fieldset label {
   display: flex;
   flex-direction: column;
   z-index: 20;
-}
-
-.rumor-banner {
-  display: flex;
-  gap: 24px;
-  overflow-x: auto;
-  padding: 6px 12px;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
-  white-space: nowrap;
-}
-
-.rumor-entry {
-  opacity: 0.7;
-}
-
-.rumor-entry.rumor-called-out {
-  opacity: 1;
-  font-weight: bold;
 }
 
 .climate-banner-footer {
