@@ -35,7 +35,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 23 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 24 | Regional mission generation and journal — spec | done | 22, 23 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 25 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 23, 24 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
-| 26 | Se renseigner intermède action — spec | spec | 24, 25 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
+| 26 | Se renseigner intermède action — spec | done | 24, 25 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
 | 27 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 28 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
 | 29 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
@@ -2162,45 +2162,47 @@ Not implemented yet.
 
 ## Se renseigner intermède action (spec needed)
 
-Status: **designed, not implemented**. Blocked by
-[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)
-(needs the new generation routine to call) and, for the "Rumeur" harvesting half described below,
+Status: **spec resolved, not implemented**. Depended on
+[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed) for
+the new generation routine it calls, and on
 [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed)
-(needs that entry's still-open question about the rumor-flavor-text mechanic's fate resolved first).
-Replaces the "Rumeur" action (`kindId: "intermede"`, `handlerId: "rumeur"`, see
-[Rumor and mission system](#rumor-and-mission-system)) with "Se renseigner" — same Intermède-kind
-action slot, but no longer always available: it is only offered again once the character has
-completed a certain number of missions, that count itself scaled by reputation, mirroring how rumor
-availability used to be paced.
+resolving the rumor-flavor-text mechanic's fate — both are now spec-resolved, the latter confirming
+that the flavor-text rumor mechanic (region rumor sightings/propagation, `RumorBanner.jsx`, etc.)
+stays as-is, unrelated to the mission-catalog retirement. Replaces the "Rumeur" action (`kindId:
+"intermede"`, `handlerId: "rumeur"`, see [Rumor and mission system](#rumor-and-mission-system)) with
+"Se renseigner" — same Intermède-kind action slot, but no longer always available: it is only
+offered again once the character has completed a reputation-scaled number of missions since it was
+last performed.
 
-- **Renamed and repurposed**: "Se renseigner" takes over "Rumeur"'s role of generating new
-  `character.missionJournal` entries (now via the climate/Subject draw in
+- **Renamed and repurposed, both halves carried over**: "Se renseigner" keeps "Rumeur"'s
+  rumor-harvesting half unchanged — up to `rumorHarvestCount` sightings at or above "rare" from the
+  character's current region into `character.rumorJournal`, same skip-already-owned rule — and takes
+  over its mission-generation half, now via the climate/Subject draw in
   [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)
-  instead of the current objective+uniform-difficulty draw).
+  instead of the current objective+uniform-difficulty draw.
 - **Reputation-scaled cadence**: rather than being available every Interval like any other Intermède
   action, "Se renseigner" only reappears once the character has completed
-  `missionsRequiredForRenseignement(reputation)` missions since it was last available — the exact
-  formula/table is left open below, but the shape (a reputation-scaled mission count, not a flat
-  cooldown) mirrors [Rumor and mission system](#rumor-and-mission-system)'s original design intent
-  for rumor pacing.
+  `missionsRequiredForRenseignement(reputation)` missions since it was last performed. Decided
+  formula: `missionsRequiredForRenseignement(reputation) = clamp(5 - floor(reputation / 20), 1, 5)`
+  — 5 missions required at 0 reputation, one fewer every 20 reputation earned, floored at 1 (never
+  fully free); a starting balance value, not playtested, tunable the same way
+  `rumorHarvestCount`/`missionRollCount` already are (see
+  [Rumor and mission system](#rumor-and-mission-system)). Gated the same way as
+  [Trainers](#trainers)' `trainerReachable`: a new `renseignementAvailable` predicate in
+  `actionConditions.js` (⇄ `src/lib/actionConditions.js`), injected implicitly by
+  `actionCatalog.js`'s `resolveConditions` rather than authored per action.
+- **Counter**: `character.missionsSinceRenseignement` (new field, same "nobody authors this row"
+  convention as `character.intermedeActionsThisInterval`) increments by 1 whenever a mission
+  resolves (`mission.js`'s `resolve()`), success or failure alike, and resets to 0 when "Se
+  renseigner" itself resolves — not merely when the condition first turns true, so leaving the
+  action unused past its threshold for several Intervals doesn't matter.
 
-**Still open (deliberately deferred)**:
-- The exact reputation-to-mission-count formula or table.
-- Whether "Se renseigner" still harvests `worldData/rumors/items` sightings into
-  `character.rumorJournal` the way "Rumeur" did, or drops that half entirely and becomes
-  mission-generation-only — depends on
-  [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed)'s
-  still-undecided fate for the flavor-text rumor mechanic (region rumor sightings/propagation,
-  `RumorBanner.jsx`, etc., none of which this chantier's description explicitly mentions removing).
-- How the "count since it was last available" counter is tracked (a new `character` field, mirroring
-  `character.intermedeActionsThisInterval`'s "nobody authors this row" convention, most likely) and
-  where it resets/increments — needs pinning down alongside the reputation formula above.
-
-**Data model implications** (sketch):
+**Data model implications**:
 ```
 characters/{id}
-  missionsSinceRenseignement: number   -- NEW (name TBD), increments on each completed mission,
-                                         --   reset to 0 once "Se renseigner" becomes available again
+  missionsSinceRenseignement: number   -- NEW, increments by 1 on every mission resolution (success
+                                         --   or failure), reset to 0 when "Se renseigner" itself
+                                         --   resolves
 ```
 
 Not implemented yet.
