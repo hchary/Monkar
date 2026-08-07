@@ -143,7 +143,7 @@ const TERMINAL_PUNCTUATION = /[.!?…]$/;
 
 // Fragments are authored as clauses without a leading capital ("vous avez triomphé de {sujet}"),
 // because the same climax text is also embedded mid-sentence in a loot item's description
-// ("[Obtenue lorsque vous avez triomphé des bandits]", see partirEnQuete.js's drawQuestLoot).
+// ("[Obtenue lorsque vous avez triomphé des bandits]", see missionResolution.js's drawQuestLoot).
 // Presenting them as a paragraph is therefore the engine's job, not the author's.
 function toSentence(text) {
   const trimmed = text.trim();

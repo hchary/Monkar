@@ -1,7 +1,9 @@
-// The scheduled Interval-tick sweep behind quest triggers (docs/TODO.md "Quest triggers and
-// end-of-action pop-up pages"): grants a quest to every character whose owned talents/
-// reputation/profession/region/etc. satisfy that quest's authored `trigger.conditions` - the
-// same row shape and evaluator already used to gate action availability (actionConditions.js).
+// The scheduled Interval-tick sweep behind subject triggers (docs/TODO.md "Quest triggers and
+// end-of-action pop-up pages", repointed at worldData/missionSubjects/items by "Retiring quests
+// and quest objectives for the subject-action system"): grants a mission Subject to every
+// character whose owned talents/reputation/profession/region/etc. satisfy that Subject's authored
+// `trigger.conditions` - the same row shape and evaluator already used to gate action availability
+// (actionConditions.js).
 //
 // Server-only, unlike actionConditions.js/actionLifecycle.js: this only ever runs inside the
 // scheduled Cloud Function registered in functions/src/index.ts, so there is no client copy that
@@ -10,44 +12,44 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { evaluateConditions, conditionsNeedInstances } = require("./actionConditions");
 
-// A quest with no trigger, or an empty conditions list, is never auto-granted - see
-// shared/schema/quest.ts's `trigger` field.
-function questsWithTriggers(quests) {
-  return quests.filter((quest) => Array.isArray(quest?.trigger?.conditions) && quest.trigger.conditions.length > 0);
+// A Subject with no trigger, or an empty conditions list, is never auto-granted - see
+// shared/schema/missionSubject.ts's `trigger` field.
+function subjectsWithTriggers(subjects) {
+  return subjects.filter((subject) => Array.isArray(subject?.trigger?.conditions) && subject.trigger.conditions.length > 0);
 }
 
-// The quest ids a single character newly qualifies for in this pass. Quests already in
-// character.triggeredQuestIds are skipped, so a match is granted exactly once, ever - a
+// The Subject ids a single character newly qualifies for in this pass. Subjects already in
+// character.triggeredSubjectIds are skipped, so a match is granted exactly once, ever - a
 // character who later stops meeting a trigger's conditions (e.g. reputation drops back down)
 // keeps whatever it already granted.
-function evaluateQuestTriggersForCharacter({ character, triggerableQuests, instanceTagIds }) {
-  const alreadyTriggered = new Set(character?.triggeredQuestIds || []);
+function evaluateQuestTriggersForCharacter({ character, triggerableSubjects, instanceTagIds }) {
+  const alreadyTriggered = new Set(character?.triggeredSubjectIds || []);
   const ctx = { character, instanceTagIds: instanceTagIds || new Set() };
 
-  return triggerableQuests
-    .filter((quest) => !alreadyTriggered.has(quest.id))
-    .filter((quest) => evaluateConditions(quest.trigger.conditions, ctx).ok)
-    .map((quest) => quest.id);
+  return triggerableSubjects
+    .filter((subject) => !alreadyTriggered.has(subject.id))
+    .filter((subject) => evaluateConditions(subject.trigger.conditions, ctx).ok)
+    .map((subject) => subject.id);
 }
 
-// Full sweep: every living character against every quest carrying a trigger, plus (as a sibling
+// Full sweep: every living character against every Subject carrying a trigger, plus (as a sibling
 // pass, not a separate concern) resetting each character's Intermède budget counter
 // (docs/TODO.md "Intermède actions"). Run once per Interval tick (see functions/src/index.ts's
 // scheduled `sweepQuestTriggers` export) rather than on any individual character's own completesAt
 // clock, per docs/TODO.md's cadence decision.
 async function sweepQuestTriggers({ db }) {
-  const [questsSnap, charactersSnap] = await Promise.all([
-    db.collection("worldData").doc("quests").collection("items").get(),
+  const [subjectsSnap, charactersSnap] = await Promise.all([
+    db.collection("worldData").doc("missionSubjects").collection("items").get(),
     db.collection("characters").where("alive", "==", true).get(),
   ]);
 
-  const quests = questsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const triggerableQuests = questsWithTriggers(quests);
-  if (triggerableQuests.length === 0) return { charactersUpdated: 0 };
+  const subjects = subjectsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const triggerableSubjects = subjectsWithTriggers(subjects);
+  if (triggerableSubjects.length === 0) return { charactersUpdated: 0 };
 
   // The owned-instance tag set costs extra reads per character, so it is only ever loaded when
   // some trigger actually asks for it - same guard as actionContext.js's buildConditionContext.
-  const needsInstances = triggerableQuests.some((quest) => conditionsNeedInstances(quest.trigger.conditions));
+  const needsInstances = triggerableSubjects.some((subject) => conditionsNeedInstances(subject.trigger.conditions));
   const objectTagIdsByObjectId = needsInstances
     ? new Map(
         (await db.collection("worldData").doc("objects").collection("items").get()).docs.map((doc) => [
@@ -71,8 +73,8 @@ async function sweepQuestTriggers({ db }) {
       }
     }
 
-    const newlyTriggeredIds = evaluateQuestTriggersForCharacter({ character, triggerableQuests, instanceTagIds });
-    if (newlyTriggeredIds.length > 0) updates.triggeredQuestIds = FieldValue.arrayUnion(...newlyTriggeredIds);
+    const newlyTriggeredIds = evaluateQuestTriggersForCharacter({ character, triggerableSubjects, instanceTagIds });
+    if (newlyTriggeredIds.length > 0) updates.triggeredSubjectIds = FieldValue.arrayUnion(...newlyTriggeredIds);
 
     // Sibling reset pass for docs/TODO.md "Intermède actions"'s per-Interval budget - piggybacked
     // on this same scheduled tick rather than a second cron schedule, per that entry's own
@@ -88,4 +90,4 @@ async function sweepQuestTriggers({ db }) {
   return { charactersUpdated };
 }
 
-module.exports = { questsWithTriggers, evaluateQuestTriggersForCharacter, sweepQuestTriggers };
+module.exports = { subjectsWithTriggers, evaluateQuestTriggersForCharacter, sweepQuestTriggers };

@@ -12,7 +12,7 @@ const TODAY = "2026-07-28";
 
 describe("stampLifecycle", () => {
   const NOW = Timestamp.fromMillis(Date.parse("2026-07-28T12:00:00Z"));
-  const ACTION_TYPE = { label: "Partir en quête", categoryId: "aventure", handlerId: "partirEnQuete" };
+  const ACTION_TYPE = { label: "Mission", categoryId: "aventure", handlerId: "mission" };
 
   function stamp(updates, options) {
     return stampLifecycle(updates, { actionType: ACTION_TYPE, now: NOW, ...options });
@@ -48,15 +48,15 @@ describe("stampLifecycle", () => {
   test("denormalizes the label and category, and starts unacknowledged", () => {
     const { lastAction } = stamp({ lastAction: {} });
 
-    assert.equal(lastAction.label, "Partir en quête");
+    assert.equal(lastAction.label, "Mission");
     assert.equal(lastAction.categoryId, "aventure");
-    assert.equal(lastAction.handlerId, "partirEnQuete");
+    assert.equal(lastAction.handlerId, "mission");
     assert.equal(lastAction.acknowledged, false);
   });
 
   test("keeps a handler's own accent, and falls back to the category otherwise", () => {
-    const questAccent = { kind: "difficulty", value: "epique" };
-    assert.deepStrictEqual(stamp({ lastAction: { accent: questAccent } }).lastAction.accent, questAccent);
+    const missionAccent = { kind: "difficulty", value: "epique" };
+    assert.deepStrictEqual(stamp({ lastAction: { accent: missionAccent } }).lastAction.accent, missionAccent);
 
     assert.deepStrictEqual(stamp({ lastAction: {} }).lastAction.accent, {
       kind: "category",
@@ -72,14 +72,14 @@ describe("stampLifecycle", () => {
     const stamped = stamp({
       lastActionDate: TODAY,
       gold: FieldValue.increment(10),
-      lastAction: { actionTypeId: "partir-en-quete", success: true, quest: { id: "q1" } },
+      lastAction: { actionTypeId: "mission-action", success: true, mission: { id: "m1" } },
     });
 
     assert.equal(stamped.lastActionDate, TODAY);
     assert.deepStrictEqual(stamped.gold, FieldValue.increment(10));
-    assert.equal(stamped.lastAction.actionTypeId, "partir-en-quete");
+    assert.equal(stamped.lastAction.actionTypeId, "mission-action");
     assert.equal(stamped.lastAction.success, true);
-    assert.deepStrictEqual(stamped.lastAction.quest, { id: "q1" });
+    assert.deepStrictEqual(stamped.lastAction.mission, { id: "m1" });
   });
 
   test("does not mutate the patch it was given", () => {

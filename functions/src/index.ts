@@ -15,7 +15,6 @@ const {
 const { withProfessionChange, knownLevel } = require("./lib/professions");
 import { withAuthAndSchema } from "./lib/callableHandler";
 import { CharacterDocumentSchema, DEFAULTS as CHARACTER_DEFAULTS } from "./schema/character";
-const partirEnQuete = require("./actions/partirEnQuete");
 const recolte = require("./actions/recolte");
 const artisanat = require("./actions/artisanat");
 const rumeur = require("./actions/rumeur");
@@ -46,12 +45,14 @@ async function getOwnCharacterSnap(uid: string) {
 }
 
 // A handler is the escape hatch for an action whose mechanics don't fit the generic tier
-// roller (see functions/src/lib/actionPipeline.js) - drawing a quest, picking a trainer, and
+// roller (see functions/src/lib/actionPipeline.js) - drawing a mission, picking a trainer, and
 // so on. Keyed by handlerId (worldData/actionTypes/items/{id}.handlerId), not by the action
 // type's own document id, so an action can be renamed or duplicated without a code change
-// (docs/ISSUE-02-ACTION-FRAMEWORK.md D13).
+// (docs/ISSUE-02-ACTION-FRAMEWORK.md D13). "partirEnQuete" is retired (docs/TODO.md "Retiring
+// quests and quest objectives for the subject-action system") - any worldData/actionTypes/items
+// document still authored with that handlerId needs disabling (enabled: false) or deleting by
+// hand in the Firestore console.
 const ACTION_HANDLERS: Record<string, any> = {
-  partirEnQuete,
   recolte,
   artisanat,
   rumeur,
@@ -211,9 +212,9 @@ exports.performAction = onCall(async (request: any) => {
 });
 
 // Closes the loop on a finished action: runs whatever the action deferred until the player
-// actually saw the result (a quest's rolled loot becomes Instance documents, see
-// partirEnQuete.commit), then marks it acknowledged so the result pop-up doesn't reopen and
-// re-clicking "Fermer" can't duplicate anything.
+// actually saw the result (a mission's rolled loot becomes Instance documents, see
+// mission.commit), then marks it acknowledged so the result pop-up doesn't reopen and re-clicking
+// "Fermer" can't duplicate anything.
 //
 // Deferring the commit is deliberate: the outcome is fixed the moment the action resolves, but
 // nothing lands in the character's inventory until they have been shown what they got. Replaces

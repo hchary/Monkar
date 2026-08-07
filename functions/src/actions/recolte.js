@@ -1,8 +1,8 @@
 // Handler for every Récolte action (functions/src/lib/actionKinds.js's HARVEST_ACTION_KIND_ID),
-// registered once under the shared "recolte" handlerId - unlike partirEnQuete.js, there is no
-// single hardcoded action document here, since a game can have several Récolte actions (bûcheron,
-// pêcheur...) all sharing this mechanic. actionTypeId is read from the pipeline's own argument
-// rather than a module constant for that reason.
+// registered once under the shared "recolte" handlerId - unlike the Aventure-branch handlers
+// (mission.js, partirExplorer.js), there is no single hardcoded action document here, since a game
+// can have several Récolte actions (bûcheron, pêcheur...) all sharing this mechanic. actionTypeId
+// is read from the pipeline's own argument rather than a module constant for that reason.
 //
 // Mechanic (docs/TODO.md "Action de récolte"): the harvest always runs to completion - no more
 // weighted roll deciding whether it fails outright (see "Abandoning the paliers system" in
@@ -51,10 +51,11 @@ async function prepare({ db, actionType }) {
   return { candidateTables, objects };
 }
 
-// Turns a table draw's raw object ids into the same loot-entry shape partirEnQuete.js uses, so
-// ActionOutcome.jsx's "Butin obtenu" box and the commit-time Instance write need no récolte-
-// specific branch. Repeated ids from the same draw simply produce several entries, one per
-// harvested unit - each becomes its own Instance on commit, exactly like distinct quest loot.
+// Turns a table draw's raw object ids into the same loot-entry shape missionResolution.js's
+// drawQuestLoot uses, so ActionOutcome.jsx's "Butin obtenu" box and the commit-time Instance write
+// need no récolte-specific branch. Repeated ids from the same draw simply produce several entries,
+// one per harvested unit - each becomes its own Instance on commit, exactly like distinct mission
+// loot.
 function toLootEntries({ objectIds, objects, table }) {
   return objectIds
     .map((objectId) => objects.find((o) => o.id === objectId))
@@ -105,7 +106,7 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
 }
 
 // Runs when the player closes the result pop-up (see acknowledgeAction in functions/src/index.js)
-// - identical in shape to partirEnQuete.js's commit(), turning the loot frozen onto
+// - identical in shape to the other Aventure handlers' own commit(), turning the loot frozen onto
 // lastAction.loot during resolve() into Instance documents the character actually owns.
 async function commit({ tx, db, characterRef, lastAction, uid, today }) {
   for (const item of lastAction.loot || []) {

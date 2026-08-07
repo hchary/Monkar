@@ -38,11 +38,11 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 26 | Regional mission generation and journal — spec | done | 22, 24 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 27 | Regional mission generation and journal — implementation | done | 23, 25, 26 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 28 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 24, 26 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
-| 29 | Retiring quests and quest objectives for the subject-action system — implementation | todo | 27, 28 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
+| 29 | Retiring quests and quest objectives for the subject-action system — implementation | done | 27, 28 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 30 | Se renseigner intermède action — spec | done | 26, 28 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
 | 31 | Se renseigner intermède action — implementation | todo | 27, 30 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
 | 32 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
-| 33 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
+| 33 | Misc small polish (profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention — `favoredQuestIds` effect dropped, no longer applicable) | todo | — | [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
 | 34 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
 | 35 | Known recipes grant mechanism — implementation | todo | 21 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 
@@ -201,7 +201,9 @@ worldData/trainerTypes/items/{id}
 
 ## Quest creation and editing
 
-Status: **implemented**. `worldData/quests/items` via `QuestsManager.jsx`, registered as the "Quêtes" tab in `CreatorDashboard.jsx`. Loot on quest completion is a separate feature, see [Quest loot draw](#quest-loot-draw).
+Status: **retired**, by [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed). `worldData/quests/items`, `QuestsManager.jsx`, and `QuestObjectivesManager.jsx` are deleted; the "Quêtes"/"Objectifs de quête" creator tabs are gone. `worldData/missionSubjects/items` (`MissionSubjectsManager.jsx`) and `worldData/missionActions/items` (`MissionActionsManager.jsx`) are the sole Aventure-branch content catalog now — see [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed) and [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed). Kept below for historical reference only; nothing in this section reflects live code any more.
+
+Status (historical, pre-retirement): **implemented**. `worldData/quests/items` via `QuestsManager.jsx`, registered as the "Quêtes" tab in `CreatorDashboard.jsx`. Loot on quest completion is a separate feature, see [Quest loot draw](#quest-loot-draw).
 
 A quest is characterized by:
 
@@ -233,22 +235,15 @@ worldData/quests/items/{id}
   locationId: string          -- worldData/adventureZones/items id
 ```
 
-**Still open (deliberately deferred)**:
-- How `favoredQuestIds` on a talent should affect gameplay is still undecided (see above).
+**Superseded, no longer open**: `favoredQuestIds` never gained a gameplay effect before `worldData/quests/items` itself retired — [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) dropped the field outright (from `talent.ts`/`shared/schema/talent.ts` and `TalentsManager.jsx`) rather than repointing it at Subjects, since it never had a real consumer to migrate. Roadmap row #33's mention of this as a polish item is stale; there is nothing left to implement here.
 
-**Implementation scope** (roadmap #33 — `favoredQuestIds` effect):
-- Read: `src/components/creator/TalentsManager.jsx` (`favoredQuestIds` multi-select, purely informational today), `functions/src/actions/partirEnQuete.js` (the quest-drawing code this would need to weight), and `functions/src/actions/mission.js` (the mission-generation path, if this should apply there too).
-- Update: whichever of the above ends up implementing the weighting, plus `functions/src/schema/talent.ts` / `shared/schema/talent.ts` if the field's meaning changes.
-- This needs a decision on *how* `favoredQuestIds` should affect gameplay before implementation — confirm the intended effect with the user first if it isn't already decided elsewhere.
-- Do not read or open any other file without asking the user first.
-
-Loot is now drawn on quest resolution — see [Quest loot draw](#quest-loot-draw). It ended up not needing a `lootTableId` field on the quest: which loot table is used is resolved dynamically per draw (by tag overlap and objective rarity) rather than fixed per quest.
+Loot used to be drawn on quest resolution — see [Quest loot draw](#quest-loot-draw), now itself superseded by the mission system's own loot mapping ([Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed)).
 
 ## Quest difficulty
 
-Status: **implemented**. Replaces the earlier reuse of the talent rarity enum for quests ("Rareté") with a dedicated, semantically-named difficulty scale.
+Status: **implemented**. Replaces the earlier reuse of the talent rarity enum for quests ("Rareté") with a dedicated, semantically-named difficulty scale. The scale itself outlived the hand-authored quest catalog it was named after — [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) relocated `DIFFICULTIES` from the now-deleted `QuestsManager.jsx` to `src/lib/difficulties.js`, and it drives mission difficulty today, not quest difficulty.
 
-A quest's difficulty is drawn from its own 6-tier enum, exported as `DIFFICULTIES` from `QuestsManager.jsx`: facile, moyen, difficile, très difficile, épique, mythique (positionally equivalent to the talent rarity tiers commun, peu commun, rare, très rare, légendaire, mythique, but a separate enum — quests have no "divin"/"unique" tier). Each tier has its own color, shown as a border/text color rather than the talent system's border-only treatment:
+A mission's difficulty is drawn from its own 6-tier enum, exported as `DIFFICULTIES` from `src/lib/difficulties.js`: facile, moyen, difficile, très difficile, épique, mythique (positionally equivalent to the talent rarity tiers commun, peu commun, rare, très rare, légendaire, mythique, but a separate enum — no "divin"/"unique" tier). Each tier has its own color, shown as a border/text color rather than the talent system's border-only treatment:
 
 - Facile → green
 - Moyen → yellow
@@ -257,9 +252,9 @@ A quest's difficulty is drawn from its own 6-tier enum, exported as `DIFFICULTIE
 - Épique → gold, with an animated diagonal pixel-striped shine sweeping across the panel
 - Mythique → gold-and-silver gradient border/text
 
-**UI**: when the last action drew a quest, the "Action de la veille" panel (`.last-action` in `ActionPanel.jsx`) takes a border colored by `lastAction.quest.difficulty`. In the expanded action detail, the "Succès" toggle text (not "Échec") is colored the same way. Colors live in `src/index.css` as `.last-action.difficulty-{value}` and `.difficulty-text-{value}`.
+**UI**: when the last action drew a mission, the "Action de la veille" panel (`.last-action` in `ActionPanel.jsx`) takes a border colored by `lastAction.mission.difficulty`. In the expanded action detail, the "Succès" toggle text (not "Échec") is colored the same way. Colors live in `src/index.css` as `.last-action.difficulty-{value}` and `.difficulty-text-{value}`.
 
-**Quest drawing**: `partirEnQuete.js` rolls a difficulty first against `actionType.questDifficultyWeights` (defaults to facile 55/moyen 30/difficile 10/tres_difficile 4/epique 1), then picks a random quest carrying that difficulty from the region's catalog — see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
+**Mission drawing**: `rumeur.js` rolls a difficulty uniformly at random (see [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed) for the full draw), then picks a climate/difficulty-matched Subject and a type-matched Action — see [docs/ARCHITECTURE.md](ARCHITECTURE.md). The `actionType.questDifficultyWeights`-driven weighted draw described here historically belonged to the retired `partirEnQuete.js`; `partirExplorer.js`'s per-round encounter draw still uses that same weighted-draw mechanism today.
 
 No Firestore migration was needed for this rename — there was no real quest data yet, so the old `rarities` field/values were replaced outright rather than converted.
 
@@ -339,7 +334,9 @@ Quest integration is implemented — see [Quest loot draw](#quest-loot-draw).
 
 ## Quest loot draw
 
-Status: **implemented**. A completed quest grants the character 1-3 random Instances (see "Still open" under [Object creation](#object-creation)), rolled server-side by `functions/src/actions/partirEnQuete.js` as part of the same `performAction` resolution as everything else (tier, gold, talent, etc.) — only committed to Firestore once the player closes the result pop-up (see "Interaction" below).
+Status: **retired**, by [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) — `functions/src/actions/partirEnQuete.js` is deleted. The matching mechanism this section describes (rarity + tag overlap, one loot table per item) survives as `drawQuestLoot` in `functions/src/missionResolution.js`, now the *default* loot drawer for any resolution that doesn't override it (`partirExplorer.js`'s rounds); missions specifically draw through `functions/src/missionLoot.js`'s `drawMissionLoot` instead — see [Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed). The `claimQuestLoot` callable this section also describes was itself already superseded pre-retirement by the generic `acknowledgeAction` + per-handler `commit()` pattern (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). Kept below for historical reference only.
+
+Status (historical, pre-retirement): **implemented**. A completed quest grants the character 1-3 random Instances (see "Still open" under [Object creation](#object-creation)), rolled server-side by `functions/src/actions/partirEnQuete.js` as part of the same `performAction` resolution as everything else (tier, gold, talent, etc.) — only committed to Firestore once the player closes the result pop-up (see "Interaction" below).
 
 - **Rarity source**: Quest Objectives (`QuestObjectivesManager.jsx`, `worldData/narrativeSubjects/items` tagged "objectif de quête") now carry their own `rarity` field (the 8-tier enum shared with talents/objects/loot tables). A quest usually has several possible objectives; the objective used for rarity matching is re-rolled independently for each loot item, not fixed once for the whole quest.
 - **Loot count**: driven by the quest's resolved difficulty (`quest.difficulty`, already rolled for quest selection — see [Quest difficulty](#quest-difficulty)), via `LOOT_COUNT_BY_DIFFICULTY` in `functions/src/lib/loot.js`: facile/moyen → 1, difficile/très difficile → 2, épique/mythique → 3.
@@ -365,12 +362,7 @@ character.lastAction.lootClaimed: boolean   -- flips to true once claimQuestLoot
 
 firestore.rules gained an `instances/{id}` rule (read: creator or the owning player via a denormalized `ownerUid`; write: false, Cloud Functions only) — it was missing entirely before this feature, so the "Inventaire" tab's `instances` query had no rule to authorize it.
 
-**Still open**: no creator UI surfaces which loot tables/objectives are actually reachable together (e.g. a rarity/tag combination with zero matching tables) — a content author has to cross-reference `QuestObjectivesManager.jsx` and `TablesDeTirageManager.jsx` by hand to avoid dead combinations.
-
-**Implementation scope** (roadmap #33 — creator tooling for unreachable loot combinations):
-- Read: `src/components/creator/QuestObjectivesManager.jsx` and `src/components/creator/TablesDeTirageManager.jsx` (the two catalogs a content author currently has to cross-reference by hand), and `functions/src/actions/partirEnQuete.js`'s `drawQuestLoot` (the exact matching rule — rarity + tag overlap — the new tooling must mirror).
-- Update: likely a new read-only report/warning surfaced in `src/components/creator/TablesDeTirageManager.jsx` or `src/components/creator/QuestObjectivesManager.jsx` — exact placement is a UI decision, confirm with the user before picking one.
-- Do not read or open any other file without asking the user first.
+**Still open, now stale**: this section's own "creator tooling for unreachable loot combinations" idea (roadmap #33) named `QuestObjectivesManager.jsx` as one of the two catalogs to cross-reference; that manager is deleted. If this polish item is picked up later, it should cross-reference `MissionSubjectsManager.jsx` (or `TextGenerationManager.jsx`'s narrativeSubjects, for `partirExplorer.js`'s synthetic per-round objectives) and `TablesDeTirageManager.jsx` instead, mirroring `functions/src/missionLoot.js`'s `drawMissionLoot` matching rule rather than the deleted `drawQuestLoot`.
 
 ## Modular action framework
 
@@ -1045,9 +1037,11 @@ way "Partir en quête" generates its narration.
   ("Rumeurs" tab), same convention as quests/loot tables/narrative subjects — hand-authored, not
   procedurally generated. A rumor carries French flavor text, a rarity (the existing shared 8-tier
   scale — commun .. unique — reused as-is, not a separate lighter scale, for the same reason every
-  other loot/talent/quest system already reuses it), the region(s) it originates in
-  (`originRegionIds`, same shape as `quest.regionIds`), and an optional `linkedQuestId` pointing at
-  `worldData/quests/items`.
+  other loot/talent/quest system already reuses it), and the region(s) it originates in
+  (`originRegionIds`, same shape as a quest's own `regionIds` used to be). It also carried an
+  optional `linkedQuestId` pointing at `worldData/quests/items` — dropped, not repointed at
+  Subjects, once that catalog retired (see [Retiring quests and quest objectives for the
+  subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed)).
 - **Location = region**: resolved by investigation, not by design call. Propagation (below) needs
   an adjacency graph between locations, and that graph already exists — but only on
   `worldData/regions/items` (`neighbors: [{regionId, direction}]`, authored and wired up in
@@ -1074,8 +1068,8 @@ way "Partir en quête" generates its narration.
   receiving region already has a sighting for that rumor id, the arrival is a no-op — the earlier
   sighting's rarity is never upgraded or downgraded by a later, differently-decayed arrival.
 - **Character rumor journal**: `character.rumorJournal`, an unbounded array of denormalized copies
-  (`{ id, text, rarity, linkedQuestId, receivedAt }`, same "copy the catalog entry so a later rename
-  doesn't rewrite already-granted history" convention as `character.talents`) — the rumors a
+  (`{ id, text, rarity, receivedAt }`, same "copy the catalog entry so a later rename doesn't
+  rewrite already-granted history" convention as `character.talents`) — the rumors a
   character has personally harvested via the Rumeur action, independent of any region's journal and
   never pruned.
 - **Rumor banner**: a character standing in a region sees that region's `rumorSightings` scroll
@@ -1168,8 +1162,10 @@ way "Partir en quête" generates its narration.
 worldData/rumors/items/{id}                                        -- NEW catalog
   text: string                       -- French flavor text
   rarity: string                     -- 8-tier RARITIES
-  originRegionIds: string[]          -- worldData/regions/items ids, same shape as quest.regionIds
-  linkedQuestId: string | null       -- worldData/quests/items id, or null
+  originRegionIds: string[]          -- worldData/regions/items ids, same shape a quest's regionIds used to be
+  -- linkedQuestId: DROPPED by "Retiring quests and quest objectives for the subject-action system"
+  --   (docs/TODO.md) - used to point at worldData/quests/items, now-retired; never repointed at
+  --   Subjects since it had no real gameplay consumer beyond flavor text.
 
 worldData/regions/items/{regionId}/rumorSightings/{rumorId}        -- NEW subcollection
   rarity: string                     -- effective rarity at this region (decayed from origin)
@@ -1180,7 +1176,7 @@ worldData/actionTypes/items/{id}
   missionRollCount: number           -- NEW, default 3, only meaningful when handlerId is "rumeur"
 
 characters/{id}
-  rumorJournal: [{ id, text, rarity, linkedQuestId, receivedAt }]                        -- NEW, unbounded
+  rumorJournal: [{ id, text, rarity, receivedAt }]                                            -- NEW, unbounded
   missionJournal: [{ id, objectiveId, difficulty, tagIds, locationId, regionId, generatedAt }]  -- NEW, ephemeral
 ```
 
@@ -1195,7 +1191,14 @@ banner (`RumorBanner.jsx`, wired into `CharacterProfile.jsx`), the "Rumeurs" cha
 
 Status: **implemented**, except the region-to-region rumor propagation the same scheduled tick
 was always meant to drive (split out as its own follow-up, roadmap #34, once this entry's
-implementation was under way — see [Rumor and mission system](#rumor-and-mission-system)). Quests
+implementation was under way — see [Rumor and mission system](#rumor-and-mission-system)).
+**Repointed at Subjects** by [Retiring quests and quest objectives for the subject-action
+system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed): every
+"quest"/`triggeredQuestIds` reference below describes the mechanism as it was designed and first
+built, before `worldData/quests/items` retired — the live mechanism now triggers
+`worldData/missionSubjects/items` entries into `character.triggeredSubjectIds`, same sweep logic,
+same notification pipeline, see [docs/ARCHITECTURE.md](ARCHITECTURE.md)'s `sweepQuestTriggers`
+section for the current shape. Quests
 are meant to be generated less frequently than
 missions and, unlike missions, are given to a character based on a trigger the quest defines rather
 than picked at will. A player who now satisfies a quest's trigger is notified at the start of their
@@ -1240,12 +1243,13 @@ next Interval, through a new page added to the existing end-of-action result pop
   triggered quest needs no "claim" step: it's simply available (e.g. in a future quest list/journal)
   from the moment the scheduled tick grants it, whether or not the player ever opens page 2.
 
-**Implemented in**: `functions/src/lib/questTriggers.js` (`questsWithTriggers` /
+**Implemented in**: `functions/src/lib/questTriggers.js` (`subjectsWithTriggers` /
 `evaluateQuestTriggersForCharacter` / `sweepQuestTriggers`, unit-tested in
 `questTriggers.test.js`), registered as the scheduled `sweepQuestTriggers` export in
 `functions/src/index.ts` (`onSchedule({ schedule: "0 0,12 * * *", timeZone: "UTC" }, ...)`),
-`shared/schema/quest.ts`'s `trigger` field and `shared/schema/character.ts`'s
-`triggeredQuestIds` field (both reused by their `functions/src/schema/*` re-exports), and the
+`shared/schema/missionSubject.ts`'s `trigger` field and `shared/schema/character.ts`'s
+`triggeredSubjectIds` field (both reused by their `functions/src/schema/*` re-exports; renamed
+from `quest.ts`'s `trigger` and `triggeredQuestIds` by the subject-action retirement), and the
 paginated `src/components/actions/ActionResultDialog.jsx`.
 
 - **"Newly triggered … for that Interval" tracking**: the data model deliberately adds no field
@@ -1688,19 +1692,26 @@ for what shipped.
 
 ## Composite quests (implementation)
 
-Status: **implemented**. Builds exactly the shape
-[Composite quests (spec needed)](#composite-quests-spec-needed) above decided: a new
+Status: **implemented**, then **ported onto Subject/difficulty pairs** by [Retiring quests and
+quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed).
+Originally built exactly the shape
+[Composite quests (spec needed)](#composite-quests-spec-needed) above decided: a
 `worldData/questChains/items` catalog (`shared/schema/questChain.ts` ⇄
 `functions/src/schema/questChain.ts`, no creator UI, authored directly in the Firestore console),
-a `character.questChainProgress` counter (`shared/schema/character.ts`), and the chain-step branch
-in `partirEnQuete.js`'s `prepare()`/`resolve()` (`findPendingChainStep`/`findChainAdvance`) — see
-[docs/ARCHITECTURE.md](ARCHITECTURE.md)'s "Composite quests" section for the full mechanism.
-`mission.js` is untouched, per the spec's own scoping.
+a `character.questChainProgress` counter (`shared/schema/character.ts`), and a chain-step branch in
+`partirEnQuete.js`'s `prepare()`/`resolve()` (`findPendingChainStep`/`findChainAdvance`) — `mission.js`
+was untouched, per the spec's own scoping at the time. Once `partirEnQuete.js` retired, that
+scoping no longer held: `questChains/items/{id}.steps` is now `[{ subjectId, difficulty }]` instead
+of a `questIds: string[]` list, the chain logic moved to `functions/src/lib/questChains.js` (same
+two function names), and it is now `rumeur.js` (generation, forcing a pending step into the mission
+batch) and `mission.js` (advancement, on a matching mission's success) that call it — see
+[docs/ARCHITECTURE.md](ARCHITECTURE.md)'s "Composite quests" section for the current mechanism.
 
 **Implementation scope**: see
 [Composite quests (spec needed)](#composite-quests-spec-needed)'s own "Implementation scope"
 above — the same file list applies here, since the spec pass already scoped exactly what building
-it touches.
+it touches. (Historical: this scope predates the subject-action retirement above, which is what
+actually ported the mechanism onto missions.)
 
 ## Mission and quest resolution algorithm
 
@@ -2134,7 +2145,7 @@ grouping, `mission.name` used directly instead of a `narrativeSubjects` lookup).
 
 ## Retiring quests and quest objectives for the subject-action system (spec needed)
 
-Status: **spec resolved, not implemented**. Blocked by
+Status: **implemented**. Blocked by
 [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed),
 [Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed), and
 [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed). The
@@ -2202,12 +2213,45 @@ leave it as an unplanned casualty.
   rumor mechanic (region rumor sightings/propagation, `RumorBanner.jsx`, etc.), which this chantier's
   description never asks to remove and which stays as-is.
 
-**Implementation scope**: not scoped file-by-file yet — the decisions above (composite quests onto
-Subjects, quest triggers onto Subjects, dropped fields, retired outcome narration) are now settled,
-but the actual removal/migration pass is left to whichever future work picks this row up for
-implementation.
+**Implemented as follows**:
 
-Not implemented yet.
+- `functions/src/actions/partirEnQuete.js` and its test file are deleted; the "partirEnQuete"
+  handlerId is removed from `functions/src/index.ts`'s `ACTION_HANDLERS` and from
+  `ActionsManager.jsx`'s `KNOWN_HANDLER_IDS` (a `worldData/actionTypes/items` document still
+  authored with that handlerId needs disabling/deleting by hand in the Firestore console — no
+  content migration ships with this change). The shared score-roll engine it used to house
+  (`resolveQuestOutcome`, `drawQuestLoot`, narration helpers) moved unchanged to
+  `functions/src/missionResolution.js`, now imported by `mission.js` and `partirExplorer.js`.
+- `src/components/creator/QuestsManager.jsx` and `QuestObjectivesManager.jsx` are deleted and
+  unregistered from `CreatorDashboard.jsx`. `worldData/quests/items` and `shared/schema/quest.ts` /
+  `functions/src/schema/quest.ts` are gone; `DIFFICULTIES` (still needed by `MissionPicker.jsx`,
+  `ActionOutcome.jsx`, `MissionSubjectsManager.jsx`) relocated to `src/lib/difficulties.js`.
+  `narrativeSubject.ts`'s `rarity`/`condition` fields are kept as documented dead fields (their only
+  writer, `QuestObjectivesManager.jsx`, is gone).
+- `partirExplorer.js`'s encounter draw no longer reads the "objectif de quête" narrativeSubjects
+  pool: each round now builds a synthetic `{ tagIds, rarity }` objective from the location's tags
+  and the round's own difficulty (`missionLoot.js`'s `difficultyToRarity`), the same pattern
+  `mission.js` already used, and draws loot through `missionLoot.js`'s `drawMissionLoot` too.
+- Composite quests: `worldData/questChains/items/{id}.steps` is now `[{ subjectId, difficulty }]`
+  (`shared/schema/questChain.ts`). `functions/src/lib/questChains.js` holds the ported
+  `findPendingChainStep`/`findChainAdvance`; `rumeur.js`'s mission-generation batch reserves one
+  guaranteed slot for a pending step, `mission.js`'s `resolve()` advances the chain on a matching
+  success.
+- Quest triggers: `missionSubject.trigger` replaces `quest.trigger`
+  (`shared/schema/missionSubject.ts`), `character.triggeredSubjectIds` replaces
+  `triggeredQuestIds` (`shared/schema/character.ts`). `functions/src/lib/questTriggers.js` now loads
+  `worldData/missionSubjects/items`; `ActionResultDialog.jsx` fetches/shows triggered Subjects
+  ("Sujets débloqués" page) instead of quests.
+- `mission.js` no longer fetches `narrativeSubjects`/`verbPhrases` or narrates its outcome —
+  `resolveQuestOutcome` is called with `narrate: false`, so the result pop-up shows only
+  "Succès"/"Échec" for a mission.
+- `favoredQuestIds` (talent.ts, `TalentsManager.jsx`) and `linkedQuestId` (rumor.ts,
+  `RumorsManager.jsx`, and the denormalized copy in `character.ts`'s `rumorJournal` entries) are
+  dropped outright, as decided above.
+
+Not implemented as part of this pass, deliberately unrelated: the flavor-text rumor mechanic
+(region rumor sightings/propagation, `RumorBanner.jsx`) and the "Se renseigner" action itself (see
+[Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed)) both stay untouched.
 
 ## Se renseigner intermède action (spec needed)
 

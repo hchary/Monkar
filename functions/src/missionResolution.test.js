@@ -6,9 +6,7 @@ const {
   narrateQuestFailure,
   preferQuestPhrasesPerSlot,
   resolveQuestOutcome,
-  findPendingChainStep,
-  findChainAdvance,
-} = require("./partirEnQuete");
+} = require("./missionResolution");
 
 const QUEST = { id: "q1", name: "Le siège de Vaubourg", tagIds: ["t-protection"] };
 
@@ -279,59 +277,26 @@ describe("resolveQuestOutcome", () => {
       Math.random = originalRandom;
     }
   });
-});
 
-describe("findPendingChainStep", () => {
-  const chain = { id: "chain1", questIds: ["q-first", "q-second", "q-third"] };
+  test("narrate: false skips verb-phrase narration entirely and always falls back to the default text", () => {
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0.999;
 
-  test("returns null when no chain has been started", () => {
-    const character = { triggeredQuestIds: [], questChainProgress: {} };
-    assert.equal(findPendingChainStep({ character, chains: [chain] }), null);
-  });
+      const outcome = resolveQuestOutcome(
+        baseArgs({
+          quest: { ...baseArgs().quest, difficulty: "facile" },
+          narrate: false,
+          defaultSuccessText: "",
+          narrativeSubjects: undefined,
+          verbPhrases: undefined,
+        })
+      );
 
-  test("returns null once the last step has been resolved (progress reaches questIds.length)", () => {
-    const character = { triggeredQuestIds: ["q-second"], questChainProgress: { chain1: 3 } };
-    assert.equal(findPendingChainStep({ character, chains: [chain] }), null);
-  });
-
-  test("finds the pending step granted by resolving the previous one", () => {
-    const character = { triggeredQuestIds: ["q-second"], questChainProgress: { chain1: 1 } };
-    const pending = findPendingChainStep({ character, chains: [chain] });
-    assert.deepEqual(pending, { chainId: "chain1", questId: "q-second", grantIndex: 0 });
-  });
-
-  test("picks the earliest-granted step when several chains have one pending", () => {
-    const chainA = { id: "chainA", questIds: ["a1", "a2"] };
-    const chainB = { id: "chainB", questIds: ["b1", "b2"] };
-    const character = {
-      triggeredQuestIds: ["b2", "a2"],
-      questChainProgress: { chainA: 1, chainB: 1 },
-    };
-    const pending = findPendingChainStep({ character, chains: [chainA, chainB] });
-    assert.equal(pending.chainId, "chainB");
-    assert.equal(pending.questId, "b2");
-  });
-
-  test("ignores a step not yet actually granted into triggeredQuestIds", () => {
-    const character = { triggeredQuestIds: [], questChainProgress: { chain1: 1 } };
-    assert.equal(findPendingChainStep({ character, chains: [chain] }), null);
-  });
-});
-
-describe("findChainAdvance", () => {
-  const chain = { id: "chain1", questIds: ["q-first", "q-second", "q-third"] };
-
-  test("returns null for a quest that belongs to no chain", () => {
-    assert.equal(findChainAdvance({ questId: "unrelated", chains: [chain] }), null);
-  });
-
-  test("advances to the next step and names the next quest id for a non-final step", () => {
-    const advance = findChainAdvance({ questId: "q-first", chains: [chain] });
-    assert.deepEqual(advance, { chainId: "chain1", nextStepIndex: 1, nextQuestId: "q-second" });
-  });
-
-  test("still bumps progress past the final step, but grants no next quest", () => {
-    const advance = findChainAdvance({ questId: "q-third", chains: [chain] });
-    assert.deepEqual(advance, { chainId: "chain1", nextStepIndex: 3, nextQuestId: null });
+      assert.equal(outcome.success, true);
+      assert.equal(outcome.narrativeText, "");
+    } finally {
+      Math.random = originalRandom;
+    }
   });
 });

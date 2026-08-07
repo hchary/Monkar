@@ -5,10 +5,10 @@
 // src/components/creator/TagsManager.jsx, which also sweeps every referencing collection on
 // delete so no dangling tag id survives.
 //
-// One entry is reserved: the tag named "objectif de quête" is created at the fixed document id
-// OBJECTIVE_TAG_ID ("objectif-de-quete", see src/components/creator/QuestObjectivesManager.jsx) -
-// a narrativeSubject carrying that tag id doubles as a quest objective. Renaming (but not
-// deleting) that entry is harmless, since every consumer matches on id, not on name.
+// LEGACY: the tag doc at id "objectif-de-quete" ("objectif de quête") used to be reserved - a
+// narrativeSubject carrying that tag id doubled as a quest objective. That mechanic was retired by
+// "Retiring quests and quest objectives for the subject-action system" (docs/TODO.md); the tag doc
+// itself, if it still exists, is now an ordinary tag with no special meaning to any consumer.
 //
 // The document id is the Firestore key, never a field.
 //

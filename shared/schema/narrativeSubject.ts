@@ -2,16 +2,17 @@ import { z } from "zod";
 import { ActionAvailabilityConditionSchema } from "./actionType";
 
 // Structural contract for `worldData/narrativeSubjects/items/{subjectId}` documents, shared
-// between the two client creators that write this collection (see the header notes below) and the
-// Cloud Functions codebase (functions/src/schema/narrativeSubject.ts re-exports this alongside the
-// collection-level documentation the project's schema convention requires).
+// between the client creator that writes this collection and the Cloud Functions codebase
+// (functions/src/schema/narrativeSubject.ts re-exports this alongside the collection-level
+// documentation the project's schema convention requires).
 //
-// Authored through two creator screens that write the same document with different field sets:
-//   - src/components/creator/QuestObjectivesManager.jsx (creates objectives; writes tagIds + rarity,
-//     and always forces the reserved "objectif de quête" tag id (OBJECTIVE_TAG_ID) into tagIds)
-//   - src/components/creator/TextGenerationManager.jsx (edits any subject; writes tagIds only, and
-//     drops rarity from the document when it saves)
-// That asymmetry is the reason rarity is marked optional below.
+// Authored through src/components/creator/TextGenerationManager.jsx (writes tagIds only). LEGACY:
+// `rarity` and `condition` below were written by src/components/creator/QuestObjectivesManager.jsx
+// when a subject doubled as an "objectif de quête" - that manager and the whole quest-objective
+// mechanic were retired by "Retiring quests and quest objectives for the subject-action system"
+// (docs/TODO.md), so nothing writes these two fields any more. Existing documents may still carry
+// stale values; nothing reads them either. Kept in the schema, not deleted, per this project's
+// dead-field convention.
 
 export const NarrativeSubjectDocumentSchema = z.object({
   type: z
@@ -39,20 +40,17 @@ export const NarrativeSubjectDocumentSchema = z.object({
     .optional()
     .default([])
     .describe(
-      "Ids in worldData/tags/items. Written by both creator screens. Forms the narrative context a verb " +
-        "phrase's own `tagIds` must be a subset of (functions/src/textGeneration.js's tagsOf/isSubset). " +
-        'Contains the reserved "objectif de quête" tag id (OBJECTIVE_TAG_ID) when the subject is a quest ' +
-        "objective. Also read directly by functions/src/actions/partirEnQuete.js's drawQuestLoot and " +
-        "rollTalentEvolutions when the subject acts as a quest objective."
+      "Ids in worldData/tags/items. Forms the narrative context a verb phrase's own `tagIds` must be " +
+        "a subset of (functions/src/textGeneration.js's tagsOf/isSubset)."
     ),
   rarity: z
     .string()
     .optional()
     .default("commun")
     .describe(
-      "One of the 8 RARITIES (commun | peu_commun | rare | tres_rare | legendaire | mythique | divin | " +
-        "unique). Picks the loot table drawn from when this objective is defeated. Written only by " +
-        "QuestObjectivesManager; TextGenerationManager drops the field when it saves."
+      "LEGACY, dead: one of the 8 RARITIES. Written only by the now-retired " +
+        "QuestObjectivesManager.jsx when this subject doubled as a quest objective; nothing writes " +
+        "or reads it any more (see the header comment above)."
     ),
   condition: z
     .object({ conditions: z.array(ActionAvailabilityConditionSchema).default([]) })
@@ -60,14 +58,10 @@ export const NarrativeSubjectDocumentSchema = z.object({
     .optional()
     .default(null)
     .describe(
-      "Optional strict gate, only meaningful for entries tagged \"objectif de quête\" (same row shape " +
-        "as an action's availability.conditions - see shared/schema/actionType.ts - most naturally a " +
-        "single hasTalentTag row here). Used by the quest/mission resolution algorithm's score roll " +
-        "(functions/src/lib/questResolution.js): restricts whether a character's talent-tag overlap " +
-        "with this objective counts at all toward the success-threshold and wound-threshold " +
-        "adjustments (all-or-nothing - the character must own at least one talent matching this " +
-        "condition, or none of its tag-sharing talents count). Null/absent (default): every talent " +
-        "sharing a tag with this objective counts, as before. Written only by QuestObjectivesManager."
+      "LEGACY, dead: optional strict gate (same row shape as an action's availability.conditions - " +
+        "see shared/schema/actionType.ts). Written only by the now-retired QuestObjectivesManager.jsx " +
+        "when this subject doubled as a quest objective; nothing writes or reads it any more (see the " +
+        "header comment above)."
     ),
 });
 

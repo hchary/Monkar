@@ -7,10 +7,7 @@ export default function DefaultResult({ lastAction, showLoot, character, error, 
 
   return (
     <>
-      <h3>
-        {lastAction.label}
-        {lastAction.quest && ` — ${lastAction.quest.name}`}
-      </h3>
+      <h3>{lastAction.label}</h3>
       <p className={`outcome ${outcomeClass}`.trim()}>{lastAction.success ? "Succès" : "Échec"}</p>
 
       <ActionOutcome lastAction={lastAction} showLoot={showLoot} character={character} />

@@ -4,8 +4,8 @@ const { evaluateConditions } = require("./actionConditions");
 // The score-roll resolution algorithm for "Partir en quête"/"Mission" (docs/TODO.md "Mission and
 // quest resolution algorithm"): one random score (1-100) per resolution, compared against two
 // independent difficulty-derived scales. Pure math only - no Firestore access - so it can be unit
-// tested without mocking anything beyond Math.random. Shared by partirEnQuete.js's
-// resolveQuestOutcome (and, through it, mission.js).
+// tested without mocking anything beyond Math.random. Shared by missionResolution.js's
+// resolveQuestOutcome (and, through it, mission.js/partirExplorer.js).
 
 // Base success threshold and the talent level a tier "expects", per difficulty tier.
 const SUCCESS_TABLE = {

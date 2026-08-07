@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { DIFFICULTIES } from "../creator/QuestsManager";
+import { DIFFICULTIES } from "../../lib/difficulties";
 
 function useItems(collectionName) {
   const [items, setItems] = useState([]);

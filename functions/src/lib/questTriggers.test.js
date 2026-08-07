@@ -1,51 +1,51 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { questsWithTriggers, evaluateQuestTriggersForCharacter } = require("./questTriggers");
+const { subjectsWithTriggers, evaluateQuestTriggersForCharacter } = require("./questTriggers");
 
 const CHARACTER = {
   reputation: 40,
   region: { id: "cote-des-brumes", name: "Côte des Brumes" },
-  triggeredQuestIds: ["already-triggered"],
+  triggeredSubjectIds: ["already-triggered"],
 };
 
-describe("questsWithTriggers", () => {
-  test("keeps only quests with a non-empty trigger.conditions", () => {
-    const quests = [
+describe("subjectsWithTriggers", () => {
+  test("keeps only Subjects with a non-empty trigger.conditions", () => {
+    const subjects = [
       { id: "no-trigger" },
       { id: "null-trigger", trigger: null },
       { id: "empty-conditions", trigger: { conditions: [] } },
       { id: "with-conditions", trigger: { conditions: [{ type: "minReputation", value: 10 }] } },
     ];
     assert.deepStrictEqual(
-      questsWithTriggers(quests).map((q) => q.id),
+      subjectsWithTriggers(subjects).map((s) => s.id),
       ["with-conditions"]
     );
   });
 });
 
 describe("evaluateQuestTriggersForCharacter", () => {
-  test("grants a quest whose trigger conditions are met", () => {
-    const triggerableQuests = [{ id: "reputation-quest", trigger: { conditions: [{ type: "minReputation", value: 10 }] } }];
+  test("grants a Subject whose trigger conditions are met", () => {
+    const triggerableSubjects = [{ id: "reputation-subject", trigger: { conditions: [{ type: "minReputation", value: 10 }] } }];
     assert.deepStrictEqual(
-      evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableQuests }),
-      ["reputation-quest"]
+      evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableSubjects }),
+      ["reputation-subject"]
     );
   });
 
-  test("does not grant a quest whose trigger conditions are unmet", () => {
-    const triggerableQuests = [{ id: "reputation-quest", trigger: { conditions: [{ type: "minReputation", value: 100 }] } }];
-    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableQuests }), []);
+  test("does not grant a Subject whose trigger conditions are unmet", () => {
+    const triggerableSubjects = [{ id: "reputation-subject", trigger: { conditions: [{ type: "minReputation", value: 100 }] } }];
+    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableSubjects }), []);
   });
 
-  test("skips a quest already in character.triggeredQuestIds, even if its conditions still match", () => {
-    const triggerableQuests = [{ id: "already-triggered", trigger: { conditions: [{ type: "minReputation", value: 10 }] } }];
-    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableQuests }), []);
+  test("skips a Subject already in character.triggeredSubjectIds, even if its conditions still match", () => {
+    const triggerableSubjects = [{ id: "already-triggered", trigger: { conditions: [{ type: "minReputation", value: 10 }] } }];
+    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableSubjects }), []);
   });
 
   test("ANDs multiple conditions, same as action availability", () => {
-    const triggerableQuests = [
+    const triggerableSubjects = [
       {
-        id: "combo-quest",
+        id: "combo-subject",
         trigger: {
           conditions: [
             { type: "minReputation", value: 10 },
@@ -54,15 +54,15 @@ describe("evaluateQuestTriggersForCharacter", () => {
         },
       },
     ];
-    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableQuests }), []);
+    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableSubjects }), []);
   });
 
   test("evaluates hasInstanceTag against the supplied instanceTagIds set", () => {
-    const triggerableQuests = [{ id: "instance-quest", trigger: { conditions: [{ type: "hasInstanceTag", tagId: "amulette" }] } }];
+    const triggerableSubjects = [{ id: "instance-subject", trigger: { conditions: [{ type: "hasInstanceTag", tagId: "amulette" }] } }];
     assert.deepStrictEqual(
-      evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableQuests, instanceTagIds: new Set(["amulette"]) }),
-      ["instance-quest"]
+      evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableSubjects, instanceTagIds: new Set(["amulette"]) }),
+      ["instance-subject"]
     );
-    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableQuests }), []);
+    assert.deepStrictEqual(evaluateQuestTriggersForCharacter({ character: CHARACTER, triggerableSubjects }), []);
   });
 });

@@ -1,5 +1,5 @@
 import { RARITIES } from "../creator/TalentsManager";
-import { DIFFICULTIES } from "../creator/QuestsManager";
+import { DIFFICULTIES } from "../../lib/difficulties";
 
 const WOUND_LABELS = { light: "légère", severe: "grave", permanent: "permanente" };
 
@@ -22,13 +22,6 @@ export default function ActionOutcome({ lastAction, showLoot, character }) {
   return (
     <>
       <p>{lastAction.narrativeText}</p>
-
-      {lastAction.quest && (
-        <p className="quest-info">
-          Quête : {lastAction.quest.name}
-          {lastAction.quest.locationName && ` — ${lastAction.quest.locationName}`}
-        </p>
-      )}
 
       {lastAction.mission && (
         <p className="quest-info">

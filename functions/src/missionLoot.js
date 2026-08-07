@@ -1,14 +1,14 @@
 // Selects loot for a generated mission occurrence - see docs/TODO.md "Mission loot and rarity
-// mapping". Reuses the exact rarity + tag matching mechanism functions/src/actions/partirEnQuete.js
-// built for quests (drawQuestLoot), but resolves the target rarity and tag pool once per mission
-// occurrence instead of re-rolling them per item: a mission's difficulty, Subject, difficulty-tier
-// and variation are all already fixed at generation time, so there is no second candidate to draw
-// from the way a quest's several possible objectives allow. Only the loot table pick and the
+// mapping". Reuses the exact rarity + tag matching mechanism functions/src/missionResolution.js's
+// drawQuestLoot uses, but resolves the target rarity and tag pool once per mission occurrence
+// instead of re-rolling them per item: a mission's difficulty, Subject, difficulty-tier and
+// variation are all already fixed at generation time, so there is no second candidate to draw from
+// the way a quest's several possible objectives used to allow. Only the loot table pick and the
 // drawLootTableItemId draw within it vary per item.
 //
-// Wired into functions/src/actions/mission.js's resolve(), passed as partirEnQuete.js's
-// resolveQuestOutcome's `drawLoot` override (docs/TODO.md "Regional mission generation and
-// journal").
+// Wired into functions/src/actions/mission.js's and functions/src/actions/partirExplorer.js's
+// resolve(), passed as missionResolution.js's resolveQuestOutcome's `drawLoot` override (docs/
+// TODO.md "Regional mission generation and journal").
 
 const { RARITY_ORDER, DIFFICULTY_ORDER } = require("./lib/rolls");
 const { pickRandom, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("./lib/loot");
@@ -27,9 +27,9 @@ function difficultyToRarity(difficulty) {
 // failing the mission itself - the same content-gap precedent drawQuestLoot already set.
 //
 // `rarityOffset` (default 0) shifts the target rarity down that many ranks on the shared 8-tier
-// scale, floored at "commun" - mirrors partirEnQuete.js's drawQuestLoot, used the same way by
-// mission.js to draw the degraded-rarity consolation loot a failed mission resolution grants
-// (docs/TODO.md "Mission and quest resolution algorithm").
+// scale, floored at "commun" - mirrors missionResolution.js's drawQuestLoot, used the same way by
+// mission.js/partirExplorer.js to draw the degraded-rarity consolation loot a failed resolution
+// grants (docs/TODO.md "Mission and quest resolution algorithm").
 function drawMissionLoot({ difficulty, tagIds, lootTables, objects, accomplishmentMessage, rarityOffset = 0 }) {
   const baseRarity = difficultyToRarity(difficulty);
   if (!baseRarity) return [];

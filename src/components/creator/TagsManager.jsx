@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot, getDocs, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-// Matches a tag's name — for use as MultiSelectModalField's matchesFilter (e.g. QuestsManager's tagIds).
+// Matches a tag's name — for use as MultiSelectModalField's matchesFilter (e.g. ObjectsManager's tagIds).
 export function matchesTag(option, search) {
   const q = search.toLowerCase();
   return !q || (option.name || "").toLowerCase().includes(q);

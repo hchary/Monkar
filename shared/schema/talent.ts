@@ -33,10 +33,6 @@ export const TalentDocumentSchema = z.object({
       'Id in worldData/trainerTypes/items, or "" when none / not trainable. Only meaningful while ' +
         "trainable is true."
     ),
-  favoredQuestIds: z
-    .array(z.string())
-    .default([])
-    .describe("Ids in worldData/quests/items this talent is especially suited to."),
   tagIds: z
     .array(z.string())
     .default([])
@@ -64,7 +60,6 @@ const DEFAULTED_KEYS = [
   "trainable",
   "rarity",
   "effect",
-  "favoredQuestIds",
   "trainerTypeId",
   "tagIds",
   "ancestorIds",

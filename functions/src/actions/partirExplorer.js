@@ -1,25 +1,27 @@
 // Handler for the "Partir explorer" action (docs/TODO.md "Aventure exploration mechanics"),
 // registered under the shared "partirExplorer" handlerId - a second, sibling Aventure-branch
-// action alongside partirEnQuete.js's "Partir en quête" and mission.js's "Mission", not a
-// replacement for either.
+// action alongside mission.js's "Mission", not a replacement for it.
 //
 // Draws one worldData/adventureZones/items location at random from the character's current
 // region, once per action occurrence, then resolves actionType.encounterCount independent rounds
-// of partirEnQuete.js's own resolveQuestOutcome against a synthetic, in-memory pseudo-quest built
-// from that location - the same shared score-roll engine "Partir en quête"/"Mission" already use,
-// called in a loop instead of once. No second consequence roller, no new encounter catalog: quest
-// objectives are drawn from the same "objectif de quête" pool every other generated content
-// (missions) already reuses, filtered by the location's own tagIds when it has any.
+// of missionResolution.js's own resolveQuestOutcome against a synthetic, in-memory pseudo-quest
+// built from that location - the same shared score-roll engine "Mission" already uses, called in a
+// loop instead of once. No second consequence roller, no new encounter catalog: each round's
+// objective is a synthetic { tagIds, rarity } stand-in built from the location's own tagIds and the
+// round's own drawn difficulty (missionLoot.js's difficultyToRarity), the same pattern mission.js
+// uses for a mission - not drawn from the retired "objectif de quête" narrativeSubjects pool
+// (docs/TODO.md "Retiring quests and quest objectives for the subject-action system"). Loot is
+// drawn the same way, through missionLoot.js's drawMissionLoot. Narration is unaffected by that
+// retirement - it still falls back to the global narrativeSubjects catalog, since the synthetic
+// objective has no `type` field and can never itself be picked as a narration subject (same
+// fallback mission.js's own header comment used to describe, before missions stopped narrating at
+// all).
 
 const { FieldValue } = require("firebase-admin/firestore");
 const { rollWeighted } = require("../lib/rolls");
 const { pickRandom } = require("../lib/loot");
-const { resolveQuestOutcome, DEFAULT_QUEST_DIFFICULTY_WEIGHTS } = require("./partirEnQuete");
-
-// Same reserved tag id QuestObjectivesManager.jsx's OBJECTIVE_TAG_ID forces onto every quest
-// objective it authors - duplicated as a literal here rather than imported, same convention as
-// rumeur.js (functions/ shares no build step with the Vite app).
-const OBJECTIVE_TAG_ID = "objectif-de-quete";
+const { resolveQuestOutcome, DEFAULT_QUEST_DIFFICULTY_WEIGHTS } = require("../missionResolution");
+const { drawMissionLoot, difficultyToRarity } = require("../missionLoot");
 
 async function prepare({ db, character }) {
   const regionId = character.region?.id || null;
@@ -29,7 +31,7 @@ async function prepare({ db, character }) {
   const adventureZoneIds = (regionSnap?.exists && regionSnap.data().adventureZoneIds) || [];
 
   // A location with no candidates (region has none authored yet) is a content gap, not an error -
-  // the action still runs, its encounter pool just stays unfiltered by location tags (see resolve).
+  // the action still runs, its rounds just synthesize an untagged objective (see resolve).
   const locationId = pickRandom(adventureZoneIds);
   let location = null;
   if (locationId) {
@@ -63,11 +65,6 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
 
   const locationName = location?.name || null;
   const locationTagIds = location?.tagIds || [];
-  const objectivePool = narrativeSubjects.filter((s) => (s.tagIds || []).includes(OBJECTIVE_TAG_ID));
-  const questObjectives =
-    locationTagIds.length > 0
-      ? objectivePool.filter((o) => (o.tagIds || []).some((id) => locationTagIds.includes(id)))
-      : objectivePool;
 
   const difficultyWeights = actionType.questDifficultyWeights || DEFAULT_QUEST_DIFFICULTY_WEIGHTS;
   const encounterCount = Number(actionType.encounterCount) || 1;
@@ -95,10 +92,25 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
       difficulty,
     };
 
+    // Stands in for the "objective" resolveQuestOutcome's threshold/wound/talent-evolution
+    // pipeline expects - see the header comment above.
+    const roundObjective = { tagIds: locationTagIds, rarity: difficultyToRarity(difficulty) };
+
+    function drawLoot({ difficulty: d, lootTables: tables, objects: objectCatalog, accomplishmentMessage, rarityOffset }) {
+      return drawMissionLoot({
+        difficulty: d,
+        tagIds: locationTagIds,
+        lootTables: tables,
+        objects: objectCatalog,
+        accomplishmentMessage,
+        rarityOffset,
+      });
+    }
+
     const outcome = resolveQuestOutcome({
       character: roundCharacter,
       quest,
-      questObjectives,
+      questObjectives: [roundObjective],
       narrativeSubjects,
       verbPhrases,
       lootTables,
@@ -111,10 +123,10 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
       defaultSuccessClause: "vous triomphez d'une rencontre",
       defaultFailureText: "Vous échouez face à une rencontre.",
       defaultFailureClause: "vous échouez face à une rencontre",
+      drawLoot,
     });
 
     rounds.push({
-      objectiveId: outcome.objective?.id || null,
       difficulty,
       score: outcome.score,
       threshold: outcome.threshold,
@@ -185,7 +197,7 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
   return { updates, logFields };
 }
 
-// Identical in shape to partirEnQuete.js's/mission.js's own commit() - turns the loot flattened
+// Identical in shape to the other Aventure handlers' own commit() - turns the loot flattened
 // onto lastAction.loot during resolve() into Instance documents the character actually owns.
 async function commit({ tx, db, characterRef, lastAction, uid, today }) {
   for (const item of lastAction.loot || []) {

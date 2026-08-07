@@ -1,7 +1,9 @@
-// Canonical contract for `worldData/questChains/items/{chainId}`: an ordered sequence of quests
-// (functions/src/actions/partirEnQuete.js draws step 1 normally, then offers each later step
-// exclusively once the previous one succeeds - see docs/TODO.md "Composite quests (spec
-// needed)"). No creator UI - authored directly in the Firestore console.
+// Canonical contract for `worldData/questChains/items/{chainId}`: an ordered sequence of
+// { subjectId, difficulty } mission steps (functions/src/lib/questChains.js resolves step 1
+// normally through the regular mission draw, then offers each later step exclusively once the
+// previous one succeeds - see docs/TODO.md "Composite quests" and "Retiring quests and quest
+// objectives for the subject-action system"). No creator UI - authored directly in the Firestore
+// console.
 //
 // The document id is the Firestore key, never a field.
 //

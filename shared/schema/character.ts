@@ -74,7 +74,6 @@ export const CharacterDocumentSchema = z.object({
         id: z.string(),
         text: z.string(),
         rarity: z.string(),
-        linkedQuestId: z.string().nullable(),
         receivedAt: z.string(),
       })
     )
@@ -113,29 +112,31 @@ export const CharacterDocumentSchema = z.object({
         "worldData/narrativeSubjects/items id) instead; those are stale rolling-offer data that get " +
         "overwritten by the next 'rumeur' resolution, not migrated."
     ),
-  triggeredQuestIds: z
+  triggeredSubjectIds: z
     .array(z.string())
     .default([])
     .describe(
-      "worldData/quests/items ids already granted by the scheduled quest-trigger sweep " +
-        "(functions/src/lib/questTriggers.js), which runs once per Interval tick. A quest id lands here " +
-        "the moment its trigger.conditions first match this character, whether or not the player has " +
-        "seen the notification yet, so a later re-evaluation never re-triggers or re-notifies the same " +
-        "quest. Which of these are still unseen (for the result pop-up's quest-notification page) is " +
+      "worldData/missionSubjects/items ids already granted by the scheduled subject-trigger sweep " +
+        "(functions/src/lib/questTriggers.js), which runs once per Interval tick. A Subject id lands " +
+        "here the moment its trigger.conditions first match this character, whether or not the player " +
+        "has seen the notification yet, so a later re-evaluation never re-triggers or re-notifies the " +
+        "same Subject. Which of these are still unseen (for the result pop-up's notification page) is " +
         "tracked client-side, not here - see src/components/actions/ActionResultDialog.jsx. Also gains " +
-        "a quest id whenever a worldData/questChains/items step beyond the first is granted by " +
-        "functions/src/actions/partirEnQuete.js's resolve() (see questChainProgress above) - same " +
-        "arrayUnion write, same notification pipeline, no separate field."
+        "a Subject id whenever a worldData/questChains/items step beyond the first is granted by " +
+        "functions/src/actions/mission.js's resolve() (see questChainProgress above) - same arrayUnion " +
+        "write, same notification pipeline, no separate field. RENAMED from triggeredQuestIds by " +
+        "'Retiring quests and quest objectives for the subject-action system' - it stored " +
+        "worldData/quests/items ids before that migration."
     ),
   questChainProgress: z
     .record(z.string(), z.number())
     .default({})
     .describe(
       "{ [chainId]: number }, worldData/questChains/items ids to the number of that chain's steps " +
-        "completed so far (0 = not started; an index into the chain's questIds this character has " +
-        "cleared). Bumped by functions/src/actions/partirEnQuete.js's resolve() whenever a quest " +
-        "belonging to a chain succeeds and isn't that chain's last step, in the same write that " +
-        "pushes the next step's quest id into triggeredQuestIds below."
+        "completed so far (0 = not started; an index into the chain's steps this character has " +
+        "cleared). Bumped by functions/src/actions/mission.js's resolve() whenever a mission whose " +
+        "{ subjectId, difficulty } belongs to a chain succeeds and isn't that chain's last step, in " +
+        "the same write that pushes the next step's subject id into triggeredSubjectIds below."
     ),
   blessings: z.array(z.unknown()).default([]).describe("Reserved, not yet populated by any handler."),
   curses: z.array(z.unknown()).default([]).describe("Reserved, not yet populated by any handler."),
@@ -199,7 +200,7 @@ const DEFAULTED_KEYS = [
   "inventory",
   "rumorJournal",
   "missionJournal",
-  "triggeredQuestIds",
+  "triggeredSubjectIds",
   "questChainProgress",
   "blessings",
   "curses",
