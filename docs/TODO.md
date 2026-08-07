@@ -34,7 +34,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
 | 23 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 24 | Regional mission generation and journal — spec | done | 22, 23 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
-| 25 | Retiring quests and quest objectives for the subject-action system — spec | spec | 22, 23, 24 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
+| 25 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 23, 24 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 26 | Se renseigner intermède action — spec | spec | 24, 25 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
 | 27 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 28 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
@@ -2085,7 +2085,7 @@ Not implemented yet.
 
 ## Retiring quests and quest objectives for the subject-action system (spec needed)
 
-Status: **designed, not implemented**. Blocked by
+Status: **spec resolved, not implemented**. Blocked by
 [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed),
 [Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed), and
 [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed). The
@@ -2093,8 +2093,8 @@ description handed down for this chantier is explicit that both "objectif de qu�
 (`worldData/narrativeSubjects/items` tagged "objectif de quête") and "quête"
 (`worldData/quests/items`, the hand-authored catalog) disappear, replaced everywhere by the
 Subject/Action mission system above. Several already-implemented features are built directly on top
-of the catalog being retired here, so this entry exists to decide, explicitly, what happens to each
-rather than leave it as an unplanned casualty.
+of the catalog being retired here; this entry decides, explicitly, what happens to each rather than
+leave it as an unplanned casualty.
 
 - **Hand-authored quests gone**: `worldData/quests/items`, `QuestsManager.jsx`, and the "Partir en
   quête" action/handler (`partirEnQuete.js`) are retired. "Partir en mission" (see
@@ -2108,41 +2108,55 @@ rather than leave it as an unplanned casualty.
   [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success), and
   [Aventure exploration mechanics](#aventure-exploration-mechanics-implementation)'s encounter draw
   all currently read from this pool and need to be repointed at the Subject catalog instead.
-- **Verb phrases superseded for mission naming**:
+- **Verb phrases retired for mission outcome narration too**:
   [Procedural narrative generation](#procedural-narrative-generation)'s multi-slot grammar
-  (`worldData/verbPhrases/items`) stops being the source of a mission's *name*, per
-  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed) — but it may
-  still have a role narrating the mission's *outcome* (the success/failure paragraph shown in the
-  result pop-up), which is a separate concern from the title. Whether outcome narration keeps using
-  verb phrases as-is, keyed off the mission's Subject `tagIds` instead of an objective's, or is
-  retired too, is an open question below.
+  (`worldData/verbPhrases/items`) already stops being the source of a mission's *name*, per
+  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed). It is not
+  kept on for the mission's *outcome* either (the success/failure paragraph shown in the result
+  pop-up) — that paragraph is retired along with it, and the result pop-up shows only "Succès" or
+  "Échec" for a mission, the same way it already does for other non-narrated actions. Verb phrases
+  and `functions/src/textGeneration.js` remain in place for whatever non-mission content still uses
+  them; this only removes their mission-outcome consumer.
+- **Composite quests retired, ported onto Subjects**:
+  [Composite quests](#composite-quests-implementation) (`worldData/questChains/items`,
+  `character.questChainProgress`) is not dropped — it's rebuilt on top of the new system as a chain
+  of Subject/difficulty pairs instead of a chain of quest ids. `questChains/items/{id}.steps` moves
+  from referencing `questId` per step to a `{ subjectId, difficulty }` pair per step (mirroring
+  [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)'s
+  own mission shape), and progression/completion checks compare against a resolved mission's Subject
+  and difficulty instead of its quest id. The chain-advancement trigger point (on mission completion,
+  same as today's on quest completion) is unchanged.
+- **Quest triggers retired, repointed at a Subject**:
+  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
+  (`quest.trigger`, `character.triggeredQuestIds`, the scheduled `sweepQuestTriggers` sweep) keeps
+  its condition-gated grant mechanic, but what it grants changes: instead of unlocking a specific
+  hand-authored quest, a trigger grants access to a specific Subject (guaranteeing that Subject is
+  eligible to be drawn the next time the character generates a mission, the same "guaranteed next
+  draw" semantics the old mechanism gave a specific quest). `quest.trigger` moves to
+  `subject.trigger` on the Subject catalog entry, and `character.triggeredQuestIds` is renamed
+  `character.triggeredSubjectIds`, storing Subject ids instead of quest ids; `sweepQuestTriggers`'s
+  sweep logic (condition evaluation, one-time grant) is otherwise unchanged.
+- **Mission and quest resolution algorithm carries over unchanged**:
+  [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) (the score-roll
+  success/wound/reward engine) was already written to be difficulty- and tag-driven, not
+  quest-catalog-specific, and is confirmed to carry over onto the new mission shape as-is — no rework
+  needed here.
+- **`favoredQuestIds` and `linkedQuestId` dropped**: `favoredQuestIds` on talents (see
+  [Quest creation and editing](#quest-creation-and-editing)) and
+  `worldData/rumors/items.linkedQuestId` (see
+  [Rumor and mission system](#rumor-and-mission-system)) both reference `worldData/quests/items` ids
+  directly and would go dangling once that catalog is retired. Neither field had a real gameplay
+  consumer yet (`favoredQuestIds` was purely informational; `linkedQuestId` only ever fed flavor
+  text), so both fields are simply dropped rather than repointed at Subjects — from
+  `TalentsManager.jsx`'s form and `talent.ts`/`shared/schema/talent.ts`, and from the rumor schema
+  and `RumorsManager.jsx`, respectively. This is unrelated to the fate of the rest of the flavor-text
+  rumor mechanic (region rumor sightings/propagation, `RumorBanner.jsx`, etc.), which this chantier's
+  description never asks to remove and which stays as-is.
 
-**Still open (deliberately deferred) — needs a decision before this entry can be implemented**:
-- **Composite quests** ([Composite quests](#composite-quests-implementation),
-  `worldData/questChains/items`, `character.questChainProgress`): built entirely on the
-  hand-authored quest catalog being retired here. No equivalent "chain of missions" concept exists
-  in the description. Does this feature get ported onto Subjects (a chain of Subject/difficulty
-  pairs instead of quest ids), retired outright, or left stranded as dead code/data until a future
-  decision? Confirm with the user before implementing this entry.
-- **Quest triggers**
-  ([Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
-  `quest.trigger`, `character.triggeredQuestIds`, the scheduled `sweepQuestTriggers` sweep): a
-  condition-gated grant mechanism keyed to specific hand-authored quests. With no hand-authored
-  quest catalog left, this either needs a new target to grant (a specific Subject? a guaranteed
-  mission generation?) or is retired. Confirm with the user before implementing this entry.
-- **Mission and quest resolution algorithm**
-  ([Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm), the score-roll
-  success/wound/reward engine): written to be difficulty- and tag-driven, not quest-catalog-specific,
-  so it should carry over onto the new mission shape largely unchanged — flagged here for
-  confirmation, not because it's expected to need real rework.
-- **`favoredQuestIds`** (talents, see [Quest creation and editing](#quest-creation-and-editing)) and
-  **`worldData/rumors/items.linkedQuestId`** (see [Rumor and mission system](#rumor-and-mission-system))
-  both reference `worldData/quests/items` ids directly and go dangling once that catalog is retired
-  — needs cleanup (drop the fields, or repoint them) as part of implementing this entry.
-
-**Implementation scope**: not scoped yet — this entry's own open questions (composite quests, quest
-triggers) need the user's decision first; scoping the actual file-by-file removal/migration is left
-to whichever pass resolves those.
+**Implementation scope**: not scoped file-by-file yet — the decisions above (composite quests onto
+Subjects, quest triggers onto Subjects, dropped fields, retired outcome narration) are now settled,
+but the actual removal/migration pass is left to whichever future work picks this row up for
+implementation.
 
 Not implemented yet.
 
