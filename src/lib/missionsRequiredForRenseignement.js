@@ -9,9 +9,9 @@
 // floored at 1 (never fully free) - a starting balance value, not playtested, tunable the same
 // way rumorHarvestCount/missionRollCount already are (see docs/TODO.md "Rumor and mission
 // system").
-export const MISSIONS_REQUIRED_BASE = 5;
-export const REPUTATION_PER_DISCOUNT = 20;
-export const MISSIONS_REQUIRED_MIN = 1;
+export const MISSIONS_REQUIRED_BASE = 0;
+export const REPUTATION_PER_DISCOUNT = 0;
+export const MISSIONS_REQUIRED_MIN = 0;
 
 export function missionsRequiredForRenseignement(reputation) {
   const rep = Number(reputation) || 0;
