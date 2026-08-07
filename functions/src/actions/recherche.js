@@ -98,7 +98,7 @@ async function prepare({ db, character }) {
 async function resolve({ character, actionType, actionTypeId, today, context }) {
   const { region, missionSubjects, missionActions, chains } = context;
 
-  const missionRollCount = 3;
+  const missionRollCount = 6;
   const adventureZoneIds = region?.adventureZoneIds || [];
   const newMissions = [];
 
