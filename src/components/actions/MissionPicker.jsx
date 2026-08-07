@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { DIFFICULTIES } from "../creator/QuestsManager";
@@ -20,8 +20,8 @@ function useItems(collectionName) {
 // functions/src/actions/rumeur.js), same convention as CraftingTab.jsx passing recetteId through
 // to the "artisanat" handler.
 export default function MissionPicker({ character, onStart, submitting, availabilityOk }) {
-  const narrativeSubjects = useItems("narrativeSubjects");
   const adventureZones = useItems("adventureZones");
+  const regions = useItems("regions");
   const [selectedId, setSelectedId] = useState(null);
 
   const missions = character.missionJournal || [];
@@ -33,11 +33,35 @@ export default function MissionPicker({ character, onStart, submitting, availabi
   }, [missions, selectedId]);
 
   function missionLabel(mission) {
-    const objective = narrativeSubjects.find((s) => s.id === mission.objectiveId);
     const difficultyLabel = DIFFICULTIES.find((d) => d.value === mission.difficulty)?.label || mission.difficulty;
     const zoneName = adventureZones.find((z) => z.id === mission.locationId)?.name;
-    return `${objective?.nom || "Mission"} (${difficultyLabel})${zoneName ? ` — ${zoneName}` : ""}`;
+    return `${mission.name || "Mission"} (${difficultyLabel})${zoneName ? ` — ${zoneName}` : ""}`;
   }
+
+  // Grouped by region first, then sorted by difficulty within each region (docs/TODO.md "Regional
+  // mission generation and journal"'s "Mission journal UI" note), rather than the earlier flat list
+  // - a character's missions now span several regions since generation is climate/region-aware.
+  const groupedMissions = useMemo(() => {
+    const byRegion = new Map();
+    for (const mission of missions) {
+      const key = mission.regionId || "";
+      if (!byRegion.has(key)) byRegion.set(key, []);
+      byRegion.get(key).push(mission);
+    }
+
+    const groups = [...byRegion.entries()].map(([regionId, regionMissions]) => ({
+      regionId,
+      regionName: regions.find((r) => r.id === regionId)?.name || "Région inconnue",
+      missions: [...regionMissions].sort(
+        (a, b) =>
+          DIFFICULTIES.findIndex((d) => d.value === a.difficulty) -
+          DIFFICULTIES.findIndex((d) => d.value === b.difficulty)
+      ),
+    }));
+
+    groups.sort((a, b) => a.regionName.localeCompare(b.regionName));
+    return groups;
+  }, [missions, regions]);
 
   return (
     <div className="mission-picker">
@@ -46,19 +70,24 @@ export default function MissionPicker({ character, onStart, submitting, availabi
         {missions.length === 0 ? (
           <p className="empty-state">Aucune mission disponible — récoltez des rumeurs pour en générer.</p>
         ) : (
-          <ul className="mission-list">
-            {missions.map((mission) => (
-              <li key={mission.id}>
-                <button
-                  type="button"
-                  className={mission.id === selectedId ? "selected" : ""}
-                  onClick={() => setSelectedId(mission.id)}
-                >
-                  {missionLabel(mission)}
-                </button>
-              </li>
-            ))}
-          </ul>
+          groupedMissions.map((group) => (
+            <div key={group.regionId} className="mission-region-group">
+              <h4>{group.regionName}</h4>
+              <ul className="mission-list">
+                {group.missions.map((mission) => (
+                  <li key={mission.id}>
+                    <button
+                      type="button"
+                      className={mission.id === selectedId ? "selected" : ""}
+                      onClick={() => setSelectedId(mission.id)}
+                    >
+                      {missionLabel(mission)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
         )}
       </fieldset>
 

@@ -3,11 +3,14 @@ const assert = require("node:assert/strict");
 const { resolve } = require("./mission");
 const { LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 
-const OBJECTIVE = { id: "obj1", nom: "bandits", article: "les", rarity: "commun", tagIds: ["tag-x"], tags: [] };
-
+// difficultyToRarity("difficile") -> "rare" (docs/TODO.md "Mission loot and rarity mapping"), so
+// the loot table below must match "rare" (not the objective's own rarity, since a mission has no
+// objective any more - it reads its rarity from its own difficulty).
 const MISSION = {
   id: "mission1",
-  objectiveId: "obj1",
+  subjectId: "subj1",
+  actionId: "act1",
+  name: "Vaincre dragon",
   difficulty: "difficile",
   tagIds: ["tag-x"],
   locationId: "",
@@ -15,20 +18,18 @@ const MISSION = {
   generatedAt: "2026-08-01",
 };
 
-const LOOT_TABLES = [{ id: "table1", rarity: "commun", tagIds: ["tag-x"], itemIds: ["obj-sword"] }];
-const OBJECTS = [{ id: "obj-sword", name: "Épée", rarity: "commun", type: "arme", tagIds: [] }];
+const LOOT_TABLES = [{ id: "table1", rarity: "rare", tagIds: ["tag-x"], itemIds: ["obj-sword"] }];
+const OBJECTS = [{ id: "obj-sword", name: "Épée", rarity: "rare", type: "arme", tagIds: [] }];
 
 function baseContext(overrides = {}) {
   return {
     mission: MISSION,
-    objective: OBJECTIVE,
     locationName: null,
-    narrativeSubjects: [OBJECTIVE],
+    narrativeSubjects: [],
     verbPhrases: [],
     lootTables: LOOT_TABLES,
     objects: OBJECTS,
     talents: [],
-    tags: [],
     ...overrides,
   };
 }
@@ -41,9 +42,10 @@ describe("mission resolve()", () => {
   test("draws loot at the mission's own full difficulty, without the removed reward discount", async () => {
     // "difficile" draws 2 items per LOOT_COUNT_BY_DIFFICULTY - no longer scaled down to "moyen"'s 1
     // the way the retired rewardDifficulty discount used to (docs/TODO.md "Mission and quest
-    // resolution algorithm": "a balance mistake... removed"). The single fixture loot table is
-    // "commun", which both a success (exact match) and a failure (floored at "commun" after the
-    // two-rank degrade) still match, so this is deterministic regardless of the score roll.
+    // resolution algorithm": "a balance mistake... removed"). The single fixture loot table
+    // matches "rare" (difficile's rarity equivalence), so both a success (exact match) and a
+    // failure (floored at "commun" after the two-rank degrade would miss it) - see the next test
+    // for the failure case - this one only asserts the success-path count.
     assert.equal(LOOT_COUNT_BY_DIFFICULTY.difficile, 2);
 
     const { updates } = await resolve({
@@ -53,8 +55,9 @@ describe("mission resolve()", () => {
       context: baseContext(),
     });
 
-    assert.equal(updates.lastAction.loot.length, 2);
     assert.equal(updates.lastAction.mission.difficulty, "difficile");
+    assert.equal(updates.lastAction.mission.name, "Vaincre dragon");
+    if (updates.lastAction.success) assert.equal(updates.lastAction.loot.length, 2);
   });
 
   test("surfaces the score-roll outcome fields on lastAction", async () => {
@@ -74,7 +77,7 @@ describe("mission resolve()", () => {
 
   test("guarantees success when talent tag overlap drops the threshold to the floor", async () => {
     // "difficile" bases at 80 with requiredTalentLevel 2; 79 quality-1 talents sharing the
-    // objective's tag each contribute -1, driving the threshold to 1 - low enough that any
+    // mission's own tagIds each contribute -1, driving the threshold to 1 - low enough that any
     // 1-100 score roll succeeds, without needing to mock Math.random.
     const talents = Array.from({ length: 79 }, (_, i) => ({
       id: `t${i}`,
@@ -92,6 +95,7 @@ describe("mission resolve()", () => {
 
     assert.equal(updates.lastAction.success, true);
     assert.ok(updates.lastAction.reputationGained > 0);
+    assert.equal(updates.lastAction.loot.length, 2);
   });
 
   test("removes only the resolved mission from missionJournal, keeping any others untouched", async () => {
@@ -107,17 +111,6 @@ describe("mission resolve()", () => {
     assert.deepEqual(
       updates.missionJournal.map((m) => m.id),
       ["mission2"]
-    );
-  });
-
-  test("fails closed when the mission's objective narrativeSubject no longer exists", async () => {
-    await assert.rejects(() =>
-      resolve({
-        character: baseCharacter(),
-        actionTypeId: "mission-action",
-        today: "2026-08-05",
-        context: baseContext({ objective: null }),
-      })
     );
   });
 });

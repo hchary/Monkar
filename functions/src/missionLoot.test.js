@@ -82,4 +82,38 @@ describe("drawMissionLoot", () => {
     });
     assert.deepEqual(loot, []);
   });
+
+  test("rarityOffset shifts the target rarity down that many ranks (failure consolation loot)", () => {
+    // "difficile" -> "rare" (index 2); an offset of 2 targets "commun" (index 0) instead.
+    const commonTable = { ...MATCHING_TABLE, id: "table-commun-feu", rarity: "commun" };
+
+    const loot = drawMissionLoot({
+      difficulty: "difficile",
+      tagIds: ["feu"],
+      lootTables: [MATCHING_TABLE, commonTable],
+      objects: [SWORD],
+      accomplishmentMessage: "vous rentrez bredouille",
+      rarityOffset: 2,
+    });
+
+    assert.equal(loot.length, 2);
+    for (const item of loot) assert.equal(item.tableId, "table-commun-feu");
+  });
+
+  test("rarityOffset floors at the scale's lowest rank rather than going negative", () => {
+    // "facile" -> "commun" (index 0) already; an offset of 5 still targets "commun".
+    const commonTable = { ...MATCHING_TABLE, id: "table-commun-feu", rarity: "commun" };
+
+    const loot = drawMissionLoot({
+      difficulty: "facile",
+      tagIds: ["feu"],
+      lootTables: [commonTable],
+      objects: [SWORD],
+      accomplishmentMessage: "vous rentrez bredouille",
+      rarityOffset: 5,
+    });
+
+    assert.equal(loot.length, 1); // LOOT_COUNT_BY_DIFFICULTY.facile
+    assert.equal(loot[0].tableId, "table-commun-feu");
+  });
 });

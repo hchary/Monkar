@@ -21,6 +21,15 @@ export const RegionDocumentSchema = z.object({
         "form does not mirror the edge onto the neighbour."
     ),
   climatId: z.string().default("").describe('Id in worldData/climats/items, or "" when the region has no climate.'),
+  climateIds: z
+    .array(z.string())
+    .default([])
+    .describe(
+      "Ids in worldData/climats/items this region draws mission Subjects from (docs/TODO.md 'Regional " +
+        "mission generation and journal') - a region bordering several biomes can list more than one. " +
+        "Distinct from the single climatId above (which only drives the character page's banner " +
+        "illustration); the two are not kept in sync automatically."
+    ),
   reliefIds: z.array(z.string()).default([]).describe("Ids in worldData/reliefs/items."),
   factionIds: z.array(z.string()).default([]).describe("Ids in worldData/factions/items."),
   adventureZoneIds: z
@@ -44,6 +53,7 @@ const DEFAULTED_KEYS = [
   "description",
   "neighbors",
   "climatId",
+  "climateIds",
   "reliefIds",
   "factionIds",
   "adventureZoneIds",

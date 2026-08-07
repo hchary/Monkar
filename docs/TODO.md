@@ -36,7 +36,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 24 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 25 | Mission loot and rarity mapping — implementation | done | 23, 24 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 26 | Regional mission generation and journal — spec | done | 22, 24 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
-| 27 | Regional mission generation and journal — implementation | todo | 23, 25, 26 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
+| 27 | Regional mission generation and journal — implementation | done | 23, 25, 26 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 28 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 24, 26 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 29 | Retiring quests and quest objectives for the subject-action system — implementation | todo | 27, 28 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 30 | Se renseigner intermède action — spec | done | 26, 28 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
@@ -1103,6 +1103,11 @@ way "Partir en quête" generates its narration.
   ```
   where `locationId` is drawn from the character's current region's `adventureZoneIds` (or `""`
   when the region lists none) and `regionId` is that region's id, both fixed at generation time.
+  **Correction, decided in [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed):**
+  this narrativeSubjects-objective-based draw has been replaced by a climate-aware draw against the
+  new Subject/Action catalog; `character.missionJournal` entries now carry `subjectId`/`actionId`/
+  `name` instead of `objectiveId` (`difficulty`/`tagIds`/`locationId`/`regionId`/`generatedAt`
+  unchanged) — see that entry for the current shape and mechanism.
 - **Mission journal expiry**: `character.missionJournal` is not a growing history like the rumor
   journal — it's a rolling offer. Missions still sitting there unclaimed are simply overwritten the
   next time the Rumeur action resolves (see above); nothing else prunes them, since there's no
@@ -1903,8 +1908,9 @@ Not blocking anything else in this list.
 
 ## Mission subject and action catalog (spec needed)
 
-Status: **implemented** (catalogs, creator UI, and name-assembly helper; drawing/generation logic
-is a separate follow-up, see [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)).
+Status: **implemented** (catalogs, creator UI, name-assembly helper, and — since
+[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed) —
+the drawing/generation logic that actually calls it).
 Replaces the multi-slot narrative grammar system
 (`worldData/verbPhrases/items`, see
 [Procedural narrative generation](#procedural-narrative-generation)) as the source of a mission's
@@ -1989,17 +1995,15 @@ Zod contracts, re-exported by `functions/src/schema/missionAction.ts` /
 under a new "Missions" group in `CreatorDashboard.jsx`), and the name-assembly helper
 `functions/src/missionNaming.js` (`assembleMissionName`, tested in
 `functions/src/missionNaming.test.js`) — mirrors `textGeneration.js`'s fixed-slot-order,
-skip-if-absent assembly style. Current mission naming still draws one
-`worldData/narrativeSubjects/items` objective and runs it through the multi-slot verb-phrase
-grammar until the drawing/generation logic that calls `assembleMissionName` is built — see
-[Rumor and mission system](#rumor-and-mission-system),
-[Procedural narrative generation](#procedural-narrative-generation), and
+skip-if-absent assembly style. `assembleMissionName` is now actually called by mission generation
+(`functions/src/actions/rumeur.js`'s `drawMission`) — see
 [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed).
+The multi-slot verb-phrase grammar ([Procedural narrative generation](#procedural-narrative-generation))
+is unrelated to a mission's *title* and is still used for its end-of-mission *narration* paragraph.
 
 ## Mission loot and rarity mapping (spec needed)
 
-Status: **implemented** (the standalone rarity/tag-matching and draw logic; wiring it into an actual
-mission occurrence is a separate follow-up, see
+Status: **implemented**, including wiring it into an actual mission resolution (see
 [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)).
 Once a mission is generated from a difficulty and a Subject (with its difficulty-tier and variation
 `tagIds`), this entry pins down how that combination selects a `worldData/lootTables/items` entry —
@@ -2026,28 +2030,30 @@ reusing the exact matching mechanism [Quest loot draw](#quest-loot-draw) already
   [Quest loot draw](#quest-loot-draw)), unchanged.
 
 Implemented in `functions/src/missionLoot.js` (`difficultyToRarity`, `drawMissionLoot`, tested in
-`functions/src/missionLoot.test.js`), mirroring `functions/src/missionNaming.js`'s convention of a
-standalone helper not yet wired into a handler. `difficultyToRarity` reuses the same
+`functions/src/missionLoot.test.js`). `difficultyToRarity` reuses the same
 `DIFFICULTY_ORDER`/`RARITY_ORDER` positional-equivalence arrays (`functions/src/lib/rolls.js`)
 `talentEvolution.js`'s `evolutionChance` already relies on. `drawMissionLoot` resolves the target
 rarity and tag pool once, then reuses `functions/src/lib/loot.js`'s `pickRandom`,
 `drawLootTableItemId`, and `LOOT_COUNT_BY_DIFFICULTY` per item, same as `partirEnQuete.js`'s
-`drawQuestLoot`. Calling it from an actual mission-generation/resolution flow is left to
+`drawQuestLoot`; it also gained a `rarityOffset` parameter (mirroring `drawQuestLoot`'s own) for the
+failure-consolation-loot case. Called from `functions/src/actions/mission.js`'s `resolve()`, passed
+into `partirEnQuete.js`'s `resolveQuestOutcome` as its new overridable `drawLoot` parameter — see
 [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed).
 
 ## Regional mission generation and journal (spec needed)
 
-Status: **spec resolved, not implemented**. Blocked by
-[Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed) and
-[Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed). Replaces
-[Rumor and mission system](#rumor-and-mission-system)'s mission-generation mechanic (today: one
+Status: **implemented**, except moving the generation *trigger* itself onto "Se renseigner" — see
+the "Generation trigger" bullet and "Still open" below. Replaces
+[Rumor and mission system](#rumor-and-mission-system)'s mission-generation mechanic (previously: one
 random `worldData/narrativeSubjects/items` objective and a uniformly random difficulty) with a
 climate-aware draw against the new Subject/Action catalog, and ties each generated mission to the
 region it was generated in.
 
 - **Region climate**: regions gain a `climateIds: string[]` field (multi-select, mirroring the
   Subject catalog's own `climateIds` rather than a single value) — a region bordering several
-  biomes can list more than one climate. No such field exists on `worldData/regions/items` today.
+  biomes can list more than one climate. Distinct from the pre-existing single-value `climatId`
+  field (which only drives the character page's banner illustration, `ClimateBanner.jsx`) — the
+  two are authored independently and not kept in sync.
 - **Generation**: for each mission rolled, draw a difficulty, then a random Subject whose
   `climateIds` overlaps the region's `climateIds` (same tag-overlap-style matching already used
   elsewhere in this catalog, e.g. [Quest loot draw](#quest-loot-draw)'s tag matching — not an
@@ -2055,12 +2061,12 @@ region it was generated in.
   Action sharing that Subject's `type`, then a random variation for the Subject (independent of
   difficulty) — assembling the mission name per
   [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed).
-- **Generation trigger**: mission generation is triggered exclusively by performing "Se renseigner"
-  ([Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed)) — mirroring how
-  the "Rumeur" action it replaces is today's sole trigger for a `missionRollCount` batch of draws
-  (see [Rumor and mission system](#rumor-and-mission-system)). No passive or scheduled source
-  generates missions; the scheduled Interval tick (`sweepQuestTriggers`) stays reserved for quest
-  triggers and rumor propagation, not mission generation.
+- **Generation trigger**: still the "Rumeur" action for now, exactly as before — moving it onto
+  "Se renseigner" ([Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed))
+  is that entry's own implementation (roadmap #31), deliberately not resolved here since "Se
+  renseigner" doesn't exist yet. No passive or scheduled source generates missions; the scheduled
+  Interval tick (`sweepQuestTriggers`) stays reserved for quest triggers and rumor propagation, not
+  mission generation.
 - **Roll count and overwrite semantics unchanged**: `missionRollCount` (missions rolled per
   trigger, still a `worldData/actionTypes/items` field, default 3) and the "unclaimed journal
   entries are simply overwritten on the next roll" rule (see
@@ -2068,35 +2074,63 @@ region it was generated in.
   only narrows which Subjects are eligible for a given roll, it doesn't change how many missions
   are rolled or what happens to leftovers. A region whose climate has too few matching Subjects to
   fill `missionRollCount` is a content-coverage gap (same "silently skipped, not retried" precedent
-  as [Quest loot draw](#quest-loot-draw)), not a mechanic change.
+  as [Quest loot draw](#quest-loot-draw)), not a mechanic change: a roll that finds no matching
+  Subject, or no Action sharing that Subject's type, is simply skipped, not retried with a
+  different difficulty.
 - **Region-locked**: a generated mission is tied to its origin region (already true of
-  `character.missionJournal` entries' `regionId`/`locationId` today — see
+  `character.missionJournal` entries' `regionId`/`locationId` before this entry — see
   [Rumor and mission system](#rumor-and-mission-system)) and can only be completed there; a
-  character who travels to a different region should not be able to resolve a mission generated
-  elsewhere. This needs an explicit check added to the mission-resolution handler
-  (`functions/src/actions/mission.js`), since today's implementation records `regionId` but never
-  enforces it against the character's current region at resolution time.
-- **Mission journal UI**: the player's mission journal — already the `character.missionJournal`
-  array and its `MissionPicker.jsx` display (see [Rumor and mission system](#rumor-and-mission-system),
-  [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish)) — is reused, not rebuilt,
-  but its listing needs grouping/sorting by region first, then difficulty within each region, rather
-  than today's flat list.
+  character who travels to a different region can no longer resolve a mission generated elsewhere.
+  Enforced in `functions/src/actions/mission.js`'s `prepare()`, which previously recorded
+  `regionId` but never checked it against the character's current region at resolution time.
+- **Mission journal UI**: the player's mission journal — the `character.missionJournal` array and
+  its `MissionPicker.jsx` display (see [Rumor and mission system](#rumor-and-mission-system),
+  [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish)) — is reused, not
+  rebuilt, but its listing is now grouped by region (sorted by region name) then sorted by
+  difficulty within each region, rather than the earlier flat list.
 - **"Partir en mission"**: the existing "Mission" action (`kindId: "aventure"`, `handlerId:
-  "mission"`) and its `MissionPicker.jsx` entry point in the Aventure tab already satisfy "select a
-  journal entry and perform it from the Aventure tab" — no new action or entry point needed, only
-  its generation source and journal display change.
+  "mission"`) and its `MissionPicker.jsx` entry point in the Aventure tab already satisfied "select
+  a journal entry and perform it from the Aventure tab" — no new action or entry point was needed,
+  only its generation source and journal display changed.
+- **Loot and threshold/wound math without a narrativeSubjects objective**: a mission no longer
+  carries any `worldData/narrativeSubjects/items` reference at all — its own `tagIds` (the union
+  fixed at generation time) and its difficulty's rarity equivalence
+  ([Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed)'s
+  `difficultyToRarity`) stand in for what an "objectif de quête" objective used to supply to
+  `resolveQuestOutcome`'s threshold/wound/talent-evolution pipeline. `resolveQuestOutcome` gained
+  an overridable `drawLoot` parameter (default: the existing per-item `drawQuestLoot`) so
+  `mission.js` can inject `missionLoot.js`'s `drawMissionLoot` instead, finally wiring that
+  standalone helper into an actual handler. The end-of-mission narration paragraph itself is
+  unaffected — it still draws from the global `narrativeSubjects` pool via `resolveQuestOutcome`'s
+  existing fallback, since that catalog is unrelated to how a mission is *titled*.
 
-**Data model implications** (sketch):
+**Still open (deliberately deferred)**:
+- The generation trigger stays on "Rumeur", not "Se renseigner" — see the "Generation trigger"
+  bullet above; moving it is roadmap #31's job once that action exists.
+
+**Data model implications**:
 ```
 worldData/regions/items/{id}
-  climateIds: string[]   -- NEW, climates this region draws mission Subjects from
+  climateIds: string[]   -- NEW, climates this region draws mission Subjects from - distinct from
+                          --   the pre-existing single-value climatId (banner illustration only)
 
-characters/{id}.missionJournal[]   -- shape mostly unchanged (see Rumor and mission system),
-                                     --   but objectiveId/tagIds replaced by references into the
-                                     --   new Subject/Action catalog and the drawn variation
+characters/{id}.missionJournal[]   -- objectiveId replaced; difficulty/tagIds/locationId/regionId/
+                                     --   generatedAt unchanged (see Rumor and mission system)
+  subjectId: string      -- worldData/missionSubjects/items id drawn at generation time
+  actionId: string        -- worldData/missionActions/items id drawn at generation time
+  name: string             -- the already-assembled title (functions/src/missionNaming.js), so
+                            --   resolution never needs to re-fetch either catalog entry
 ```
 
-Not implemented yet.
+Implemented in `functions/src/actions/rumeur.js` (`drawMission`, replacing the old
+narrativeSubjects-based draw), `functions/src/actions/mission.js` (region-lock check in `prepare()`,
+synthetic `{ tagIds, rarity }` objective stand-in and `drawMissionLoot` wiring in `resolve()`),
+`functions/src/actions/partirEnQuete.js` (`resolveQuestOutcome`'s new `drawLoot` override
+parameter), `functions/src/missionLoot.js` (`drawMissionLoot` gained a `rarityOffset` parameter,
+mirroring `drawQuestLoot`'s own, for the failure-consolation-loot case), `shared/schema/region.ts`
+and `src/components/creator/RegionsManager.jsx` (`climateIds`), `shared/schema/character.ts`
+(`missionJournal`'s new shape), and `src/components/actions/MissionPicker.jsx` (region/difficulty
+grouping, `mission.name` used directly instead of a `narrativeSubjects` lookup).
 
 ## Retiring quests and quest objectives for the subject-action system (spec needed)
 
