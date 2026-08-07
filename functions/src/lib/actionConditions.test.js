@@ -201,6 +201,30 @@ describe("evaluateConditions - professionless", () => {
   });
 });
 
+// The gate behind "Se renseigner". Injected by the catalog whenever the action's kind inherits
+// from RENSEIGNEMENT_ACTION_KIND_ID (see actionCatalog.js's resolveConditions), same reason as
+// hasIntermedeBudget for not being offered by CONDITION_TYPES.
+describe("evaluateConditions - renseignementAvailable", () => {
+  test("passes once missionsSinceRenseignement reaches the reputation-scaled requirement", () => {
+    // CHARACTER.reputation is 40, so missionsRequiredForRenseignement(40) is 3.
+    const notEnough = { ...CHARACTER, missionsSinceRenseignement: 2 };
+    const enough = { ...CHARACTER, missionsSinceRenseignement: 3 };
+    assert.equal(check({ type: "renseignementAvailable" }, ctx({ character: notEnough })), false);
+    assert.equal(check({ type: "renseignementAvailable" }, ctx({ character: enough })), true);
+  });
+
+  test("a character who never resolved a mission fails it", () => {
+    const noCounter = { ...CHARACTER };
+    delete noCounter.missionsSinceRenseignement;
+    assert.equal(check({ type: "renseignementAvailable" }, ctx({ character: noCounter })), false);
+  });
+
+  test("a higher reputation lowers the requirement", () => {
+    const highReputation = { ...CHARACTER, reputation: 1000, missionsSinceRenseignement: 1 };
+    assert.equal(check({ type: "renseignementAvailable" }, ctx({ character: highReputation })), true);
+  });
+});
+
 describe("evaluateConditions - notWounded", () => {
   test("passes only while the character carries no wound", () => {
     assert.equal(check({ type: "notWounded" }), true);

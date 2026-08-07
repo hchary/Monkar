@@ -7,6 +7,7 @@ const {
   CRAFTING_ACTION_KIND_ID,
   TRAINING_ACTION_KIND_ID,
   PROFESSION_LEARNING_ACTION_KIND_ID,
+  RENSEIGNEMENT_ACTION_KIND_ID,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,
@@ -54,6 +55,11 @@ describe("the registry itself", () => {
   test("the profession-learning kind is one of them, nested under the training kind", () => {
     assert.ok(findActionKind(PROFESSION_LEARNING_ACTION_KIND_ID));
     assert.equal(findActionKind(PROFESSION_LEARNING_ACTION_KIND_ID).parentId, TRAINING_ACTION_KIND_ID);
+  });
+
+  test("the renseignement kind is one of them, nested under the intermède kind", () => {
+    assert.ok(findActionKind(RENSEIGNEMENT_ACTION_KIND_ID));
+    assert.equal(findActionKind(RENSEIGNEMENT_ACTION_KIND_ID).parentId, "intermede");
   });
 
   test("every kind resolves to a root category", () => {
@@ -148,13 +154,14 @@ describe("actionKindsInTreeOrder", () => {
         "entrainement",
         "apprentissage",
         "commerce",
+        "renseignement",
         "metier",
         "recolte",
         "artisanat",
         "social",
       ]
     );
-    const subtypes = ["recolte", "artisanat", "entrainement", "commerce"];
+    const subtypes = ["recolte", "artisanat", "entrainement", "commerce", "renseignement"];
     for (const value of subtypes) {
       assert.equal(flattened.find((kind) => kind.value === value).depth, 1);
     }

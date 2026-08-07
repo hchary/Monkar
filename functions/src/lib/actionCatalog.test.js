@@ -272,6 +272,44 @@ describe("resolveConditions - the implicit professionless gate", () => {
   });
 });
 
+// "Se renseigner n'est disponible qu'une fois assez de missions accomplies" - expressed the same
+// way as the other implicit gates: injected by the catalog whenever the action's kind inherits
+// from RENSEIGNEMENT_ACTION_KIND_ID, never authored by hand.
+describe("resolveConditions - the implicit renseignement-availability gate", () => {
+  test("a Renseignement action is gated on renseignementAvailable", () => {
+    const conditions = resolveConditions({ kindId: "renseignement" });
+    assert.deepStrictEqual(conditions, [{ type: "renseignementAvailable" }]);
+  });
+
+  test("the gate is appended to the authored conditions, not substituted for them", () => {
+    const conditions = resolveConditions({
+      kindId: "renseignement",
+      availability: { conditions: [{ type: "notWounded" }] },
+    });
+    assert.deepStrictEqual(conditions, [{ type: "notWounded" }, { type: "renseignementAvailable" }]);
+  });
+
+  test("actions outside the Renseignement branch are left alone", () => {
+    for (const kindId of ["aventure", "intermede", "social"]) {
+      assert.deepStrictEqual(resolveConditions({ kindId }), []);
+    }
+  });
+
+  test("a character short on missions since the last occurrence may not act", () => {
+    const actionType = { kindId: "renseignement" };
+    const ctx = { character: { reputation: 0, missionsSinceRenseignement: 4 }, instanceTagIds: new Set() };
+    const result = evaluateAvailability(actionType, ctx);
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "Vous n'avez pas encore accompli assez de missions depuis la dernière fois.");
+  });
+
+  test("a character with enough missions since the last occurrence may act", () => {
+    const actionType = { kindId: "renseignement" };
+    const ctx = { character: { reputation: 0, missionsSinceRenseignement: 5 }, instanceTagIds: new Set() };
+    assert.equal(evaluateAvailability(actionType, ctx).ok, true);
+  });
+});
+
 describe("evaluateAvailability - Métier actions", () => {
   const actionType = { kindId: "metier", professionIds: ["forgeron"] };
   const ctxFor = (character) => ({ character, instanceTagIds: new Set() });
