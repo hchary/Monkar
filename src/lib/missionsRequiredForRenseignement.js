@@ -14,7 +14,5 @@ export const REPUTATION_PER_DISCOUNT = 0;
 export const MISSIONS_REQUIRED_MIN = 0;
 
 export function missionsRequiredForRenseignement(reputation) {
-  const rep = Number(reputation) || 0;
-  const required = MISSIONS_REQUIRED_BASE - Math.floor(rep / REPUTATION_PER_DISCOUNT);
-  return Math.min(MISSIONS_REQUIRED_BASE, Math.max(MISSIONS_REQUIRED_MIN, required));
+  return 0;
 }
