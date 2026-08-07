@@ -32,7 +32,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 | 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
-| 23 | Mission subject and action catalog — implementation | todo | 22 | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
+| 23 | Mission subject and action catalog — implementation | done | 22 | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
 | 24 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 25 | Mission loot and rarity mapping — implementation | todo | 23, 24 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 26 | Regional mission generation and journal — spec | done | 22, 24 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
@@ -1903,7 +1903,9 @@ Not blocking anything else in this list.
 
 ## Mission subject and action catalog (spec needed)
 
-Status: **spec resolved, not implemented**. Replaces the multi-slot narrative grammar system
+Status: **implemented** (catalogs, creator UI, and name-assembly helper; drawing/generation logic
+is a separate follow-up, see [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)).
+Replaces the multi-slot narrative grammar system
 (`worldData/verbPhrases/items`, see
 [Procedural narrative generation](#procedural-narrative-generation)) as the source of a mission's
 *name* with a much simpler two-part model: an **Action** and a **Subject**, concatenated to read as
@@ -1980,20 +1982,19 @@ worldData/missionSubjects/items/{id}  -- NEW catalog
   }]
 ```
 
-Not implemented yet. Current mission naming instead draws one `worldData/narrativeSubjects/items`
-objective and runs it through the multi-slot verb-phrase grammar — see
-[Rumor and mission system](#rumor-and-mission-system) and
-[Procedural narrative generation](#procedural-narrative-generation).
-
-**Implementation scope** (roadmap #23):
-- Create: `worldData/missionActions/items` and `worldData/missionSubjects/items` schema files
-  (`functions/src/schema/`), `MissionActionsManager.jsx` and `MissionSubjectsManager.jsx`
-  (`src/components/creator/`), plus the name-assembly helper (mirroring `textGeneration.js`'s
-  existing slot-assembly style).
-- Update: `CreatorDashboard.jsx` (register the two new tabs).
-- Do not read or open any other file without asking the user first — the drawing/generation logic
-  that calls this assembly helper is [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)'s
-  scope, not this entry's.
+Implemented in `shared/schema/missionAction.ts` / `shared/schema/missionSubject.ts` (isomorphic
+Zod contracts, re-exported by `functions/src/schema/missionAction.ts` /
+`functions/src/schema/missionSubject.ts`), `src/components/creator/MissionActionsManager.jsx` /
+`MissionSubjectsManager.jsx` (registered as the "Actions de mission" / "Sujets de mission" tabs
+under a new "Missions" group in `CreatorDashboard.jsx`), and the name-assembly helper
+`functions/src/missionNaming.js` (`assembleMissionName`, tested in
+`functions/src/missionNaming.test.js`) — mirrors `textGeneration.js`'s fixed-slot-order,
+skip-if-absent assembly style. Current mission naming still draws one
+`worldData/narrativeSubjects/items` objective and runs it through the multi-slot verb-phrase
+grammar until the drawing/generation logic that calls `assembleMissionName` is built — see
+[Rumor and mission system](#rumor-and-mission-system),
+[Procedural narrative generation](#procedural-narrative-generation), and
+[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed).
 
 ## Mission loot and rarity mapping (spec needed)
 

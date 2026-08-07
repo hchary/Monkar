@@ -18,6 +18,8 @@ import TablesDeTirageManager from "../components/creator/TablesDeTirageManager";
 import ActionsManager from "../components/creator/ActionsManager";
 import RecettesManager from "../components/creator/RecettesManager";
 import RumorsManager from "../components/creator/RumorsManager";
+import MissionActionsManager from "../components/creator/MissionActionsManager";
+import MissionSubjectsManager from "../components/creator/MissionSubjectsManager";
 
 const DEFAULT_SECTION = "Régions";
 
@@ -37,6 +39,13 @@ const GROUPS = [
       "Objectifs de quête": QuestObjectivesManager,
       "Lieux de quête": QuestLocationsManager,
       Rumeurs: RumorsManager,
+    },
+  },
+  {
+    name: "Missions",
+    tabs: {
+      "Actions de mission": MissionActionsManager,
+      "Sujets de mission": MissionSubjectsManager,
     },
   },
   {
