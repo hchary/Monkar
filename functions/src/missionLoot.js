@@ -6,8 +6,9 @@
 // from the way a quest's several possible objectives allow. Only the loot table pick and the
 // drawLootTableItemId draw within it vary per item.
 //
-// Wiring this into an actual mission-generation/resolution flow is out of scope here - see
-// docs/TODO.md "Regional mission generation and journal" for that consumer.
+// Wired into functions/src/actions/mission.js's resolve(), passed as partirEnQuete.js's
+// resolveQuestOutcome's `drawLoot` override (docs/TODO.md "Regional mission generation and
+// journal").
 
 const { RARITY_ORDER, DIFFICULTY_ORDER } = require("./lib/rolls");
 const { pickRandom, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("./lib/loot");
@@ -24,9 +25,17 @@ function difficultyToRarity(difficulty) {
 // Subject at generation time (docs/TODO.md "Mission subject and action catalog"). Tables with no
 // matching rarity/tag, or an empty draw within a matching table, are silently skipped rather than
 // failing the mission itself - the same content-gap precedent drawQuestLoot already set.
-function drawMissionLoot({ difficulty, tagIds, lootTables, objects, accomplishmentMessage }) {
-  const targetRarity = difficultyToRarity(difficulty);
-  if (!targetRarity) return [];
+//
+// `rarityOffset` (default 0) shifts the target rarity down that many ranks on the shared 8-tier
+// scale, floored at "commun" - mirrors partirEnQuete.js's drawQuestLoot, used the same way by
+// mission.js to draw the degraded-rarity consolation loot a failed mission resolution grants
+// (docs/TODO.md "Mission and quest resolution algorithm").
+function drawMissionLoot({ difficulty, tagIds, lootTables, objects, accomplishmentMessage, rarityOffset = 0 }) {
+  const baseRarity = difficultyToRarity(difficulty);
+  if (!baseRarity) return [];
+
+  const targetRarityIndex = Math.max(RARITY_ORDER.indexOf(baseRarity) - rarityOffset, 0);
+  const targetRarity = RARITY_ORDER[targetRarityIndex] ?? baseRarity;
 
   const relevantTagIds = new Set(tagIds || []);
   const candidateTables = lootTables.filter(

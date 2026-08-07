@@ -23,6 +23,7 @@ const emptyRegionForm = {
   description: "",
   neighbors: [],
   climatId: "",
+  climateIds: [],
   reliefIds: [],
   factionIds: [],
   adventureZoneIds: [],
@@ -269,6 +270,7 @@ export default function RegionsManager() {
       description: region.description || "",
       neighbors: region.neighbors || [],
       climatId: region.climatId || "",
+      climateIds: region.climateIds || [],
       reliefIds: region.reliefIds || [],
       factionIds: region.factionIds || [],
       adventureZoneIds: region.adventureZoneIds || [],
@@ -306,6 +308,7 @@ export default function RegionsManager() {
       description: form.description,
       neighbors: form.neighbors,
       climatId: form.climatId,
+      climateIds: form.climateIds,
       reliefIds: form.reliefIds,
       factionIds: form.factionIds,
       adventureZoneIds: form.adventureZoneIds,
@@ -395,6 +398,15 @@ export default function RegionsManager() {
             ))}
           </select>
         </fieldset>
+
+        <MultiSelectField
+          legend="Climats (génération de missions)"
+          options={climats}
+          selectedIds={form.climateIds}
+          onToggle={(id) => toggleIn("climateIds", id)}
+          createLink={`/creator?section=${encodeURIComponent("Climat")}`}
+          getTooltip={(climat) => climat.description}
+        />
 
         <MultiSelectField
           legend="Reliefs"

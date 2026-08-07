@@ -305,6 +305,11 @@ function resolveQuestOutcome({
   defaultSuccessClause,
   defaultFailureText,
   defaultFailureClause,
+  // Overridable so mission.js can draw loot through missionLoot.js's drawMissionLoot instead - a
+  // mission's loot pool is resolved once per occurrence from its own tagIds/rarity rather than
+  // re-rolled per item against a curated questObjectives list (docs/TODO.md "Mission loot and
+  // rarity mapping"). Same call signature as drawQuestLoot below, so either can be dropped in.
+  drawLoot = drawQuestLoot,
 }) {
   // Reused for the threshold/wound adjustments below and for talent evolution - the same single
   // draw already made for that mechanism, not a second roll. Independent of loot's own per-item
@@ -345,7 +350,7 @@ function resolveQuestOutcome({
   const narrativeText = narrative?.text || (success ? defaultSuccessText : defaultFailureText);
   const reputationGained = success ? rollReputationReward(quest.difficulty) : 0;
 
-  const loot = drawQuestLoot({
+  const loot = drawLoot({
     quest,
     difficulty: quest.difficulty,
     questObjectives,

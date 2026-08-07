@@ -1177,6 +1177,14 @@ fieldset label {
   gap: 12px;
 }
 
+.mission-region-group + .mission-region-group {
+  margin-top: 12px;
+}
+
+.mission-region-group h4 {
+  margin: 0 0 4px;
+}
+
 .mission-list {
   list-style: none;
   padding: 0;

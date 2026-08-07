@@ -4,16 +4,32 @@
 // entry from their own character.missionJournal (generated earlier by the "rumeur" handler, see
 // rumeur.js), passed in as payload.missionId exactly like artisanat.js's payload.recetteId.
 //
-// Resolution reuses partirEnQuete.js's own resolveQuestOutcome (score roll, narration, loot,
-// talent-evolution pipeline) wholesale rather than duplicating it, treating the mission journal
-// entry as a single-objective, unnamed "quest" shape. Rewards use the mission's own drawn
-// difficulty exactly, the same way a quest uses quest.difficulty - the earlier "one tier lower,
-// clamped at facile" reward discount was a balance mistake (docs/TODO.md "Mission and quest
-// resolution algorithm") and has been removed, not preserved.
+// Resolution reuses partirEnQuete.js's own resolveQuestOutcome (score roll, narration, talent-
+// evolution pipeline) wholesale rather than duplicating it - except for loot, which is drawn
+// through missionLoot.js's drawMissionLoot instead (docs/TODO.md "Mission loot and rarity
+// mapping"): a mission's loot pool is resolved once per occurrence from its own tagIds/rarity, not
+// re-rolled per item against a curated objectives list the way a quest's drawQuestLoot works.
+// Rewards use the mission's own drawn difficulty exactly, the same way a quest uses
+// quest.difficulty - the earlier "one tier lower, clamped at facile" reward discount was a balance
+// mistake (docs/TODO.md "Mission and quest resolution algorithm") and has been removed, not
+// preserved.
+//
+// A mission carries no worldData/narrativeSubjects/items objective of its own any more (docs/
+// TODO.md "Regional mission generation and journal" replaced the old objectiveId-based draw with
+// the missionSubjects/missionActions catalog pair, and the mission's title is already assembled at
+// generation time - see rumeur.js). The threshold/wound/talent-evolution pipeline, which expects
+// an "objective"-shaped { tagIds, rarity } for its own tag/rank matching, is instead fed a
+// synthetic stand-in built from the mission's own tagIds and its difficulty's rarity equivalence
+// (missionLoot.js's difficultyToRarity - the same mapping quest objectives already used). The
+// narration itself still falls back to the global narrativeSubjects catalog
+// (resolveQuestOutcome's own [questObjectives, narrativeSubjects] fallback, since the synthetic
+// objective has no `type` field and can never itself be picked as a narration subject) - that
+// catalog is unrelated to how a mission is titled.
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
 const { resolveQuestOutcome } = require("./partirEnQuete");
+const { drawMissionLoot, difficultyToRarity } = require("../missionLoot");
 
 async function prepare({ db, character, payload }) {
   const missionId = payload?.missionId;
@@ -22,6 +38,15 @@ async function prepare({ db, character, payload }) {
   const mission = (character.missionJournal || []).find((m) => m.id === missionId);
   if (!mission) {
     throw new HttpsError("failed-precondition", "Cette mission n'est plus disponible.");
+  }
+
+  // Region-locked (docs/TODO.md "Regional mission generation and journal"): a mission stays tied
+  // to the region it was generated in, even if the character has since travelled elsewhere.
+  if (mission.regionId && mission.regionId !== character.region?.id) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Cette mission n'est accessible que depuis sa région d'origine."
+    );
   }
 
   let locationName = null;
@@ -48,39 +73,39 @@ async function prepare({ db, character, payload }) {
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  // Missions carry a single objectiveId rather than a curated list (see rumeur.js) - resolved
-  // here so resolve() below can fail closed if the narrativeSubject it points to was deleted
-  // between generation and resolution, instead of narrating with nothing.
-  const objective = narrativeSubjects.find((s) => s.id === mission.objectiveId) || null;
-
-  return { mission, objective, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
+  return { mission, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
 }
 
 async function resolve({ character, actionTypeId, today, context }) {
-  const { mission, objective, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
+  const { mission, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
 
-  if (!objective) {
-    throw new HttpsError("failed-precondition", "L'objectif de cette mission n'existe plus.");
-  }
+  // Stands in for the "objective" resolveQuestOutcome's threshold/wound/talent-evolution pipeline
+  // expects - see the header comment above.
+  const missionObjective = { tagIds: mission.tagIds || [], rarity: difficultyToRarity(mission.difficulty) };
 
-  const questObjectives = [objective];
-
-  // The shape every reused partirEnQuete helper expects - a mission has no catalog name, so the
-  // drawn objective's own noun stands in for one (only used for the {quete} narration placeholder
-  // and the talent-evolution circumstance text below).
-  const missionName = objective.nom ? objective.nom.charAt(0).toUpperCase() + objective.nom.slice(1) : "mission";
   const missionAsQuest = {
     id: mission.id,
-    name: missionName,
+    name: mission.name,
     tagIds: mission.tagIds || [],
     locationId: mission.locationId || null,
     difficulty: mission.difficulty,
   };
 
+  function drawLoot({ difficulty, lootTables: tables, objects: objectCatalog, accomplishmentMessage, rarityOffset }) {
+    return drawMissionLoot({
+      difficulty,
+      tagIds: mission.tagIds || [],
+      lootTables: tables,
+      objects: objectCatalog,
+      accomplishmentMessage,
+      rarityOffset,
+    });
+  }
+
   const outcome = resolveQuestOutcome({
     character,
     quest: missionAsQuest,
-    questObjectives,
+    questObjectives: [missionObjective],
     narrativeSubjects,
     verbPhrases,
     lootTables,
@@ -88,16 +113,17 @@ async function resolve({ character, actionTypeId, today, context }) {
     talents,
     locationName,
     today,
-    circumstance: `lors de la mission « ${missionName} »`,
+    circumstance: `lors de la mission « ${mission.name} »`,
     defaultSuccessText: "Vous revenez de votre mission.",
     defaultSuccessClause: "vous revenez de votre mission",
     defaultFailureText: "Vous rentrez bredouille de votre mission.",
     defaultFailureClause: "vous rentrez bredouille de votre mission",
+    drawLoot,
   });
 
   const missionSummary = {
     id: mission.id,
-    name: missionName,
+    name: mission.name,
     difficulty: mission.difficulty,
     locationId: mission.locationId || null,
     locationName,
