@@ -32,7 +32,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 | 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
-| 23 | Mission loot and rarity mapping — spec | spec | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
+| 23 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 24 | Regional mission generation and journal — spec | spec | 22, 23 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 25 | Retiring quests and quest objectives for the subject-action system — spec | spec | 22, 23, 24 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 26 | Se renseigner intermède action — spec | spec | 24, 25 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
@@ -1992,7 +1992,7 @@ objective and runs it through the multi-slot verb-phrase grammar — see
 
 ## Mission loot and rarity mapping (spec needed)
 
-Status: **designed, not implemented**. Blocked by
+Status: **spec resolved, not implemented**. Blocked by
 [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed). Once a
 mission is generated from a difficulty and a Subject (with its difficulty-tier and variation
 `tagIds`), this entry pins down how that combination selects a `worldData/lootTables/items` entry —
@@ -2003,20 +2003,20 @@ reusing the exact matching mechanism [Quest loot draw](#quest-loot-draw) already
   `DIFFICULTIES` scale) maps onto the existing 8-tier rarity scale the same way
   `worldData/narrativeSubjects/items` objectives already do it today (see
   [Quest loot draw](#quest-loot-draw)'s rarity source) — reused, not redefined.
-- **Tag source for matching**: the union of the Subject's own tags plus whichever difficulty-tier
-  and variation `tagIds` were drawn for this occurrence (see
-  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed)) — replacing
-  the current per-item random-objective tag draw with a fixed set already resolved once for the
-  whole mission occurrence, since a mission's Subject (and its drawn modifiers) don't change per
-  loot item the way a quest's per-item objective re-roll does today.
+- **Tag source for matching**: the union of the difficulty-tier `tagIds` and variation `tagIds`
+  drawn for this Subject at generation time (see
+  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed)) — the
+  Subject catalog has no separate base-level `tagIds` of its own, only per-difficulty-tier and
+  per-variation ones.
+- **Resolved once per mission occurrence, not re-rolled per item**: unlike
+  [Quest loot draw](#quest-loot-draw), where each loot item independently re-rolls a random
+  objective (and therefore its own rarity/tag pool), every loot item drawn for one mission
+  occurrence shares the exact same rarity and tag pool. A mission's difficulty, Subject,
+  difficulty-tier, and variation are all already fixed once, at generation time — there is no
+  second candidate to re-roll per item the way a quest's several possible objectives allow. Only
+  the loot table pick and the `drawLootTableItemId` draw within it vary per item.
 - **Loot count**: still driven by `LOOT_COUNT_BY_DIFFICULTY` (see
   [Quest loot draw](#quest-loot-draw)), unchanged.
-
-**Still open (deliberately deferred)**:
-- Whether every loot item drawn for one mission occurrence shares the exact same tag/rarity pool
-  (per above) or each item independently re-rolls its own variation the way today's per-item
-  objective draw does — the user's description doesn't distinguish, and either is a small,
-  self-contained implementation choice once picked.
 
 Not implemented yet.
 
