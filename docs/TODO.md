@@ -31,7 +31,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 19 | Composite quests — spec | done | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
 | 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
-| 22 | Mission subject and action catalog — spec | spec | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
+| 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
 | 23 | Mission loot and rarity mapping — spec | spec | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 24 | Regional mission generation and journal — spec | spec | 22, 23 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 25 | Retiring quests and quest objectives for the subject-action system — spec | spec | 22, 23, 24 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
@@ -1898,7 +1898,7 @@ Not blocking anything else in this list.
 
 ## Mission subject and action catalog (spec needed)
 
-Status: **designed, not implemented**. Replaces the multi-slot narrative grammar system
+Status: **spec resolved, not implemented**. Replaces the multi-slot narrative grammar system
 (`worldData/verbPhrases/items`, see
 [Procedural narrative generation](#procedural-narrative-generation)) as the source of a mission's
 *name* with a much simpler two-part model: an **Action** and a **Subject**, concatenated to read as
@@ -1907,15 +1907,24 @@ This is a new, dedicated catalog pair — distinct from `worldData/actionTypes/i
 action a character actually performs, e.g. "Partir en mission", "S'entraîner") — narrative
 title-building blocks only.
 
-- **Shared type enum**: both a mission-name Action and a Subject carry a `type` from a small fixed
-  enum — ennemis, livraison, trésor, protection (content may need to grow this list once real
-  content is authored; not closed off to exactly four). Generation only ever pairs an Action and a
-  Subject of the same `type`.
-- **Mission-name Action catalog** (new, e.g. `worldData/missionVerbs/items`): a French verb phrase
-  template ("Protéger", "Vaincre", "Enquêter sur") plus its `type`. Kept deliberately separate from
-  the gameplay `worldData/actionTypes/items` catalog — nothing about starting a mission ties to
-  which verb phrase named it.
-- **Subject catalog** (new, e.g. `worldData/missionSubjects/items`): a base French name ("caravane
+- **Shared type field**: both a mission-name Action and a Subject carry a `type` string. It starts
+  seeded with four values — ennemis, livraison, trésor, protection — but is plain free text, not a
+  hardcoded frontend enum (unlike, say, `OBJECT_TYPES`): a content author adds a new type simply by
+  giving an Action or Subject an unseen `type` value, no code change needed, the same
+  no-code-touch-to-extend convention already used for tag ids. Generation only ever pairs an Action
+  and a Subject sharing the same `type` value.
+- **Mission-name Action catalog** (new, `worldData/missionActions/items` — named to avoid colliding
+  with "verb phrase" from the grammar system it replaces): a French phrase template ("Protéger",
+  "Vaincre", "Enquêter sur") plus its `type`. The phrase is authored as a complete bare prefix,
+  including any trailing preposition it needs ("Enquêter sur" is one authored string, not "Enquêter"
+  plus a separate preposition field) — the same "author the whole fragment, no placeholder grammar"
+  convention `textGeneration.js` already uses elsewhere. Kept deliberately separate from the
+  gameplay `worldData/actionTypes/items` catalog — nothing about starting a mission ties to which
+  phrase named it. Has its own creator UI, `MissionActionsManager.jsx`, registered as a tab in
+  `CreatorDashboard.jsx` — this catalog is meant to keep growing with content the way quests, objects,
+  and talents do, so it gets the same list-then-create management screen those get, rather than the
+  Firestore-console-only route used for a single narrow field like `tier.talentGain`.
+- **Subject catalog** (new, `worldData/missionSubjects/items`): a base French name ("caravane
   marchande", "dragon", "meurtres"), its `type`, and:
   - **Climates**: a multi-select of the climates it may appear in (used later to match a subject to
     the region it's generated for — see
@@ -1928,36 +1937,30 @@ title-building blocks only.
   - **Variations**: a separate, difficulty-independent list of prefix/suffix flavor modifiers, each
     with its own `tagIds` — e.g. suffix "rouge" (tags: feu), suffix "blanc" (tags: glace). One
     variation is drawn at random per generation, independent of the difficulty draw.
+  Also gets its own creator UI, `MissionSubjectsManager.jsx`, same tab-in-`CreatorDashboard.jsx`
+  convention as the Action catalog above, since its per-entry structure (climates, difficulty tiers,
+  variations) is richer than a single-field console edit would comfortably support.
 - **Name assembly**: at generation time, once a `type`-matched Action and Subject are picked (plus a
-  difficulty and a random variation for the Subject), the final mission name is the Action's phrase
-  followed by the Subject's name with its difficulty-tier prefix/suffix and variation prefix/suffix
-  applied.
+  difficulty and a random variation for the Subject), the final mission name is assembled in a fixed
+  slot order — difficulty-tier prefix, then variation prefix, then the Subject's base name, then
+  variation suffix, then difficulty-tier suffix — with any absent slot simply skipped, then the whole
+  Subject string appended after the Action's phrase. Example: Action "Vaincre" + Subject "dragon"
+  drawn at épique with the "liche" difficulty suffix and the "rouge" variation suffix →
+  "Vaincre dragon rouge liche". As with the rest of `textGeneration.js`, there's no automatic French
+  grammatical agreement check on the assembled result — a content-authoring discipline, not a code
+  guarantee.
 
-**Still open (deliberately deferred)**:
-- Exact catalog names (`worldData/missionVerbs/items` / `worldData/missionSubjects/items` above are
-  placeholders) and whether they need creator UI (`MissionVerbsManager.jsx` /
-  `MissionSubjectsManager.jsx`?) or, like `tier.talentGain`/`quest.trigger`, are authored directly in
-  the Firestore console for a first pass.
-- Exact assembly order when a subject carries both a difficulty-tier modifier and a variation
-  modifier at once (no worked example combines both) — a content-authoring convention (e.g.
-  difficulty prefix, then variation prefix, then base name, then variation suffix, then difficulty
-  suffix) needs picking, with no automatic French grammatical agreement check, the same limitation
-  `textGeneration.js` already accepts elsewhere.
-- Whether an Action's phrase needs its own placeholder/preposition handling ("Enquêter sur X" vs
-  "Protéger X") or is always a bare prefix concatenated with the subject.
-- Whether the `type` enum needs more than the four named values once real content is authored (an
-  investigation-flavored subject like "meurtres macabres" doesn't obviously fit
-  ennemis/livraison/trésor/protection).
-
-**Data model implications** (sketch, names to be confirmed during the spec pass):
+**Data model implications**:
 ```
-worldData/missionVerbs/items/{id}     -- NEW catalog, name TBD
-  phrase: string      -- French, e.g. "Protéger", "Vaincre", "Enquêter sur"
-  type: string         -- ennemis | livraison | tresor | protection
+worldData/missionActions/items/{id}   -- NEW catalog
+  phrase: string      -- French, complete phrase including any trailing preposition,
+                       --   e.g. "Protéger", "Vaincre", "Enquêter sur"
+  type: string         -- free text, matched against a Subject's own type; seeded with
+                        --   ennemis | livraison | tresor | protection, open to more
 
-worldData/missionSubjects/items/{id}  -- NEW catalog, name TBD
+worldData/missionSubjects/items/{id}  -- NEW catalog
   name: string                        -- French base name, e.g. "dragon"
-  type: string                        -- ennemis | livraison | tresor | protection
+  type: string                        -- free text, matched against a mission Action's own type
   climateIds: string[]                -- climates this subject can be generated for
   difficultyTiers: [{
     difficulty: string,               -- one of the 6-tier DIFFICULTIES scale
@@ -1976,6 +1979,16 @@ Not implemented yet. Current mission naming instead draws one `worldData/narrati
 objective and runs it through the multi-slot verb-phrase grammar — see
 [Rumor and mission system](#rumor-and-mission-system) and
 [Procedural narrative generation](#procedural-narrative-generation).
+
+**Implementation scope** (roadmap #22):
+- Create: `worldData/missionActions/items` and `worldData/missionSubjects/items` schema files
+  (`functions/src/schema/`), `MissionActionsManager.jsx` and `MissionSubjectsManager.jsx`
+  (`src/components/creator/`), plus the name-assembly helper (mirroring `textGeneration.js`'s
+  existing slot-assembly style).
+- Update: `CreatorDashboard.jsx` (register the two new tabs).
+- Do not read or open any other file without asking the user first — the drawing/generation logic
+  that calls this assembly helper is [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)'s
+  scope, not this entry's.
 
 ## Mission loot and rarity mapping (spec needed)
 
