@@ -31,12 +31,21 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 19 | Composite quests — spec | done | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
 | 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
 | 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
-| 22 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
-| 23 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
-| 24 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
-| 25 | Known recipes grant mechanism — implementation | todo | 21 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
+| 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
+| 23 | Mission loot and rarity mapping — spec | spec | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
+| 24 | Regional mission generation and journal — spec | spec | 22, 23 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
+| 25 | Retiring quests and quest objectives for the subject-action system — spec | spec | 22, 23, 24 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
+| 26 | Se renseigner intermède action — spec | spec | 24, 25 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
+| 27 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
+| 28 | Misc small polish (`favoredQuestIds` effect, profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention) | todo | — | [Quest creation and editing](#quest-creation-and-editing), [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
+| 29 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
+| 30 | Known recipes grant mechanism — implementation | todo | 21 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 
-**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows. #22-23 are intentionally last: real but low-stakes polish with no downstream dependents. #24 trails everything: it only became buildable once #8 shipped the scheduled function it hooks into, and nothing else depends on it. #25 is appended last, not reordered next to #21, so it doesn't force renumbering rows #22-24 that are already cited by number elsewhere in this doc — its spec is resolved and it's buildable immediately, but it's comparable in scope to #22-23's polish tier, not urgent enough to warrant that churn.
+**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows.
+
+**#22-26 — mission/quest simplification chantier**: inserted ahead of the pre-existing #22-25 polish tier (now #27-30, renumbered — see below) per explicit priority direction, since this reworks the core Aventure loop those polish items merely touch. Strict dependency chain: the Subject/Action catalog (#22) is the foundation everything else assembles a mission name from; loot/rarity mapping (#23) only makes sense once that catalog exists to draw tags from; regional generation and the mission journal (#24) needs both #22 (what to draw) and #23 (how it pays out) settled; retiring the hand-authored quest catalog (#25) is deliberately last among the four core-mechanic entries because it has to enumerate every existing feature built on top of what's being deleted (composite quests, quest triggers, verb-phrase narration), which only stabilizes once the replacement (#22-24) is itself spec'd; "Se renseigner" (#26) trails all of them since it's a consumer of the regional generation routine (#24) and its rumor-harvesting half depends on #25's still-open call on the flavor-text rumor mechanic's fate.
+
+#27-28 (previously #22-23) are intentionally after the mission chantier now: real but low-stakes polish with no downstream dependents. #29 (previously #24) trails everything: it only became buildable once #8 shipped the scheduled function it hooks into, and nothing else depends on it — though its own relevance may need revisiting once #25 decides the rumor-flavor-text mechanic's fate. #30 (previously #25) stays last, comparable in scope to #27-28's polish tier, not urgent enough to warrant further reordering churn.
 
 ## Expanded talent system
 
@@ -134,7 +143,7 @@ descendantIds: [string]   -- other worldData/talents/items ids this talent unloc
 - The actual unlock mechanic: a character currently owning a talent's ancestors doesn't grant or reveal that talent anywhere — these links are pure data for now.
 - Cycle prevention: nothing stops a creator from linking talents into a cycle (A ancestor of B, B ancestor of A) or from an ancestor/descendant list pointing back at itself indirectly. Not a problem while the graph has no gameplay consumer, but should be revisited once the unlock mechanic is designed.
 
-**Implementation scope** (roadmap #23 — ancestor/descendant cycle prevention):
+**Implementation scope** (roadmap #28 — ancestor/descendant cycle prevention):
 - Read: `src/components/creator/TalentsManager.jsx` (the batch-write create/edit/delete handlers maintaining the `ancestorIds`/`descendantIds` mirror invariant, where a cycle check would be inserted).
 - Update: `src/components/creator/TalentsManager.jsx`.
 - Do not read or open any other file without asking the user first.
@@ -222,7 +231,7 @@ worldData/quests/items/{id}
 **Still open (deliberately deferred)**:
 - How `favoredQuestIds` on a talent should affect gameplay is still undecided (see above).
 
-**Implementation scope** (roadmap #23 — `favoredQuestIds` effect):
+**Implementation scope** (roadmap #28 — `favoredQuestIds` effect):
 - Read: `src/components/creator/TalentsManager.jsx` (`favoredQuestIds` multi-select, purely informational today), `functions/src/actions/partirEnQuete.js` (the quest-drawing code this would need to weight), and `functions/src/actions/mission.js` (the mission-generation path, if this should apply there too).
 - Update: whichever of the above ends up implementing the weighting, plus `functions/src/schema/talent.ts` / `shared/schema/talent.ts` if the field's meaning changes.
 - This needs a decision on *how* `favoredQuestIds` should affect gameplay before implementation — confirm the intended effect with the user first if it isn't already decided elsewhere.
@@ -353,7 +362,7 @@ firestore.rules gained an `instances/{id}` rule (read: creator or the owning pla
 
 **Still open**: no creator UI surfaces which loot tables/objectives are actually reachable together (e.g. a rarity/tag combination with zero matching tables) — a content author has to cross-reference `QuestObjectivesManager.jsx` and `TablesDeTirageManager.jsx` by hand to avoid dead combinations.
 
-**Implementation scope** (roadmap #23 — creator tooling for unreachable loot combinations):
+**Implementation scope** (roadmap #28 — creator tooling for unreachable loot combinations):
 - Read: `src/components/creator/QuestObjectivesManager.jsx` and `src/components/creator/TablesDeTirageManager.jsx` (the two catalogs a content author currently has to cross-reference by hand), and `functions/src/actions/partirEnQuete.js`'s `drawQuestLoot` (the exact matching rule — rarity + tag overlap — the new tooling must mirror).
 - Update: likely a new read-only report/warning surfaced in `src/components/creator/TablesDeTirageManager.jsx` or `src/components/creator/QuestObjectivesManager.jsx` — exact placement is a UI decision, confirm with the user before picking one.
 - Do not read or open any other file without asking the user first.
@@ -635,7 +644,7 @@ a quest-driven grant was considered and dropped from scope, leaving:
   as its own entry if a quest-driven grant turns out to be wanted later.
 
 **Implementation scope**:
-- **Evolution consumer (roadmap #23, misc polish)**: read `src/lib/professions.js`, `functions/src/schema/profession.ts` / `shared/schema/profession.ts` (the unread `evolutionId` field), and `src/components/ProfessionTab.jsx` (where a reached-evolution notice would surface). Update whichever of those ends up hosting the evolution trigger.
+- **Evolution consumer (roadmap #28, misc polish)**: read `src/lib/professions.js`, `functions/src/schema/profession.ts` / `shared/schema/profession.ts` (the unread `evolutionId` field), and `src/components/ProfessionTab.jsx` (where a reached-evolution notice would surface). Update whichever of those ends up hosting the evolution trigger.
 - Do not read or open any other file for this entry without asking the user first.
 
 ### Character link
@@ -716,7 +725,7 @@ character sheet's Métier tab reads the profession's. There is no Cloud Function
 `worldData` (it is creator-write per `firestore.rules`), so this runs in the creator's browser; a
 concurrent delete fails the whole batch rather than half-committing.
 
-**Action tags** (roadmap #22, one of the bundled items — **implemented**): `worldData/actionTypes/items/{id}`
+**Action tags** (roadmap #27, one of the bundled items — **implemented**): `worldData/actionTypes/items/{id}`
 now carries a `tagIds: string[]` field, referencing `worldData/tags/items` via the same
 `MultiSelectModalField.jsx` picker mechanism already used by quests, objects, loot tables, talents,
 locations, and recettes. Generic and unconditional — unlike `lootTagIds`/`recipeCategoryIds`, it
@@ -759,7 +768,7 @@ worldData/actionTypes/items/{id}
   and Artisanat only ever touch `instances`. Since the retired paliers system stopped rolling
   gold/reputation/wound changes entirely (`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7), which action
   grants how much of what is undecided content, not a missing architecture piece.
-**Implementation scope** (roadmap #22 — bundles several independent small polish items; the action
+**Implementation scope** (roadmap #27 — bundles several independent small polish items; the action
 `tagIds` field is now done, see above — the remaining two are still open):
 - Read: `src/lib/actionKinds.js` / `functions/src/lib/actionKinds.js` (`ACTION_KINDS` tree, to extend with a new Métier subtype), `functions/src/actions/recolte.js` and `functions/src/actions/artisanat.js` (precedent for how a Métier subtype adds its own handler + fields), `functions/src/lib/actionCatalog.js` (`resolveConditions`, where the `hasProfession` gate is injected), and `functions/src/schema/actionType.ts` / `shared/schema/actionType.ts`.
 - Update: whichever of the above the specific polish item touches. This row still bundles two independent items (a new Métier subtype, gold/reputation/region content on an existing handler) — confirm with the user which one to pick up first rather than doing both in one pass.
@@ -963,7 +972,7 @@ characters/{id}
                                                       --   origin.talents/origin.items
 ```
 
-**Implementation scope** (roadmap #25, now unblocked):
+**Implementation scope** (roadmap #30, now unblocked):
 - Read: `functions/src/index.ts` (`createCharacter`'s talent/item-granting loop, the pattern
   `startingRecetteIds` extends), `functions/src/actions/apprentissage.js` and
   `functions/src/actions/sEntrainer.js` (the two existing trainer-mediated handlers the new
@@ -1018,7 +1027,7 @@ lands, since they're specified in terms of "per Interval".
 
 ## Rumor and mission system
 
-Status: **implemented**, except region-to-region propagation (roadmap #24, see "Still open"
+Status: **implemented**, except region-to-region propagation (roadmap #29, see "Still open"
 below — the Interval-tick cadence it depends on is now built, shared with
 [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
 but the propagation logic itself is still not written).
@@ -1119,7 +1128,7 @@ way "Partir en quête" generates its narration.
   built — the scheduled `sweepQuestTriggers` Cloud Function
   ([Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
   `functions/src/index.ts`, ticking every Interval at 00:00/12:00 UTC) — but propagation's actual
-  sweep logic still needs to be written and hooked into it, tracked as roadmap #24 (see
+  sweep logic still needs to be written and hooked into it, tracked as roadmap #29 (see
   "Implementation scope" below). Everything else in this entry (catalog, sightings storage, both
   journals, both actions, the banner) is built and does not depend on it.
 - `rumorHarvestCount` / `missionRollCount` defaults (1 / 3) and the mission reward's "one tier
@@ -1129,7 +1138,7 @@ way "Partir en quête" generates its narration.
   [Intermède actions (spec needed)](#intermède-actions-spec-needed)) is a separate, still-undesigned
   trigger that would need to insert directly into a region's `rumorSightings`, once designed.
 
-**Implementation scope** (roadmap #24 — region-to-region propagation sweep):
+**Implementation scope** (roadmap #29 — region-to-region propagation sweep):
 - Read: `functions/src/lib/questTriggers.js` (`sweepQuestTriggers`, the sibling sweep already
   registered on the same schedule — propagation should run alongside it, e.g. a second exported
   function called from the same `functions/src/index.ts` scheduled handler, or its own scheduled
@@ -1175,7 +1184,7 @@ banner (`RumorBanner.jsx`, wired into `CharacterProfile.jsx`), the "Rumeurs" cha
 ## Quest triggers and end-of-action pop-up pages
 
 Status: **implemented**, except the region-to-region rumor propagation the same scheduled tick
-was always meant to drive (split out as its own follow-up, roadmap #24, once this entry's
+was always meant to drive (split out as its own follow-up, roadmap #29, once this entry's
 implementation was under way — see [Rumor and mission system](#rumor-and-mission-system)). Quests
 are meant to be generated less frequently than
 missions and, unlike missions, are given to a character based on a trigger the quest defines rather
@@ -1204,7 +1213,7 @@ next Interval, through a new page added to the existing end-of-action result pop
   on a player action instead. The same tick is also meant to drive
   [Rumor and mission system](#rumor-and-mission-system)'s region-to-region propagation, whose
   implementation was deferred pending this exact cadence decision; the cadence now exists, but the
-  propagation sweep itself is a separate follow-up (roadmap #24) rather than something this
+  propagation sweep itself is a separate follow-up (roadmap #29) rather than something this
   entry's implementation pass bundled in — the two are independent Firestore sweeps that happen to
   share a cron schedule, not one combined pass.
 - **Notification**: a newly triggered quest doesn't interrupt the player mid-session — it's
@@ -1253,7 +1262,7 @@ paginated `src/components/actions/ActionResultDialog.jsx`.
   [Rumor and mission system](#rumor-and-mission-system)'s region-to-region propagation sweep, but
   that sweep's own logic (walking `neighbors`, decaying rarity per hop) is independent enough,
   and touches enough files outside this entry's original scope, that it was tracked separately
-  as roadmap #24 instead of bundled into this pass.
+  as roadmap #29 instead of bundled into this pass.
 
 **Implementation scope**: exhausted — see "Implemented in" above. Roadmap #24 (propagation) is a
 separate follow-up with its own scope, listed under
@@ -1262,7 +1271,7 @@ separate follow-up with its own scope, listed under
 **Still open (deliberately deferred)**:
 - The messages feature that page 3 anticipates doesn't exist anywhere yet — this entry only
   reserves the page, it doesn't design messaging.
-- Region-to-region rumor propagation itself — see roadmap #24 above and
+- Region-to-region rumor propagation itself — see roadmap #29 above and
   [Rumor and mission system](#rumor-and-mission-system)'s own "Still open" note.
 
 **Data model implications**:
@@ -1283,7 +1292,7 @@ characters/{id}
 Depends on [Interval (12h action cycle)](#interval-12h-action-cycle) for its evaluation cadence, and
 touches the same `ActionResultDialog.jsx` that [Modular action framework](#modular-action-framework)
 generalized. Its scheduled-tick decision also resolves
-[Rumor and mission system](#rumor-and-mission-system)'s propagation cadence question (see roadmap #24
+[Rumor and mission system](#rumor-and-mission-system)'s propagation cadence question (see roadmap #29
 for that sweep's own implementation).
 
 ## Aventure exploration mechanics (spec needed)
@@ -1886,3 +1895,293 @@ starts the "Mission" action (`kindId: "aventure"`, `handlerId: "mission"`) with 
   its own heading within the Aventure tab's action detail panel.
 
 Not blocking anything else in this list.
+
+## Mission subject and action catalog (spec needed)
+
+Status: **spec resolved, not implemented**. Replaces the multi-slot narrative grammar system
+(`worldData/verbPhrases/items`, see
+[Procedural narrative generation](#procedural-narrative-generation)) as the source of a mission's
+*name* with a much simpler two-part model: an **Action** and a **Subject**, concatenated to read as
+a title — "Protéger caravane marchande", "Vaincre dragon noir", "Enquêter sur meurtres macabres".
+This is a new, dedicated catalog pair — distinct from `worldData/actionTypes/items` (the gameplay
+action a character actually performs, e.g. "Partir en mission", "S'entraîner") — narrative
+title-building blocks only.
+
+- **Shared type field**: both a mission-name Action and a Subject carry a `type` string. It starts
+  seeded with four values — ennemis, livraison, trésor, protection — but is plain free text, not a
+  hardcoded frontend enum (unlike, say, `OBJECT_TYPES`): a content author adds a new type simply by
+  giving an Action or Subject an unseen `type` value, no code change needed, the same
+  no-code-touch-to-extend convention already used for tag ids. Generation only ever pairs an Action
+  and a Subject sharing the same `type` value.
+- **Mission-name Action catalog** (new, `worldData/missionActions/items` — named to avoid colliding
+  with "verb phrase" from the grammar system it replaces): a French phrase template ("Protéger",
+  "Vaincre", "Enquêter sur") plus its `type`. The phrase is authored as a complete bare prefix,
+  including any trailing preposition it needs ("Enquêter sur" is one authored string, not "Enquêter"
+  plus a separate preposition field) — the same "author the whole fragment, no placeholder grammar"
+  convention `textGeneration.js` already uses elsewhere. Kept deliberately separate from the
+  gameplay `worldData/actionTypes/items` catalog — nothing about starting a mission ties to which
+  phrase named it. Has its own creator UI, `MissionActionsManager.jsx`, registered as a tab in
+  `CreatorDashboard.jsx` — this catalog is meant to keep growing with content the way quests, objects,
+  and talents do, so it gets the same list-then-create management screen those get, rather than the
+  Firestore-console-only route used for a single narrow field like `tier.talentGain`.
+- **Subject catalog** (new, `worldData/missionSubjects/items`): a base French name ("caravane
+  marchande", "dragon", "meurtres"), its `type`, and:
+  - **Climates**: a multi-select of the climates it may appear in (used later to match a subject to
+    the region it's generated for — see
+    [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)).
+  - **Difficulty tiers**: for each of some subset of the existing 6-tier difficulty scale (see
+    [Quest difficulty](#quest-difficulty)) the subject can appear at, an optional prefix and/or
+    suffix string, plus any extra `tagIds` that tier contributes. Example: "dragon" — prefix "jeune"
+    at difficile, prefix "ancien" at mythique, suffix "adulte" at très difficile, suffix "liche" at
+    épique (contributing e.g. a "mort-vivant" tag).
+  - **Variations**: a separate, difficulty-independent list of prefix/suffix flavor modifiers, each
+    with its own `tagIds` — e.g. suffix "rouge" (tags: feu), suffix "blanc" (tags: glace). One
+    variation is drawn at random per generation, independent of the difficulty draw.
+  Also gets its own creator UI, `MissionSubjectsManager.jsx`, same tab-in-`CreatorDashboard.jsx`
+  convention as the Action catalog above, since its per-entry structure (climates, difficulty tiers,
+  variations) is richer than a single-field console edit would comfortably support.
+- **Name assembly**: at generation time, once a `type`-matched Action and Subject are picked (plus a
+  difficulty and a random variation for the Subject), the final mission name is assembled in a fixed
+  slot order — difficulty-tier prefix, then variation prefix, then the Subject's base name, then
+  variation suffix, then difficulty-tier suffix — with any absent slot simply skipped, then the whole
+  Subject string appended after the Action's phrase. Example: Action "Vaincre" + Subject "dragon"
+  drawn at épique with the "liche" difficulty suffix and the "rouge" variation suffix →
+  "Vaincre dragon rouge liche". As with the rest of `textGeneration.js`, there's no automatic French
+  grammatical agreement check on the assembled result — a content-authoring discipline, not a code
+  guarantee.
+
+**Data model implications**:
+```
+worldData/missionActions/items/{id}   -- NEW catalog
+  phrase: string      -- French, complete phrase including any trailing preposition,
+                       --   e.g. "Protéger", "Vaincre", "Enquêter sur"
+  type: string         -- free text, matched against a Subject's own type; seeded with
+                        --   ennemis | livraison | tresor | protection, open to more
+
+worldData/missionSubjects/items/{id}  -- NEW catalog
+  name: string                        -- French base name, e.g. "dragon"
+  type: string                        -- free text, matched against a mission Action's own type
+  climateIds: string[]                -- climates this subject can be generated for
+  difficultyTiers: [{
+    difficulty: string,               -- one of the 6-tier DIFFICULTIES scale
+    prefix: string | null,
+    suffix: string | null,
+    tagIds: string[],
+  }]
+  variations: [{
+    prefix: string | null,
+    suffix: string | null,
+    tagIds: string[],
+  }]
+```
+
+Not implemented yet. Current mission naming instead draws one `worldData/narrativeSubjects/items`
+objective and runs it through the multi-slot verb-phrase grammar — see
+[Rumor and mission system](#rumor-and-mission-system) and
+[Procedural narrative generation](#procedural-narrative-generation).
+
+**Implementation scope** (roadmap #22):
+- Create: `worldData/missionActions/items` and `worldData/missionSubjects/items` schema files
+  (`functions/src/schema/`), `MissionActionsManager.jsx` and `MissionSubjectsManager.jsx`
+  (`src/components/creator/`), plus the name-assembly helper (mirroring `textGeneration.js`'s
+  existing slot-assembly style).
+- Update: `CreatorDashboard.jsx` (register the two new tabs).
+- Do not read or open any other file without asking the user first — the drawing/generation logic
+  that calls this assembly helper is [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)'s
+  scope, not this entry's.
+
+## Mission loot and rarity mapping (spec needed)
+
+Status: **designed, not implemented**. Blocked by
+[Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed). Once a
+mission is generated from a difficulty and a Subject (with its difficulty-tier and variation
+`tagIds`), this entry pins down how that combination selects a `worldData/lootTables/items` entry —
+reusing the exact matching mechanism [Quest loot draw](#quest-loot-draw) already built (rarity match
++ tag overlap against `worldData/lootTables/items`), not a new one.
+
+- **Difficulty-to-rarity equivalence**: the mission's difficulty tier (the existing 6-tier
+  `DIFFICULTIES` scale) maps onto the existing 8-tier rarity scale the same way
+  `worldData/narrativeSubjects/items` objectives already do it today (see
+  [Quest loot draw](#quest-loot-draw)'s rarity source) — reused, not redefined.
+- **Tag source for matching**: the union of the Subject's own tags plus whichever difficulty-tier
+  and variation `tagIds` were drawn for this occurrence (see
+  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed)) — replacing
+  the current per-item random-objective tag draw with a fixed set already resolved once for the
+  whole mission occurrence, since a mission's Subject (and its drawn modifiers) don't change per
+  loot item the way a quest's per-item objective re-roll does today.
+- **Loot count**: still driven by `LOOT_COUNT_BY_DIFFICULTY` (see
+  [Quest loot draw](#quest-loot-draw)), unchanged.
+
+**Still open (deliberately deferred)**:
+- Whether every loot item drawn for one mission occurrence shares the exact same tag/rarity pool
+  (per above) or each item independently re-rolls its own variation the way today's per-item
+  objective draw does — the user's description doesn't distinguish, and either is a small,
+  self-contained implementation choice once picked.
+
+Not implemented yet.
+
+## Regional mission generation and journal (spec needed)
+
+Status: **designed, not implemented**. Blocked by
+[Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed) and
+[Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed). Replaces
+[Rumor and mission system](#rumor-and-mission-system)'s mission-generation mechanic (today: one
+random `worldData/narrativeSubjects/items` objective and a uniformly random difficulty) with a
+climate-aware draw against the new Subject/Action catalog, and ties each generated mission to the
+region it was generated in.
+
+- **Region climate**: regions gain a climate (or climates) — mirroring the Subject catalog's own
+  `climateIds` — used to filter which Subjects can be drawn for a mission generated in that region.
+  No such field exists on `worldData/regions/items` today.
+- **Generation**: for each mission rolled, draw a difficulty, then a random Subject whose
+  `climateIds` includes the region's climate and whose difficulty-tier list includes the drawn
+  difficulty, then a random Action sharing that Subject's `type`, then a random variation for the
+  Subject (independent of difficulty) — assembling the mission name per
+  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed).
+- **Region-locked**: a generated mission is tied to its origin region (already true of
+  `character.missionJournal` entries' `regionId`/`locationId` today — see
+  [Rumor and mission system](#rumor-and-mission-system)) and can only be completed there; a
+  character who travels to a different region should not be able to resolve a mission generated
+  elsewhere. This needs an explicit check added to the mission-resolution handler
+  (`functions/src/actions/mission.js`), since today's implementation records `regionId` but never
+  enforces it against the character's current region at resolution time.
+- **Mission journal UI**: the player's mission journal — already the `character.missionJournal`
+  array and its `MissionPicker.jsx` display (see [Rumor and mission system](#rumor-and-mission-system),
+  [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish)) — is reused, not rebuilt,
+  but its listing needs grouping/sorting by region first, then difficulty within each region, rather
+  than today's flat list.
+- **"Partir en mission"**: the existing "Mission" action (`kindId: "aventure"`, `handlerId:
+  "mission"`) and its `MissionPicker.jsx` entry point in the Aventure tab already satisfy "select a
+  journal entry and perform it from the Aventure tab" — no new action or entry point needed, only
+  its generation source and journal display change.
+
+**Still open (deliberately deferred)**:
+- Whether region climate is a single value or a multi-select (a region bordering several biomes
+  might plausibly draw from more than one climate's Subject pool).
+- What generates missions now that the "Rumeur" action is being repurposed (see
+  [Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed)) — this entry
+  assumes *some* trigger calls the generation routine described above, without yet deciding whether
+  that's exclusively "Se renseigner" or also a passive/scheduled source.
+- Whether `missionRollCount`/journal-overwrite-on-regenerate semantics (see
+  [Rumor and mission system](#rumor-and-mission-system)) carry over unchanged or need revisiting now
+  that generation is climate-gated instead of unconditional.
+
+**Data model implications** (sketch):
+```
+worldData/regions/items/{id}
+  climateIds: string[]   -- NEW, climates this region draws mission Subjects from
+
+characters/{id}.missionJournal[]   -- shape mostly unchanged (see Rumor and mission system),
+                                     --   but objectiveId/tagIds replaced by references into the
+                                     --   new Subject/Action catalog and the drawn variation
+```
+
+Not implemented yet.
+
+## Retiring quests and quest objectives for the subject-action system (spec needed)
+
+Status: **designed, not implemented**. Blocked by
+[Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed),
+[Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed), and
+[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed). The
+description handed down for this chantier is explicit that both "objectif de quête"
+(`worldData/narrativeSubjects/items` tagged "objectif de quête") and "quête"
+(`worldData/quests/items`, the hand-authored catalog) disappear, replaced everywhere by the
+Subject/Action mission system above. Several already-implemented features are built directly on top
+of the catalog being retired here, so this entry exists to decide, explicitly, what happens to each
+rather than leave it as an unplanned casualty.
+
+- **Hand-authored quests gone**: `worldData/quests/items`, `QuestsManager.jsx`, and the "Partir en
+  quête" action/handler (`partirEnQuete.js`) are retired. "Partir en mission" (see
+  [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed))
+  becomes the sole Aventure-branch action drawing on this generative content; whether "Partir en
+  quête" is deleted outright or simply stops being offered (`enabled: false`) is an
+  implementation-time call, not a design one.
+- **"Objectif de quête" gone**: `worldData/narrativeSubjects/items` tagged "objectif de quête" and
+  `QuestObjectivesManager.jsx` are superseded by the new Subject catalog everywhere they were
+  previously the rarity/tag source — [Quest loot draw](#quest-loot-draw),
+  [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success), and
+  [Aventure exploration mechanics](#aventure-exploration-mechanics-implementation)'s encounter draw
+  all currently read from this pool and need to be repointed at the Subject catalog instead.
+- **Verb phrases superseded for mission naming**:
+  [Procedural narrative generation](#procedural-narrative-generation)'s multi-slot grammar
+  (`worldData/verbPhrases/items`) stops being the source of a mission's *name*, per
+  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed) — but it may
+  still have a role narrating the mission's *outcome* (the success/failure paragraph shown in the
+  result pop-up), which is a separate concern from the title. Whether outcome narration keeps using
+  verb phrases as-is, keyed off the mission's Subject `tagIds` instead of an objective's, or is
+  retired too, is an open question below.
+
+**Still open (deliberately deferred) — needs a decision before this entry can be implemented**:
+- **Composite quests** ([Composite quests](#composite-quests-implementation),
+  `worldData/questChains/items`, `character.questChainProgress`): built entirely on the
+  hand-authored quest catalog being retired here. No equivalent "chain of missions" concept exists
+  in the description. Does this feature get ported onto Subjects (a chain of Subject/difficulty
+  pairs instead of quest ids), retired outright, or left stranded as dead code/data until a future
+  decision? Confirm with the user before implementing this entry.
+- **Quest triggers**
+  ([Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
+  `quest.trigger`, `character.triggeredQuestIds`, the scheduled `sweepQuestTriggers` sweep): a
+  condition-gated grant mechanism keyed to specific hand-authored quests. With no hand-authored
+  quest catalog left, this either needs a new target to grant (a specific Subject? a guaranteed
+  mission generation?) or is retired. Confirm with the user before implementing this entry.
+- **Mission and quest resolution algorithm**
+  ([Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm), the score-roll
+  success/wound/reward engine): written to be difficulty- and tag-driven, not quest-catalog-specific,
+  so it should carry over onto the new mission shape largely unchanged — flagged here for
+  confirmation, not because it's expected to need real rework.
+- **`favoredQuestIds`** (talents, see [Quest creation and editing](#quest-creation-and-editing)) and
+  **`worldData/rumors/items.linkedQuestId`** (see [Rumor and mission system](#rumor-and-mission-system))
+  both reference `worldData/quests/items` ids directly and go dangling once that catalog is retired
+  — needs cleanup (drop the fields, or repoint them) as part of implementing this entry.
+
+**Implementation scope**: not scoped yet — this entry's own open questions (composite quests, quest
+triggers) need the user's decision first; scoping the actual file-by-file removal/migration is left
+to whichever pass resolves those.
+
+Not implemented yet.
+
+## Se renseigner intermède action (spec needed)
+
+Status: **designed, not implemented**. Blocked by
+[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)
+(needs the new generation routine to call) and, for the "Rumeur" harvesting half described below,
+[Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed)
+(needs that entry's still-open question about the rumor-flavor-text mechanic's fate resolved first).
+Replaces the "Rumeur" action (`kindId: "intermede"`, `handlerId: "rumeur"`, see
+[Rumor and mission system](#rumor-and-mission-system)) with "Se renseigner" — same Intermède-kind
+action slot, but no longer always available: it is only offered again once the character has
+completed a certain number of missions, that count itself scaled by reputation, mirroring how rumor
+availability used to be paced.
+
+- **Renamed and repurposed**: "Se renseigner" takes over "Rumeur"'s role of generating new
+  `character.missionJournal` entries (now via the climate/Subject draw in
+  [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)
+  instead of the current objective+uniform-difficulty draw).
+- **Reputation-scaled cadence**: rather than being available every Interval like any other Intermède
+  action, "Se renseigner" only reappears once the character has completed
+  `missionsRequiredForRenseignement(reputation)` missions since it was last available — the exact
+  formula/table is left open below, but the shape (a reputation-scaled mission count, not a flat
+  cooldown) mirrors [Rumor and mission system](#rumor-and-mission-system)'s original design intent
+  for rumor pacing.
+
+**Still open (deliberately deferred)**:
+- The exact reputation-to-mission-count formula or table.
+- Whether "Se renseigner" still harvests `worldData/rumors/items` sightings into
+  `character.rumorJournal` the way "Rumeur" did, or drops that half entirely and becomes
+  mission-generation-only — depends on
+  [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed)'s
+  still-undecided fate for the flavor-text rumor mechanic (region rumor sightings/propagation,
+  `RumorBanner.jsx`, etc., none of which this chantier's description explicitly mentions removing).
+- How the "count since it was last available" counter is tracked (a new `character` field, mirroring
+  `character.intermedeActionsThisInterval`'s "nobody authors this row" convention, most likely) and
+  where it resets/increments — needs pinning down alongside the reputation formula above.
+
+**Data model implications** (sketch):
+```
+characters/{id}
+  missionsSinceRenseignement: number   -- NEW (name TBD), increments on each completed mission,
+                                         --   reset to 0 once "Se renseigner" becomes available again
+```
+
+Not implemented yet.
