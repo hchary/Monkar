@@ -33,7 +33,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
 | 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
 | 23 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
-| 24 | Regional mission generation and journal — spec | spec | 22, 23 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
+| 24 | Regional mission generation and journal — spec | done | 22, 23 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 25 | Retiring quests and quest objectives for the subject-action system — spec | spec | 22, 23, 24 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 26 | Se renseigner intermède action — spec | spec | 24, 25 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
 | 27 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
@@ -2022,7 +2022,7 @@ Not implemented yet.
 
 ## Regional mission generation and journal (spec needed)
 
-Status: **designed, not implemented**. Blocked by
+Status: **spec resolved, not implemented**. Blocked by
 [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed) and
 [Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed). Replaces
 [Rumor and mission system](#rumor-and-mission-system)'s mission-generation mechanic (today: one
@@ -2030,14 +2030,30 @@ random `worldData/narrativeSubjects/items` objective and a uniformly random diff
 climate-aware draw against the new Subject/Action catalog, and ties each generated mission to the
 region it was generated in.
 
-- **Region climate**: regions gain a climate (or climates) — mirroring the Subject catalog's own
-  `climateIds` — used to filter which Subjects can be drawn for a mission generated in that region.
-  No such field exists on `worldData/regions/items` today.
+- **Region climate**: regions gain a `climateIds: string[]` field (multi-select, mirroring the
+  Subject catalog's own `climateIds` rather than a single value) — a region bordering several
+  biomes can list more than one climate. No such field exists on `worldData/regions/items` today.
 - **Generation**: for each mission rolled, draw a difficulty, then a random Subject whose
-  `climateIds` includes the region's climate and whose difficulty-tier list includes the drawn
-  difficulty, then a random Action sharing that Subject's `type`, then a random variation for the
-  Subject (independent of difficulty) — assembling the mission name per
+  `climateIds` overlaps the region's `climateIds` (same tag-overlap-style matching already used
+  elsewhere in this catalog, e.g. [Quest loot draw](#quest-loot-draw)'s tag matching — not an
+  exact-set match) and whose difficulty-tier list includes the drawn difficulty, then a random
+  Action sharing that Subject's `type`, then a random variation for the Subject (independent of
+  difficulty) — assembling the mission name per
   [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed).
+- **Generation trigger**: mission generation is triggered exclusively by performing "Se renseigner"
+  ([Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed)) — mirroring how
+  the "Rumeur" action it replaces is today's sole trigger for a `missionRollCount` batch of draws
+  (see [Rumor and mission system](#rumor-and-mission-system)). No passive or scheduled source
+  generates missions; the scheduled Interval tick (`sweepQuestTriggers`) stays reserved for quest
+  triggers and rumor propagation, not mission generation.
+- **Roll count and overwrite semantics unchanged**: `missionRollCount` (missions rolled per
+  trigger, still a `worldData/actionTypes/items` field, default 3) and the "unclaimed journal
+  entries are simply overwritten on the next roll" rule (see
+  [Rumor and mission system](#rumor-and-mission-system)) both carry over unchanged — climate-gating
+  only narrows which Subjects are eligible for a given roll, it doesn't change how many missions
+  are rolled or what happens to leftovers. A region whose climate has too few matching Subjects to
+  fill `missionRollCount` is a content-coverage gap (same "silently skipped, not retried" precedent
+  as [Quest loot draw](#quest-loot-draw)), not a mechanic change.
 - **Region-locked**: a generated mission is tied to its origin region (already true of
   `character.missionJournal` entries' `regionId`/`locationId` today — see
   [Rumor and mission system](#rumor-and-mission-system)) and can only be completed there; a
@@ -2054,17 +2070,6 @@ region it was generated in.
   "mission"`) and its `MissionPicker.jsx` entry point in the Aventure tab already satisfy "select a
   journal entry and perform it from the Aventure tab" — no new action or entry point needed, only
   its generation source and journal display change.
-
-**Still open (deliberately deferred)**:
-- Whether region climate is a single value or a multi-select (a region bordering several biomes
-  might plausibly draw from more than one climate's Subject pool).
-- What generates missions now that the "Rumeur" action is being repurposed (see
-  [Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed)) — this entry
-  assumes *some* trigger calls the generation routine described above, without yet deciding whether
-  that's exclusively "Se renseigner" or also a passive/scheduled source.
-- Whether `missionRollCount`/journal-overwrite-on-regenerate semantics (see
-  [Rumor and mission system](#rumor-and-mission-system)) carry over unchanged or need revisiting now
-  that generation is climate-gated instead of unconditional.
 
 **Data model implications** (sketch):
 ```
