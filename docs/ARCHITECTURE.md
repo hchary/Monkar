@@ -68,11 +68,11 @@ characters/{characterId}
   intermedeActionsThisInterval: number  -- bonus Intermède actions used this Interval, capped at 3,
                                     -- reset by sweepQuestTriggers - see "Intermède-budget actions"
                                     -- below; fully decoupled from lastAction/lastActionDate above
-  missionsSinceRenseignement: number  -- missions resolved (success or failure alike) since "Se
-                                    -- renseigner" (handlerId "rumeur") last resolved; incremented by
-                                    -- mission.js, reset to 0 by rumeur.js. Gates the implicit
-                                    -- renseignementAvailable condition (actionConditions.js) - see
-                                    -- docs/TODO.md "Se renseigner intermède action"
+  missionsSinceRenseignement: number  -- legacy/dead: used to gate an implicit renseignementAvailable
+                                    -- condition on "Se renseigner" (handlerId "rumeur"), removed
+                                    -- because that action must always be available with no
+                                    -- condition - see docs/TODO.md "Se renseigner intermède action".
+                                    -- No longer read or written by any code.
   createdAt: server timestamp
 
 actionsLog/{logId}                 -- permanent history, independent of lastAction

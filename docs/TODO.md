@@ -39,8 +39,8 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 27 | Regional mission generation and journal — implementation | done | 23, 25, 26 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 28 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 24, 26 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 29 | Retiring quests and quest objectives for the subject-action system — implementation | done | 27, 28 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
-| 30 | Se renseigner intermède action — spec | done | 26, 28 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
-| 31 | Se renseigner intermède action — implementation | done | 27, 30 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
+| 30 | Se renseigner intermède action — spec | done | 26, 28 | [Se renseigner intermède action](#se-renseigner-intermède-action) |
+| 31 | Se renseigner intermède action — implementation | done | 27, 30 | [Se renseigner intermède action](#se-renseigner-intermède-action) |
 | 32 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 33 | Misc small polish (profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention — `favoredQuestIds` effect dropped, no longer applicable) | todo | — | [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
 | 34 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
@@ -2073,7 +2073,7 @@ region it was generated in.
   difficulty) — assembling the mission name per
   [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed).
 - **Generation trigger**: still the "Rumeur" action for now, exactly as before — moving it onto
-  "Se renseigner" ([Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed))
+  "Se renseigner" ([Se renseigner intermède action](#se-renseigner-intermède-action))
   is that entry's own implementation (roadmap #31), deliberately not resolved here since "Se
   renseigner" doesn't exist yet. No passive or scheduled source generates missions; the scheduled
   Interval tick (`sweepQuestTriggers`) stays reserved for quest triggers and rumor propagation, not
@@ -2251,15 +2251,15 @@ leave it as an unplanned casualty.
 
 Not implemented as part of this pass, deliberately unrelated: the flavor-text rumor mechanic
 (region rumor sightings/propagation, `RumorBanner.jsx`) and the "Se renseigner" action itself (see
-[Se renseigner intermède action](#se-renseigner-intermède-action-spec-needed)) both stay untouched.
+[Se renseigner intermède action](#se-renseigner-intermède-action)) both stay untouched.
 
-## Se renseigner intermède action (spec needed)
+## Se renseigner intermède action
 
 Status: **implemented**. Replaces the "Rumeur" action (`handlerId: "rumeur"`, see
 [Rumor and mission system](#rumor-and-mission-system)) with "Se renseigner" in-game — same handler
-(kept for continuity, only its content doc's `label`/`kindId` change), but no longer always
-available: it is only offered again once the character has completed a reputation-scaled number of
-missions since it was last performed.
+(kept for continuity, only its content doc's `label`/`kindId` change). Every character always has
+access to it, with no condition: performing it generates three missions at random from the
+possible mission subjects in the character's current region.
 
 - **Renamed and repurposed, both halves carried over**: "Se renseigner" keeps "Rumeur"'s
   rumor-harvesting half unchanged — up to `rumorHarvestCount` sightings at or above "rare" from the
@@ -2267,42 +2267,15 @@ missions since it was last performed.
   over its mission-generation half, now via the climate/Subject draw in
   [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)
   instead of the current objective+uniform-difficulty draw.
-- **Reputation-scaled cadence**: rather than being available every Interval like any other Intermède
-  action, "Se renseigner" only reappears once the character has completed
-  `missionsRequiredForRenseignement(reputation)` missions since it was last performed. Formula:
-  `missionsRequiredForRenseignement(reputation) = clamp(5 - floor(reputation / 20), 1, 5)` — 5
-  missions required at 0 reputation, one fewer every 20 reputation earned, floored at 1 (never
-  fully free); a starting balance value, not playtested, tunable the same way
-  `rumorHarvestCount`/`missionRollCount` already are (see
-  [Rumor and mission system](#rumor-and-mission-system)). Implemented in
-  `functions/src/lib/missionsRequiredForRenseignement.js` ⇄ `src/lib/missionsRequiredForRenseignement.js`
-  (same mirrored-pure-function convention as `trainingCost.js`). Gated the same way as
-  [Trainers](#trainers)' `trainerReachable`: a new `renseignementAvailable` predicate in
-  `actionConditions.js` ⇄ `src/lib/actionConditions.js`, injected implicitly by
-  `actionCatalog.js`'s `resolveConditions` whenever an action's `kindId` inherits from a new
-  `renseignement` kind (`RENSEIGNEMENT_ACTION_KIND_ID` in `actionKinds.js` ⇄
-  `src/lib/actionKinds.js`, nested under `intermede`, same "dedicated kind for a single action"
-  precedent as `commerce`) — not authored per action.
-- **Counter**: `character.missionsSinceRenseignement` (new field, same "nobody authors this row"
-  convention as `character.intermedeActionsThisInterval`) increments by 1 whenever a mission
-  resolves (`mission.js`'s `resolve()`), success or failure alike, and resets to 0 when "Se
-  renseigner" itself resolves (`rumeur.js`'s `resolve()`) — not merely when the condition first
-  turns true, so leaving the action unused past its threshold for several Intervals doesn't matter.
-
-**Data model implications**:
-```
-characters/{id}
-  missionsSinceRenseignement: number   -- NEW, increments by 1 on every mission resolution (success
-                                         --   or failure), reset to 0 when "Se renseigner" itself
-                                         --   resolves
-
-worldData/actionTypes/items/{id}
-  kindId: "renseignement"   -- NEW enum value, nested under "intermede"; the existing "Rumeur"
-                             --   content doc must be hand-edited in the Firestore console to this
-                             --   kindId (and its label to "Se renseigner") for the new cadence
-                             --   gate to actually apply - same "authored by hand" convention as
-                             --   every other worldData/actionTypes content change
-```
+- **No availability condition**: a reputation-scaled cadence gate (a `renseignementAvailable`
+  predicate in `actionConditions.js`, injected whenever an action's `kindId` inherited from the
+  `renseignement` kind, backed by a `missionsRequiredForRenseignement(reputation)` formula and a
+  `character.missionsSinceRenseignement` counter) was implemented and then reverted: the action
+  must always be available like any other Intermède action, so the predicate, its injection in
+  `actionCatalog.js`'s `resolveConditions`, and the `missionsRequiredForRenseignement.js` helper
+  were all removed. `character.missionsSinceRenseignement` is kept in the schema as a dead field
+  (see `shared/schema/character.ts`) so existing documents stay valid, but nothing reads or writes
+  it any more.
 
 **Still open (deliberately deferred)**: the existing `worldData/actionTypes/items` "Rumeur"
 document itself is not migrated by this change — renaming its `label` to "Se renseigner" and

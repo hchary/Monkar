@@ -73,14 +73,6 @@ export const PROFESSION_LEARNING_ACTION_KIND_ID = "apprentissage";
 // mechanism) are designed and built - see docs/TODO.md's "Still open" note.
 export const INTERMEDE_BUDGET_ACTION_KIND_IDS = ["commerce"];
 
-// The kind whose descendants are gated by mission-count reachability instead of a rolled tier -
-// "Se renseigner" (docs/TODO.md "Se renseigner intermède action"). Same convention as
-// TRAINING_ACTION_KIND_ID: both the catalog (which injects the implicit renseignementAvailable
-// condition) and the "rumeur" handler (which resets the counter on resolve) ask the same
-// question. Only one action needs it today, but a dedicated kind is kept anyway, same precedent
-// as "commerce" above - the injection mechanism needs a kind to match on, not a handlerId.
-export const RENSEIGNEMENT_ACTION_KIND_ID = "renseignement";
-
 export function findActionKind(kindId) {
   return ACTION_KINDS.find((kind) => kind.value === kindId) || null;
 }

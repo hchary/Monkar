@@ -168,13 +168,12 @@ export const CharacterDocumentSchema = z.object({
     .number()
     .default(0)
     .describe(
-      "Missions resolved (success or failure alike) since 'Se renseigner' last resolved (docs/" +
-        "TODO.md 'Se renseigner intermède action'). Incremented by 1 on every mission resolution " +
-        "(functions/src/actions/mission.js's resolve()), reset to 0 when 'Se renseigner' itself " +
-        "resolves (functions/src/actions/rumeur.js's resolve()). Gates the implicit " +
-        "'renseignementAvailable' condition (actionConditions.js): the action only reappears once " +
-        "this reaches missionsRequiredForRenseignement(reputation) " +
-        "(functions/src/lib/missionsRequiredForRenseignement.js)."
+      "Legacy/dead (docs/TODO.md 'Se renseigner intermède action'): used to count missions " +
+        "resolved since 'Se renseigner' last resolved, gating an implicit 'renseignementAvailable' " +
+        "condition. 'Se renseigner' must always be available with no condition, so the gate and " +
+        "this counter's writers (functions/src/actions/mission.js's resolve(), " +
+        "functions/src/actions/rumeur.js's resolve()) were removed. No longer read or written by " +
+        "any code; kept here only so existing documents carrying the field stay schema-valid."
     ),
   lastActionDate: z.string().nullable().default(null).describe("YYYY-MM-DD of the last performed action."),
   lastActionAt: z

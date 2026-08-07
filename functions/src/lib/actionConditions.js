@@ -23,8 +23,6 @@ const CONDITION_TYPES = [
   { value: "notWounded", label: "Non blessé" },
 ];
 
-const { missionsRequiredForRenseignement } = require("./missionsRequiredForRenseignement");
-
 const UNKNOWN_CONDITION_REASON = "Cette action ne vous est pas accessible.";
 
 // A parameter that is present but unusable means the condition is malformed, which fails closed
@@ -203,20 +201,6 @@ const PREDICATES = {
     },
   },
 
-  // The gate behind "Se renseigner" (docs/TODO.md "Se renseigner intermède action"): it only
-  // reappears once the character has completed missionsRequiredForRenseignement(reputation)
-  // missions since it last resolved. Deliberately absent from CONDITION_TYPES, same reason as
-  // hasProfession/trainerReachable/professionless/hasIntermedeBudget: nobody authors this row -
-  // the catalog injects it whenever the action's kind inherits from RENSEIGNEMENT_ACTION_KIND_ID
-  // (see actionCatalog.js's resolveConditions). Reads straight off the character document, same
-  // "no extra fetch needed" convention as hasIntermedeBudget.
-  renseignementAvailable: {
-    reason: "Vous n'avez pas encore accompli assez de missions depuis la dernière fois.",
-    test(condition, ctx) {
-      const required = missionsRequiredForRenseignement(ctx.character?.reputation);
-      return numberOrZero(ctx.character?.missionsSinceRenseignement) >= required;
-    },
-  },
 };
 
 // Conditions are ANDed; the first failure decides the message. An unknown type fails closed - a

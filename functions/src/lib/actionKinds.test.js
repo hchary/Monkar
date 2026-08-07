@@ -7,7 +7,6 @@ const {
   CRAFTING_ACTION_KIND_ID,
   TRAINING_ACTION_KIND_ID,
   PROFESSION_LEARNING_ACTION_KIND_ID,
-  RENSEIGNEMENT_ACTION_KIND_ID,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,
@@ -58,8 +57,8 @@ describe("the registry itself", () => {
   });
 
   test("the renseignement kind is one of them, nested under the intermède kind", () => {
-    assert.ok(findActionKind(RENSEIGNEMENT_ACTION_KIND_ID));
-    assert.equal(findActionKind(RENSEIGNEMENT_ACTION_KIND_ID).parentId, "intermede");
+    assert.ok(findActionKind("renseignement"));
+    assert.equal(findActionKind("renseignement").parentId, "intermede");
   });
 
   test("every kind resolves to a root category", () => {

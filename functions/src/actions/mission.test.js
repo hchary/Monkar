@@ -115,28 +115,6 @@ describe("mission resolve()", () => {
     );
   });
 
-  test("increments missionsSinceRenseignement regardless of outcome", async () => {
-    const { updates } = await resolve({
-      character: baseCharacter({ missionsSinceRenseignement: 2 }),
-      actionTypeId: "mission-action",
-      today: "2026-08-05",
-      context: baseContext(),
-    });
-
-    assert.equal(updates.missionsSinceRenseignement, 3);
-  });
-
-  test("starts the counter at 1 when the character had never resolved one before", async () => {
-    const { updates } = await resolve({
-      character: baseCharacter(),
-      actionTypeId: "mission-action",
-      today: "2026-08-05",
-      context: baseContext(),
-    });
-
-    assert.equal(updates.missionsSinceRenseignement, 1);
-  });
-
   test("advances a composite-quest chain and grants the next step's subject on a matching success", async () => {
     const chain = {
       id: "chain1",
