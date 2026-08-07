@@ -34,7 +34,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
 | 23 | Mission subject and action catalog — implementation | done | 22 | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
 | 24 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
-| 25 | Mission loot and rarity mapping — implementation | todo | 23, 24 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
+| 25 | Mission loot and rarity mapping — implementation | done | 23, 24 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
 | 26 | Regional mission generation and journal — spec | done | 22, 24 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 27 | Regional mission generation and journal — implementation | todo | 23, 25, 26 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
 | 28 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 24, 26 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
@@ -1998,9 +1998,10 @@ grammar until the drawing/generation logic that calls `assembleMissionName` is b
 
 ## Mission loot and rarity mapping (spec needed)
 
-Status: **spec resolved, not implemented**. Blocked by
-[Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed). Once a
-mission is generated from a difficulty and a Subject (with its difficulty-tier and variation
+Status: **implemented** (the standalone rarity/tag-matching and draw logic; wiring it into an actual
+mission occurrence is a separate follow-up, see
+[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)).
+Once a mission is generated from a difficulty and a Subject (with its difficulty-tier and variation
 `tagIds`), this entry pins down how that combination selects a `worldData/lootTables/items` entry —
 reusing the exact matching mechanism [Quest loot draw](#quest-loot-draw) already built (rarity match
 + tag overlap against `worldData/lootTables/items`), not a new one.
@@ -2024,7 +2025,15 @@ reusing the exact matching mechanism [Quest loot draw](#quest-loot-draw) already
 - **Loot count**: still driven by `LOOT_COUNT_BY_DIFFICULTY` (see
   [Quest loot draw](#quest-loot-draw)), unchanged.
 
-Not implemented yet.
+Implemented in `functions/src/missionLoot.js` (`difficultyToRarity`, `drawMissionLoot`, tested in
+`functions/src/missionLoot.test.js`), mirroring `functions/src/missionNaming.js`'s convention of a
+standalone helper not yet wired into a handler. `difficultyToRarity` reuses the same
+`DIFFICULTY_ORDER`/`RARITY_ORDER` positional-equivalence arrays (`functions/src/lib/rolls.js`)
+`talentEvolution.js`'s `evolutionChance` already relies on. `drawMissionLoot` resolves the target
+rarity and tag pool once, then reuses `functions/src/lib/loot.js`'s `pickRandom`,
+`drawLootTableItemId`, and `LOOT_COUNT_BY_DIFFICULTY` per item, same as `partirEnQuete.js`'s
+`drawQuestLoot`. Calling it from an actual mission-generation/resolution flow is left to
+[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed).
 
 ## Regional mission generation and journal (spec needed)
 
