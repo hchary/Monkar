@@ -3,18 +3,11 @@ const assert = require("node:assert/strict");
 const { resolve } = require("./partirExplorer");
 const { LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 
-const OBJECTIVE_TAG_ID = "objectif-de-quete";
+const LOCATION = { id: "loc1", name: "Forêt sombre", tagIds: ["tag-x"] };
 
-const OBJECTIVE = {
-  id: "obj1",
-  nom: "bandits",
-  article: "les",
-  rarity: "commun",
-  tagIds: ["tag-x", OBJECTIVE_TAG_ID],
-};
-
-const LOCATION = { id: "loc1", name: "Forêt sombre", tagIds: [] };
-
+// difficultyToRarity("facile") -> "commun" (docs/TODO.md "Mission loot and rarity mapping") - the
+// same positional mapping missions use, now shared by exploration's own synthetic per-round
+// objective (docs/TODO.md "Retiring quests and quest objectives for the subject-action system").
 const LOOT_TABLES = [{ id: "table1", rarity: "commun", tagIds: ["tag-x"], itemIds: ["obj-sword"] }];
 const OBJECTS = [{ id: "obj-sword", name: "Épée", rarity: "commun", type: "arme", tagIds: [] }];
 
@@ -26,7 +19,7 @@ const FACILE_ONLY_WEIGHTS = [{ difficulty: "facile", weight: 100 }];
 function baseContext(overrides = {}) {
   return {
     location: LOCATION,
-    narrativeSubjects: [OBJECTIVE],
+    narrativeSubjects: [],
     verbPhrases: [],
     lootTables: LOOT_TABLES,
     objects: OBJECTS,
@@ -68,7 +61,6 @@ describe("partirExplorer resolve()", () => {
       assert.equal(typeof round.score, "number");
       assert.equal(typeof round.threshold, "number");
       assert.equal(typeof round.success, "boolean");
-      assert.equal(round.objectiveId, "obj1");
     }
     assert.equal(updates.fatigue, 3);
     assert.equal(updates.lastAction.location.name, "Forêt sombre");
@@ -131,7 +123,7 @@ describe("partirExplorer resolve()", () => {
     }
   });
 
-  test("falls back to an unfiltered objective pool and a null location when none was drawn", async () => {
+  test("synthesizes an untagged objective and a null location when none was drawn", async () => {
     const { updates } = await resolve({
       character: baseCharacter(),
       actionType: baseActionType({ encounterCount: 1 }),
@@ -142,6 +134,7 @@ describe("partirExplorer resolve()", () => {
 
     assert.equal(updates.lastAction.location, null);
     assert.equal(updates.lastAction.rounds.length, 1);
-    assert.equal(updates.lastAction.rounds[0].objectiveId, "obj1");
+    // No location tags to draw loot against - a content gap, not an error.
+    assert.deepEqual(updates.lastAction.loot, []);
   });
 });

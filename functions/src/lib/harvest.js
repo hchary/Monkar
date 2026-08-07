@@ -8,7 +8,7 @@ function isPositiveInteger(value) {
 // docs/TODO.md): draw baseQuantity*modifier items uniformly at random from a single loot
 // table, one draw at a time via drawLootTableItemId so duplicates are just repeated ids
 // in the returned array. recolte.js's resolve() calls this and turns the result into
-// Instance documents on commit(), the same way partirEnQuete.js does for quest loot.
+// Instance documents on commit(), the same way mission.js/partirExplorer.js do for their own loot.
 function harvestFromLootTable({ lootTable, baseQuantity, modifier = 1 }) {
   if (!isPositiveInteger(baseQuantity)) {
     throw new Error("baseQuantity must be a positive integer");

@@ -21,7 +21,6 @@ const emptyForm = {
   trainable: false,
   rarity: "commun",
   effect: "",
-  favoredQuestIds: [],
   trainerTypeId: "",
   tagIds: [],
   ancestorIds: [],
@@ -81,7 +80,6 @@ export default function TalentsManager() {
   const [filters, setFilters] = useState(emptyFilters);
   const [panelOpen, setPanelOpen] = useState(false);
 
-  const quests = useItems("quests");
   const trainerTypes = useItems("trainerTypes");
   const tags = useItems("tags");
   const sortedTags = [...tags].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
@@ -119,7 +117,6 @@ export default function TalentsManager() {
       trainable: !!talent.trainable,
       rarity: talent.rarity || "commun",
       effect: talent.effect || "",
-      favoredQuestIds: talent.favoredQuestIds || [],
       trainerTypeId: talent.trainerTypeId || "",
       tagIds: talent.tagIds || [],
       ancestorIds: talent.ancestorIds || [],
@@ -131,15 +128,6 @@ export default function TalentsManager() {
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
-  }
-
-  function toggleQuest(questId) {
-    setForm((prev) => ({
-      ...prev,
-      favoredQuestIds: prev.favoredQuestIds.includes(questId)
-        ? prev.favoredQuestIds.filter((id) => id !== questId)
-        : [...prev.favoredQuestIds, questId],
-    }));
   }
 
   function toggleTagId(id) {
@@ -185,7 +173,6 @@ export default function TalentsManager() {
       trainable: form.trainable,
       rarity: form.rarity,
       effect: form.effect,
-      favoredQuestIds: form.favoredQuestIds,
       trainerTypeId: form.trainable ? form.trainerTypeId : "",
       tagIds: form.tagIds,
       ancestorIds: form.ancestorIds,
@@ -269,14 +256,6 @@ export default function TalentsManager() {
                 <li key={talent.id}>
                   <strong>{talent.name}</strong>
                   {talent.trainable && "*"} — {talent.effect}
-                  {(talent.favoredQuestIds || []).length > 0 && (
-                    <div>
-                      Quêtes favorisées :{" "}
-                      {talent.favoredQuestIds
-                        .map((id) => quests.find((q) => q.id === id)?.name || id)
-                        .join(", ")}
-                    </div>
-                  )}
                   {talent.trainable && talent.trainerTypeId && (
                     <div>
                       Entraîneur : {trainerTypes.find((t) => t.id === talent.trainerTypeId)?.name || talent.trainerTypeId}
@@ -345,14 +324,6 @@ export default function TalentsManager() {
             />
             Entraînable
           </label>
-
-          <MultiSelectField
-            legend="Quêtes favorisées"
-            options={quests}
-            selectedIds={form.favoredQuestIds}
-            onToggle={toggleQuest}
-            createLink={`/creator?section=${encodeURIComponent("Quêtes")}`}
-          />
 
           <MultiSelectModalField
             legend="Tags"

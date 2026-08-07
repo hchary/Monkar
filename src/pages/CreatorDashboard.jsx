@@ -4,11 +4,9 @@ import ClimatsManager from "../components/creator/ClimatsManager";
 import ReliefsManager from "../components/creator/ReliefsManager";
 import FactionsManager from "../components/creator/FactionsManager";
 import QuestLocationsManager from "../components/creator/QuestLocationsManager";
-import QuestObjectivesManager from "../components/creator/QuestObjectivesManager";
 import OriginsManager from "../components/creator/OriginsManager";
 import TalentsManager from "../components/creator/TalentsManager";
 import TrainerTypesManager from "../components/creator/TrainerTypesManager";
-import QuestsManager from "../components/creator/QuestsManager";
 import TextGenerationManager from "../components/creator/TextGenerationManager";
 import TagsManager from "../components/creator/TagsManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
@@ -35,8 +33,6 @@ const GROUPS = [
   {
     name: "Quêtes",
     tabs: {
-      Quêtes: QuestsManager,
-      "Objectifs de quête": QuestObjectivesManager,
       "Lieux de quête": QuestLocationsManager,
       Rumeurs: RumorsManager,
     },

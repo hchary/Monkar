@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ActionAvailabilityConditionSchema } from "./actionType";
 
 // Structural contract for `worldData/missionSubjects/items/{missionSubjectId}` documents, shared
 // between the client creator (src/components/creator/MissionSubjectsManager.jsx, which writes the
@@ -68,11 +69,27 @@ export const MissionSubjectDocumentSchema = z.object({
       "Difficulty-independent flavor modifiers; one is drawn at random per generation, independent " +
         "of the difficulty draw."
     ),
+  trigger: z
+    .object({ conditions: z.array(ActionAvailabilityConditionSchema).default([]) })
+    .nullable()
+    .optional()
+    .default(null)
+    .describe(
+      "Optional gate for automatic granting by the scheduled subject-trigger sweep (same row shape " +
+        "as an action's availability.conditions - see shared/schema/actionType.ts). Evaluated per " +
+        "character every Interval tick (functions/src/lib/questTriggers.js); a character whose owned " +
+        "talents/reputation/profession/region/etc. satisfy every condition has this Subject's id " +
+        "added to character.triggeredSubjectIds. Null/absent (default): this Subject is never " +
+        "auto-granted - it stays reachable only through the normal mission-generation draw " +
+        "(functions/src/actions/rumeur.js). No creator UI yet - authored directly in the Firestore " +
+        "console, same convention as quest.trigger before it (RENAMED from quest.trigger by " +
+        "'Retiring quests and quest objectives for the subject-action system')."
+    ),
 });
 
 export type MissionSubjectDocument = z.infer<typeof MissionSubjectDocumentSchema>;
 
-const DEFAULTED_KEYS = ["climateIds", "difficultyTiers", "variations"] as const;
+const DEFAULTED_KEYS = ["climateIds", "difficultyTiers", "variations", "trigger"] as const;
 
 export const DEFAULTS = MissionSubjectDocumentSchema.pick(
   Object.fromEntries(DEFAULTED_KEYS.map((key) => [key, true])) as Record<(typeof DEFAULTED_KEYS)[number], true>

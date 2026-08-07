@@ -1,35 +1,34 @@
 // Handler for the "Mission" action (docs/TODO.md "Rumor and mission system"), registered under
-// the shared "mission" handlerId - a sibling of partirEnQuete's "partirEnQuete" handlerId under
-// the same Aventure kind. A mission is not hand-authored the way a quest is: the player picks one
-// entry from their own character.missionJournal (generated earlier by the "rumeur" handler, see
-// rumeur.js), passed in as payload.missionId exactly like artisanat.js's payload.recetteId.
+// the shared "mission" handlerId, the sole Aventure-branch action drawing on generated content
+// since "Partir en quête" was retired (docs/TODO.md "Retiring quests and quest objectives for the
+// subject-action system"). A mission is not hand-authored the way a quest was: the player picks
+// one entry from their own character.missionJournal (generated earlier by the "rumeur" handler,
+// see rumeur.js), passed in as payload.missionId exactly like artisanat.js's payload.recetteId.
 //
-// Resolution reuses partirEnQuete.js's own resolveQuestOutcome (score roll, narration, talent-
-// evolution pipeline) wholesale rather than duplicating it - except for loot, which is drawn
-// through missionLoot.js's drawMissionLoot instead (docs/TODO.md "Mission loot and rarity
-// mapping"): a mission's loot pool is resolved once per occurrence from its own tagIds/rarity, not
-// re-rolled per item against a curated objectives list the way a quest's drawQuestLoot works.
-// Rewards use the mission's own drawn difficulty exactly, the same way a quest uses
-// quest.difficulty - the earlier "one tier lower, clamped at facile" reward discount was a balance
-// mistake (docs/TODO.md "Mission and quest resolution algorithm") and has been removed, not
-// preserved.
+// Resolution reuses missionResolution.js's resolveQuestOutcome (score roll, talent-evolution
+// pipeline) wholesale rather than duplicating it - except for loot, which is drawn through
+// missionLoot.js's drawMissionLoot instead (docs/TODO.md "Mission loot and rarity mapping"): a
+// mission's loot pool is resolved once per occurrence from its own tagIds/rarity, not re-rolled per
+// item against a curated objectives list the way the retired drawQuestLoot works. Rewards use the
+// mission's own drawn difficulty exactly, the same way a quest used to use quest.difficulty.
 //
-// A mission carries no worldData/narrativeSubjects/items objective of its own any more (docs/
-// TODO.md "Regional mission generation and journal" replaced the old objectiveId-based draw with
-// the missionSubjects/missionActions catalog pair, and the mission's title is already assembled at
-// generation time - see rumeur.js). The threshold/wound/talent-evolution pipeline, which expects
-// an "objective"-shaped { tagIds, rarity } for its own tag/rank matching, is instead fed a
-// synthetic stand-in built from the mission's own tagIds and its difficulty's rarity equivalence
-// (missionLoot.js's difficultyToRarity - the same mapping quest objectives already used). The
-// narration itself still falls back to the global narrativeSubjects catalog
-// (resolveQuestOutcome's own [questObjectives, narrativeSubjects] fallback, since the synthetic
-// objective has no `type` field and can never itself be picked as a narration subject) - that
-// catalog is unrelated to how a mission is titled.
+// A mission carries no worldData/narrativeSubjects/items objective of its own (docs/TODO.md
+// "Regional mission generation and journal" draws from the missionSubjects/missionActions catalog
+// pair instead, and the mission's title is already assembled at generation time - see rumeur.js).
+// The threshold/wound/talent-evolution pipeline, which expects an "objective"-shaped
+// { tagIds, rarity } for its own tag/rank matching, is instead fed a synthetic stand-in built from
+// the mission's own tagIds and its difficulty's rarity equivalence (missionLoot.js's
+// difficultyToRarity). A mission's outcome is never narrated via the verb-phrase generator (docs/
+// TODO.md "Retiring quests..." - that paragraph retired along with the hand-authored catalog it
+// used to link successPhraseIds/failurePhraseIds from): resolveQuestOutcome is called with
+// narrate: false, so the result pop-up shows only "Succès"/"Échec", same as other non-narrated
+// actions.
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
-const { resolveQuestOutcome } = require("./partirEnQuete");
+const { resolveQuestOutcome } = require("../missionResolution");
 const { drawMissionLoot, difficultyToRarity } = require("../missionLoot");
+const { findChainAdvance } = require("../lib/questChains");
 
 async function prepare({ db, character, payload }) {
   const missionId = payload?.missionId;
@@ -60,24 +59,22 @@ async function prepare({ db, character, payload }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
-    db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
-    db.collection("worldData").doc("verbPhrases").collection("items").get(),
+  const [lootTablesSnap, objectsSnap, talentsSnap, chainsSnap] = await Promise.all([
     db.collection("worldData").doc("lootTables").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
     db.collection("worldData").doc("talents").collection("items").get(),
+    db.collection("worldData").doc("questChains").collection("items").get(),
   ]);
-  const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const chains = chainsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { mission, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents };
+  return { mission, locationName, lootTables, objects, talents, chains };
 }
 
 async function resolve({ character, actionTypeId, today, context }) {
-  const { mission, locationName, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
+  const { mission, locationName, lootTables, objects, talents, chains } = context;
 
   // Stands in for the "objective" resolveQuestOutcome's threshold/wound/talent-evolution pipeline
   // expects - see the header comment above.
@@ -106,17 +103,16 @@ async function resolve({ character, actionTypeId, today, context }) {
     character,
     quest: missionAsQuest,
     questObjectives: [missionObjective],
-    narrativeSubjects,
-    verbPhrases,
     lootTables,
     objects,
     talents,
     locationName,
     today,
     circumstance: `lors de la mission « ${mission.name} »`,
-    defaultSuccessText: "Vous revenez de votre mission.",
+    narrate: false,
+    defaultSuccessText: "",
     defaultSuccessClause: "vous revenez de votre mission",
-    defaultFailureText: "Vous rentrez bredouille de votre mission.",
+    defaultFailureText: "",
     defaultFailureClause: "vous rentrez bredouille de votre mission",
     drawLoot,
   });
@@ -159,6 +155,19 @@ async function resolve({ character, actionTypeId, today, context }) {
     if (outcome.woundResult.died) updates.alive = false;
   }
 
+  // Composite quests (docs/TODO.md "Composite quests", ported by "Retiring quests and quest
+  // objectives for the subject-action system"): a successful step advances its chain and, unless
+  // it was the chain's last step, grants the next one through the same triggeredSubjectIds
+  // arrayUnion convention functions/src/lib/questTriggers.js's scheduled sweep already uses for a
+  // normal trigger match - reusing the whole reveal/notification pipeline for free.
+  if (outcome.success) {
+    const advance = findChainAdvance({ subjectId: mission.subjectId, difficulty: mission.difficulty, chains: chains || [] });
+    if (advance) {
+      updates.questChainProgress = { ...(character.questChainProgress || {}), [advance.chainId]: advance.nextStepIndex };
+      if (advance.nextSubjectId) updates.triggeredSubjectIds = FieldValue.arrayUnion(advance.nextSubjectId);
+    }
+  }
+
   const logFields = {
     success: outcome.success,
     narrativeText: outcome.narrativeText,
@@ -168,7 +177,7 @@ async function resolve({ character, actionTypeId, today, context }) {
   return { updates, logFields };
 }
 
-// Identical in shape to partirEnQuete.js's commit() - turns the loot frozen onto
+// Identical in shape to the other Aventure handlers' own commit() - turns the loot frozen onto
 // lastAction.loot during resolve() into Instance documents the character actually owns.
 async function commit({ tx, db, characterRef, lastAction, uid, today }) {
   for (const item of lastAction.loot || []) {

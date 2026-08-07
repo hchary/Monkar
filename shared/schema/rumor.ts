@@ -19,20 +19,15 @@ export const RumorDocumentSchema = z.object({
     .array(z.string())
     .default([])
     .describe(
-      "Ids in worldData/regions/items where this rumor starts, same shape as quest.regionIds. " +
+      "Ids in worldData/regions/items where this rumor starts, same shape as a mission's regionId. " +
         "RumorsManager seeds a worldData/regions/items/{regionId}/rumorSightings/{rumorId} entry at " +
         "this rarity for each one on save."
     ),
-  linkedQuestId: z
-    .string()
-    .nullable()
-    .default(null)
-    .describe("Id in worldData/quests/items this rumor hints at, or null for a rumor with no quest link."),
 });
 
 export type RumorDocument = z.infer<typeof RumorDocumentSchema>;
 
-const DEFAULTED_KEYS = ["rarity", "originRegionIds", "linkedQuestId"] as const;
+const DEFAULTED_KEYS = ["rarity", "originRegionIds"] as const;
 
 export const DEFAULTS = RumorDocumentSchema.pick(
   Object.fromEntries(DEFAULTED_KEYS.map((key) => [key, true])) as Record<(typeof DEFAULTED_KEYS)[number], true>

@@ -1,5 +1,6 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
+const { FieldValue } = require("firebase-admin/firestore");
 const { resolve } = require("./mission");
 const { LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 
@@ -112,5 +113,52 @@ describe("mission resolve()", () => {
       updates.missionJournal.map((m) => m.id),
       ["mission2"]
     );
+  });
+
+  test("advances a composite-quest chain and grants the next step's subject on a matching success", async () => {
+    const chain = {
+      id: "chain1",
+      steps: [
+        { subjectId: "subj1", difficulty: "difficile" },
+        { subjectId: "subj-next", difficulty: "epique" },
+      ],
+    };
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0.999; // guarantees success against "difficile"'s threshold
+
+      const { updates } = await resolve({
+        character: baseCharacter(),
+        actionTypeId: "mission-action",
+        today: "2026-08-05",
+        context: baseContext({ chains: [chain] }),
+      });
+
+      assert.equal(updates.lastAction.success, true);
+      assert.deepEqual(updates.questChainProgress, { chain1: 1 });
+      assert.deepStrictEqual(updates.triggeredSubjectIds, FieldValue.arrayUnion("subj-next"));
+    } finally {
+      Math.random = originalRandom;
+    }
+  });
+
+  test("does not advance any chain when the mission's subject/difficulty matches no step", async () => {
+    const chain = { id: "chain1", steps: [{ subjectId: "unrelated", difficulty: "difficile" }] };
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0.999;
+
+      const { updates } = await resolve({
+        character: baseCharacter(),
+        actionTypeId: "mission-action",
+        today: "2026-08-05",
+        context: baseContext({ chains: [chain] }),
+      });
+
+      assert.equal(updates.questChainProgress, undefined);
+      assert.equal(updates.triggeredSubjectIds, undefined);
+    } finally {
+      Math.random = originalRandom;
+    }
   });
 });

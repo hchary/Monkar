@@ -6,7 +6,7 @@
 // Performing it does two things in the same resolution, neither of which can fail the action
 // outright - a content gap (no qualifying rumor, no matching mission Subject/Action) just yields
 // fewer results, the same "silently skipped rather than failing" convention
-// partirEnQuete.js's drawQuestLoot already uses:
+// functions/src/missionResolution.js's drawQuestLoot already uses:
 //   - Harvests up to actionType.rumorHarvestCount rare-or-above rumor sightings from the
 //     character's current region into character.rumorJournal (denormalized copies, skipping rumor
 //     ids already owned).
@@ -38,6 +38,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { RARITY_ORDER, DIFFICULTY_ORDER } = require("../lib/rolls");
 const { pickRandom } = require("../lib/loot");
 const { assembleMissionName } = require("../missionNaming");
+const { findPendingChainStep } = require("../lib/questChains");
 
 // Picks up to `count` distinct items without replacement - used for both the rumor harvest (never
 // hand the same sighting twice) and, implicitly, is not needed for missions, which draw with
@@ -61,20 +62,12 @@ function findDifficultyTier(subject, difficulty) {
   return (subject.difficultyTiers || []).find((tier) => tier.difficulty === difficulty) || null;
 }
 
-// One mission draw: difficulty, then a climate+difficulty-matched Subject, then a type-matched
-// Action, then an independent random variation - see the header comment above. Returns null on a
-// content gap (no matching Subject, or no matching Action for that Subject's type) - the caller
-// skips this roll rather than retrying it, the same "silently skipped, not retried" precedent
-// drawQuestLoot set for per-item content gaps.
-function drawMission({ region, missionSubjects, missionActions }) {
-  const difficulty = pickRandom(DIFFICULTY_ORDER);
-
-  const candidateSubjects = missionSubjects.filter(
-    (subject) => overlaps(subject.climateIds, region?.climateIds) && findDifficultyTier(subject, difficulty)
-  );
-  const subject = pickRandom(candidateSubjects);
-  if (!subject) return null;
-
+// Shared by drawMission's normal random draw and the forced composite-quest-chain draw below: a
+// Subject and difficulty are already picked, only the type-matched Action and the independent
+// variation remain random. Returns null on a content gap (no matching Action for that Subject's
+// type) - the caller skips this roll rather than retrying it, the same "silently skipped, not
+// retried" precedent drawQuestLoot set for per-item content gaps.
+function buildMission({ subject, difficulty, missionActions }) {
   const candidateActions = missionActions.filter((action) => action.type === subject.type);
   const action = pickRandom(candidateActions);
   if (!action) return null;
@@ -92,30 +85,47 @@ function drawMission({ region, missionSubjects, missionActions }) {
   };
 }
 
+// One mission draw: difficulty, then a climate+difficulty-matched Subject, then buildMission for
+// the rest - see the header comment above.
+function drawMission({ region, missionSubjects, missionActions }) {
+  const difficulty = pickRandom(DIFFICULTY_ORDER);
+
+  const candidateSubjects = missionSubjects.filter(
+    (subject) => overlaps(subject.climateIds, region?.climateIds) && findDifficultyTier(subject, difficulty)
+  );
+  const subject = pickRandom(candidateSubjects);
+  if (!subject) return null;
+
+  return buildMission({ subject, difficulty, missionActions });
+}
+
 async function prepare({ db, character }) {
   const regionId = character.region?.id;
   if (!regionId) throw new HttpsError("failed-precondition", "Ce personnage n'a pas de région.");
 
   const regionRef = db.collection("worldData").doc("regions").collection("items").doc(regionId);
-  const [regionSnap, sightingsSnap, rumorsSnap, missionSubjectsSnap, missionActionsSnap] = await Promise.all([
-    regionRef.get(),
-    regionRef.collection("rumorSightings").get(),
-    db.collection("worldData").doc("rumors").collection("items").get(),
-    db.collection("worldData").doc("missionSubjects").collection("items").get(),
-    db.collection("worldData").doc("missionActions").collection("items").get(),
-  ]);
+  const [regionSnap, sightingsSnap, rumorsSnap, missionSubjectsSnap, missionActionsSnap, chainsSnap] =
+    await Promise.all([
+      regionRef.get(),
+      regionRef.collection("rumorSightings").get(),
+      db.collection("worldData").doc("rumors").collection("items").get(),
+      db.collection("worldData").doc("missionSubjects").collection("items").get(),
+      db.collection("worldData").doc("missionActions").collection("items").get(),
+      db.collection("worldData").doc("questChains").collection("items").get(),
+    ]);
 
   const region = regionSnap.exists ? { id: regionSnap.id, ...regionSnap.data() } : null;
   const sightings = sightingsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const rumors = rumorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const missionSubjects = missionSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const missionActions = missionActionsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const chains = chainsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { region, sightings, rumors, missionSubjects, missionActions };
+  return { region, sightings, rumors, missionSubjects, missionActions, chains };
 }
 
 async function resolve({ character, actionType, actionTypeId, today, context }) {
-  const { region, sightings, rumors, missionSubjects, missionActions } = context;
+  const { region, sightings, rumors, missionSubjects, missionActions, chains } = context;
 
   const rareIndex = RARITY_ORDER.indexOf("rare");
   const ownedRumorIds = new Set((character.rumorJournal || []).map((r) => r.id));
@@ -134,7 +144,6 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
         // The rumor's effective rarity where it was harvested, not the catalog's origin rarity -
         // a character picking it up far from its source experiences it exactly as decayed.
         rarity: sighting.rarity,
-        linkedQuestId: rumor.linkedQuestId || null,
         receivedAt: today,
       };
     })
@@ -143,7 +152,31 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
   const missionRollCount = Number(actionType.missionRollCount) || 3;
   const adventureZoneIds = region?.adventureZoneIds || [];
   const newMissions = [];
-  for (let i = 0; i < missionRollCount; i++) {
+
+  // Composite quests (docs/TODO.md "Composite quests", ported by "Retiring quests and quest
+  // objectives for the subject-action system"): a pending chain step claims one slot of this
+  // batch outright, guaranteed, before the rest draw normally - the mission-generation analogue of
+  // partirEnQuete.js's old "this exact quest, bypassing the region pool" bypass.
+  const pendingStep = findPendingChainStep({ character, chains: chains || [] });
+  if (pendingStep) {
+    const subject = missionSubjects.find((s) => s.id === pendingStep.subjectId);
+    const drawn = subject ? buildMission({ subject, difficulty: pendingStep.difficulty, missionActions }) : null;
+    if (drawn) {
+      newMissions.push({
+        id: randomUUID(),
+        subjectId: drawn.subject.id,
+        actionId: drawn.action.id,
+        name: drawn.name,
+        difficulty: drawn.difficulty,
+        tagIds: drawn.tagIds,
+        locationId: pickRandom(adventureZoneIds) || "",
+        regionId: region?.id || character.region.id,
+        generatedAt: today,
+      });
+    }
+  }
+
+  for (let i = newMissions.length; i < missionRollCount; i++) {
     const drawn = drawMission({ region, missionSubjects, missionActions });
     if (!drawn) continue; // content gap - skipped, not retried
     newMissions.push({

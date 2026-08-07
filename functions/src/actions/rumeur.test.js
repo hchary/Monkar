@@ -36,9 +36,9 @@ describe("rumeur resolve()", () => {
       { id: "r-owned", rarity: "tres_rare" },
     ];
     const rumors = [
-      { id: "r-commun", text: "Rumeur commune", linkedQuestId: null },
-      { id: "r-rare", text: "Rumeur rare", linkedQuestId: null },
-      { id: "r-owned", text: "Rumeur déjà connue", linkedQuestId: null },
+      { id: "r-commun", text: "Rumeur commune" },
+      { id: "r-rare", text: "Rumeur rare" },
+      { id: "r-owned", text: "Rumeur déjà connue" },
     ];
     const character = { region: REGION, rumorJournal: [{ id: "r-owned" }], talents: [] };
     const actionType = { rumorHarvestCount: 5, missionRollCount: 0 };
@@ -65,7 +65,7 @@ describe("rumeur resolve()", () => {
 
   test("stores the sighting's effective (decayed) rarity, not the rumor catalog's own", async () => {
     const sightings = [{ id: "r1", rarity: "legendaire" }];
-    const rumors = [{ id: "r1", text: "Une rumeur qui a beaucoup voyagé", linkedQuestId: null }];
+    const rumors = [{ id: "r1", text: "Une rumeur qui a beaucoup voyagé" }];
     const character = { region: REGION, rumorJournal: [], talents: [] };
     const actionType = { rumorHarvestCount: 1, missionRollCount: 0 };
 
@@ -86,7 +86,7 @@ describe("rumeur resolve()", () => {
       { id: "r2", rarity: "rare" },
       { id: "r3", rarity: "rare" },
     ];
-    const rumors = sightings.map((s) => ({ id: s.id, text: s.id, linkedQuestId: null }));
+    const rumors = sightings.map((s) => ({ id: s.id, text: s.id }));
     const character = { region: REGION, rumorJournal: [], talents: [] };
     const actionType = { rumorHarvestCount: 2, missionRollCount: 0 };
 
@@ -187,6 +187,38 @@ describe("rumeur resolve()", () => {
     });
 
     assert.deepEqual(updates.missionJournal, []);
+  });
+
+  test("forces a pending composite-quest-chain step into the batch, claiming one slot", async () => {
+    const chain = {
+      id: "chain1",
+      steps: [
+        { subjectId: "subj1", difficulty: "facile" },
+        { subjectId: "subj1", difficulty: "moyen" },
+      ],
+    };
+    const character = {
+      region: REGION,
+      rumorJournal: [],
+      missionJournal: [],
+      talents: [],
+      triggeredSubjectIds: ["subj1"],
+      questChainProgress: { chain1: 1 },
+    };
+    const actionType = { rumorHarvestCount: 0, missionRollCount: 2 };
+
+    const { updates } = await resolve({
+      character,
+      actionType,
+      actionTypeId: "rumeur-action",
+      today: "2026-08-05",
+      context: context({ missionSubjects: [SUBJECT_ALL_TIERS], missionActions: [ACTION], chains: [chain] }),
+    });
+
+    assert.equal(updates.missionJournal.length, 2);
+    // The pending step is forced at exactly the chain's own difficulty, not the normal draw's -
+    // findPendingChainStep's own contract, not re-tested here (see questChains.test.js).
+    assert.ok(updates.missionJournal.some((m) => m.subjectId === "subj1" && m.difficulty === "moyen"));
   });
 });
 

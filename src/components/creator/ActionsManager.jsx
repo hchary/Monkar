@@ -30,7 +30,6 @@ import MultiSelectModalField from "./MultiSelectModalField";
 // registry by hand, since the creator UI can't see the server's registry - the closest thing to
 // compile-time safety a Firestore-authored catalog can have (F2).
 const KNOWN_HANDLER_IDS = [
-  "partirEnQuete",
   "recolte",
   "artisanat",
   "rumeur",

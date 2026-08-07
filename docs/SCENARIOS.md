@@ -15,17 +15,19 @@ scenario below leans on it to avoid actually waiting 12h.
 
 ## 1 — Mission and quest resolution algorithm (score & wound) — roadmap #1
 
-**Setup**: none beyond an existing character with at least one region/quest available.
+**Setup**: none beyond an existing character with a mission in their journal (see scenario 5) or an
+exploration location available. "Partir en quête" is retired (docs/TODO.md "Retiring quests and
+quest objectives for the subject-action system") — use "Mission" or "Partir explorer" instead.
 
 **Steps**:
-1. Start "Partir en quête" (or "Mission", if you have one in your journal — see scenario 5).
+1. Start "Mission" (from your journal — see scenario 5) or "Partir explorer".
 2. Click `[TEST] Avancer le temps d'un Interval`.
 3. Open the result pop-up.
 4. Repeat a handful of times.
 
 **Expected**:
 - Outcomes vary — you see both "Succès" and "Échec", not an always-success result.
-- A failed quest still lists a "Butin obtenu" fieldset (loot, at visibly lower rarity than a
+- A failed mission still lists a "Butin obtenu" fieldset (loot, at visibly lower rarity than a
   success would give for the same objective).
 - Occasionally a wound is inflicted (visible in the "Résolution" fieldset — see scenario 2) and,
   on a severe enough hit, `woundsLight`/`woundsSevere`/`woundsPermanent` on the character sheet
@@ -37,7 +39,7 @@ scenario below leans on it to avoid actually waiting 12h.
 **Setup**: none.
 
 **Steps**:
-1. Run a "Partir en quête" or "Mission" action to completion (as in scenario 1).
+1. Run a "Mission" or "Partir explorer" action to completion (as in scenario 1).
 2. Open the result pop-up.
 
 **Expected**: a "Résolution" fieldset is present, separate from "Butin obtenu", showing:
@@ -53,7 +55,7 @@ least one entry.
 **Steps**: open the Aventure tab.
 
 **Expected**: your pending missions appear inside a titled `<fieldset>` labelled
-"Missions en cours" — visually distinct from "Partir en quête" and "Rumeur", not a bare list.
+"Missions en cours" — visually distinct from "Partir explorer" and "Rumeur", not a bare list.
 
 ## 4 — Interval (12h action cycle) — roadmap #4
 
@@ -90,10 +92,11 @@ least one entry.
 
 ## 6 — Quest triggers and end-of-action pop-up pages — roadmap #7, #8
 
-**Setup**: in the Firestore console, add a `trigger` field to a quest your character doesn't
-already have (`worldData/quests/items/{id}.trigger.conditions`) matching something your character
-satisfies (e.g. a minimum reputation you already have). No creator UI for this field — console
-only.
+**Setup**: in the Firestore console, add a `trigger` field to a mission Subject your character
+hasn't already triggered (`worldData/missionSubjects/items/{id}.trigger.conditions`) matching
+something your character satisfies (e.g. a minimum reputation you already have). No creator UI for
+this field — console only. (Renamed from `worldData/quests/items/{id}.trigger` by docs/TODO.md
+"Retiring quests and quest objectives for the subject-action system".)
 
 **Steps**:
 1. Wait for (or manually invoke) the scheduled `sweepQuestTriggers` function — it runs at 00:00
@@ -102,8 +105,8 @@ only.
 3. Page through the dialog (numbered pages).
 
 **Expected**:
-- Page 2 appears and lists the newly triggered quest — only shown once per browser (tracked in
-  `localStorage`), and only when there's something new.
+- Page 2 ("Sujets débloqués") appears and lists the newly triggered mission Subject — only shown
+  once per browser (tracked in `localStorage`), and only when there's something new.
 - Page 3 exists (a "received messages" placeholder) even though nothing populates it yet.
 - "Fermer" closes the dialog from any page.
 

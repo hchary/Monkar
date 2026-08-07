@@ -3,9 +3,7 @@ import { collection, doc, deleteDoc, writeBatch, serverTimestamp, onSnapshot } f
 import { db } from "../../lib/firebase";
 import { RARITIES } from "./TalentsManager";
 import { matchesRegion } from "./RegionsManager";
-import { matchesQuest } from "./QuestsManager";
 import MultiSelectModalField from "./MultiSelectModalField";
-import SoloSelectModalField from "./SoloSelectModalField";
 
 // Matches a rumor's text - for use as this manager's own free-text search.
 export function matchesRumor(option, query) {
@@ -23,10 +21,10 @@ function useItems(collectionName) {
   return items;
 }
 
-const emptyForm = { text: "", rarity: RARITIES[0].value, originRegionIds: [], linkedQuestId: null };
+const emptyForm = { text: "", rarity: RARITIES[0].value, originRegionIds: [] };
 
 // Rumors, worldData/rumors/items (docs/TODO.md "Rumor and mission system"): hand-authored flavor
-// text with a rarity and an optional quest link. Saving one also seeds a
+// text with a rarity. Saving one also seeds a
 // worldData/regions/items/{regionId}/rumorSightings/{rumorId} entry - at the rumor's own authored
 // rarity - for every region in originRegionIds, since that's the only thing that makes the rumor
 // visible anywhere in play (the "Rumeur" action and the rumor banner both read sightings, never
@@ -36,14 +34,12 @@ const emptyForm = { text: "", rarity: RARITIES[0].value, originRegionIds: [], li
 export default function RumorsManager() {
   const rumors = useItems("rumors");
   const regions = useItems("regions");
-  const quests = useItems("quests");
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [filterText, setFilterText] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
 
   const sortedRegions = [...regions].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
-  const sortedQuests = [...quests].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 
   const filteredRumors = rumors.filter((rumor) => matchesRumor(rumor, filterText));
 
@@ -53,7 +49,6 @@ export default function RumorsManager() {
       text: rumor.text || "",
       rarity: rumor.rarity || RARITIES[0].value,
       originRegionIds: rumor.originRegionIds || [],
-      linkedQuestId: rumor.linkedQuestId || null,
     });
     setPanelOpen(true);
   }
@@ -81,7 +76,6 @@ export default function RumorsManager() {
       text: form.text,
       rarity: form.rarity,
       originRegionIds: form.originRegionIds,
-      linkedQuestId: form.linkedQuestId || null,
     });
     for (const regionId of form.originRegionIds) {
       const sightingRef = doc(db, "worldData", "regions", "items", regionId, "rumorSightings", ref.id);
@@ -112,7 +106,6 @@ export default function RumorsManager() {
               Régions d'origine :{" "}
               {(rumor.originRegionIds || []).map((id) => regions.find((r) => r.id === id)?.name || id).join(", ") || "aucune"}
             </div>
-            {rumor.linkedQuestId && <div>Quête liée : {quests.find((q) => q.id === rumor.linkedQuestId)?.name || rumor.linkedQuestId}</div>}
             <button type="button" onClick={() => startEdit(rumor)}>
               Modifier
             </button>
@@ -162,22 +155,6 @@ export default function RumorsManager() {
           />
           {form.originRegionIds.length === 0 && (
             <p className="error">Sans région d'origine, cette rumeur n'apparaîtra nulle part en jeu.</p>
-          )}
-
-          <SoloSelectModalField
-            legend="Quête liée (optionnel)"
-            options={sortedQuests}
-            selectedId={form.linkedQuestId}
-            onSelect={(id) => setForm({ ...form, linkedQuestId: id })}
-            createLink={`/creator?section=${encodeURIComponent("Quêtes")}`}
-            matchesFilter={matchesQuest}
-            filterPlaceholder="Filtrer par nom..."
-            buttonLabel="Choisir la quête"
-          />
-          {form.linkedQuestId && (
-            <button type="button" onClick={() => setForm({ ...form, linkedQuestId: null })}>
-              Retirer le lien
-            </button>
           )}
 
           <div>

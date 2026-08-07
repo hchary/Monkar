@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { matchesTag } from "./TagsManager";
-import { DIFFICULTIES } from "./QuestsManager";
+import { DIFFICULTIES } from "../../lib/difficulties";
 import MultiSelectModalField from "./MultiSelectModalField";
 
 // Mirrors MissionActionsManager.jsx's own list - kept in sync by hand, same convention as every
