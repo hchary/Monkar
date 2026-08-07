@@ -2,8 +2,8 @@
 // the shared "mission" handlerId, the sole Aventure-branch action drawing on generated content
 // since "Partir en quête" was retired (docs/TODO.md "Retiring quests and quest objectives for the
 // subject-action system"). A mission is not hand-authored the way a quest was: the player picks
-// one entry from their own character.missionJournal (generated earlier by the "rumeur" handler,
-// see rumeur.js), passed in as payload.missionId exactly like artisanat.js's payload.recetteId.
+// one entry from their own character.missionJournal (generated earlier by the "recherche" handler,
+// see recherche.js), passed in as payload.missionId exactly like artisanat.js's payload.recetteId.
 //
 // Resolution reuses missionResolution.js's resolveQuestOutcome (score roll, talent-evolution
 // pipeline) wholesale rather than duplicating it - except for loot, which is drawn through
@@ -14,7 +14,7 @@
 //
 // A mission carries no worldData/narrativeSubjects/items objective of its own (docs/TODO.md
 // "Regional mission generation and journal" draws from the missionSubjects/missionActions catalog
-// pair instead, and the mission's title is already assembled at generation time - see rumeur.js).
+// pair instead, and the mission's title is already assembled at generation time - see recherche.js).
 // The threshold/wound/talent-evolution pipeline, which expects an "objective"-shaped
 // { tagIds, rarity } for its own tag/rank matching, is instead fed a synthetic stand-in built from
 // the mission's own tagIds and its difficulty's rarity equivalence (missionLoot.js's

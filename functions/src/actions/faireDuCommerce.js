@@ -15,14 +15,6 @@
 // the player sees is threaded back through performAction's own return value (see `response` below
 // and actionPipeline.js's threading of it) rather than through the character document.
 //
-// Selling an object of rarity "mythique" or above also seeds a rumor of the sale at the seller's
-// current region (docs/TODO.md "Intermède actions": "selling a mythic object... spread the rumor
-// of that object's presence at the sale location"): since a sale has no hand-authored
-// worldData/rumors/items entry to copy text/rarity from (unlike RumorsManager.jsx's own flow),
-// one is authored on the fly here, then seeded into
-// worldData/regions/items/{regionId}/rumorSightings the same way RumorsManager.jsx seeds a
-// hand-authored rumor - skipping the normal hop-by-hop propagation decay, per the spec.
-//
 // Catalog-side validation (does this instance/object exist, does it belong to this character)
 // happens once in prepare() from a plain (non-transactional) read, since the object catalog is
 // creator content - same asymmetry as sEntrainer.js's talent catalog check. The instance itself is
@@ -30,11 +22,7 @@
 // re-checked fresh in resolve() via a transactional read right before it's deleted.
 
 const { HttpsError } = require("firebase-functions/v2/https");
-const { FieldValue } = require("firebase-admin/firestore");
-const { RARITY_ORDER } = require("../lib/rolls");
 const { salePrice } = require("../lib/salePrice");
-
-const MYTHIC_SALE_RARITY_INDEX = RARITY_ORDER.indexOf("mythique");
 
 async function prepare({ db, characterId, payload }) {
   const instanceId = payload?.instanceId;
@@ -74,28 +62,6 @@ async function resolve({ tx, db, character, characterId, context }) {
   const price = salePrice(object);
   tx.delete(instanceRef);
 
-  let mythicRumorTriggered = false;
-  const regionId = character.region?.id;
-  if (regionId && RARITY_ORDER.indexOf(object.rarity) >= MYTHIC_SALE_RARITY_INDEX) {
-    const rumorRef = db.collection("worldData").doc("rumors").collection("items").doc();
-    const sightingRef = db
-      .collection("worldData")
-      .doc("regions")
-      .collection("items")
-      .doc(regionId)
-      .collection("rumorSightings")
-      .doc(rumorRef.id);
-
-    tx.set(rumorRef, {
-      text: `On raconte qu'un certain ${object.name} a changé de mains à ${character.region?.name || "cette région"}.`,
-      rarity: object.rarity,
-      originRegionIds: [regionId],
-      linkedQuestId: null,
-    });
-    tx.set(sightingRef, { rarity: object.rarity, arrivedAt: FieldValue.serverTimestamp() });
-    mythicRumorTriggered = true;
-  }
-
   return {
     updates: {
       gold: (character.gold || 0) + price,
@@ -109,7 +75,6 @@ async function resolve({ tx, db, character, characterId, context }) {
     response: {
       objectName: object.name,
       goldGained: price,
-      mythicRumorTriggered,
     },
   };
 }

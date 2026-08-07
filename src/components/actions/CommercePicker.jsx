@@ -86,7 +86,6 @@ export default function CommercePicker({ character, onStart, submitting, availab
       {lastSale && (
         <p className="commerce-sale-result">
           Vendu : {lastSale.objectName} pour {lastSale.goldGained} or.
-          {lastSale.mythicRumorTriggered && " La rumeur de cette vente se répand déjà."}
         </p>
       )}
 

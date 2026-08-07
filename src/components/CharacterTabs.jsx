@@ -3,7 +3,7 @@ import InventoryTab from "./InventoryTab";
 import ProfessionTab from "./ProfessionTab";
 import EmptyState from "./EmptyState";
 
-const TABS = ["Inventaire", "Talents", "Rumeurs", "Métier", "Santé"];
+const TABS = ["Inventaire", "Talents", "Métier", "Santé"];
 
 function formatShortDate(dateStr) {
   if (!dateStr) return "";
@@ -45,23 +45,6 @@ export default function CharacterTabs({ character }) {
             </div>
           ) : (
             <EmptyState text="Aucun talent acquis pour l'instant." />
-          ))}
-
-        {activeTab === "Rumeurs" &&
-          (character.rumorJournal?.length > 0 ? (
-            <div className="talent-list">
-              {character.rumorJournal.map((rumor, i) => (
-                <div
-                  key={i}
-                  className={`talent-card rarity-${rumor.rarity}`}
-                  data-tooltip={rumor.linkedQuestId ? "[Rumeur liée à une quête]" : undefined}
-                >
-                  {rumor.text}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState text="Aucune rumeur collectée pour l'instant." />
           ))}
 
         {activeTab === "Métier" && <ProfessionTab character={character} />}

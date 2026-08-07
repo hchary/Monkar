@@ -1,6 +1,6 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { resolve, drawMission } = require("./rumeur");
+const { resolve, drawMission } = require("./recherche");
 const { DIFFICULTY_ORDER } = require("../lib/rolls");
 
 const REGION = { id: "region1", adventureZoneIds: ["zone1"], climateIds: ["climat-tempere"] };
@@ -25,90 +25,18 @@ const SUBJECT_ALL_TIERS = {
 const ACTION = { id: "act1", phrase: "Vaincre", type: "ennemis" };
 
 function context(overrides = {}) {
-  return { region: REGION, sightings: [], rumors: [], missionSubjects: [], missionActions: [], ...overrides };
+  return { region: REGION, missionSubjects: [], missionActions: [], ...overrides };
 }
 
-describe("rumeur resolve()", () => {
-  test("harvests only sightings at or above rare, skipping already-owned ids", async () => {
-    const sightings = [
-      { id: "r-commun", rarity: "commun" },
-      { id: "r-rare", rarity: "rare" },
-      { id: "r-owned", rarity: "tres_rare" },
-    ];
-    const rumors = [
-      { id: "r-commun", text: "Rumeur commune" },
-      { id: "r-rare", text: "Rumeur rare" },
-      { id: "r-owned", text: "Rumeur déjà connue" },
-    ];
-    const character = { region: REGION, rumorJournal: [{ id: "r-owned" }], talents: [] };
-    const actionType = { rumorHarvestCount: 5, missionRollCount: 0 };
-
-    const { updates } = await resolve({
-      character,
-      actionType,
-      actionTypeId: "rumeur-action",
-      today: "2026-08-05",
-      context: context({ sightings, rumors }),
-    });
-
-    // r-commun is below the "rare" floor, so only r-rare is newly harvested - r-owned was already
-    // in the journal (the pre-existing stub used for the dedup check) and stays there untouched,
-    // since rumorJournal accumulates rather than being replaced.
-    assert.deepEqual(
-      updates.rumorJournal.map((r) => r.id),
-      ["r-owned", "r-rare"]
-    );
-    const harvested = updates.rumorJournal.find((r) => r.id === "r-rare");
-    assert.equal(harvested.rarity, "rare");
-    assert.equal(harvested.text, "Rumeur rare");
-  });
-
-  test("stores the sighting's effective (decayed) rarity, not the rumor catalog's own", async () => {
-    const sightings = [{ id: "r1", rarity: "legendaire" }];
-    const rumors = [{ id: "r1", text: "Une rumeur qui a beaucoup voyagé" }];
-    const character = { region: REGION, rumorJournal: [], talents: [] };
-    const actionType = { rumorHarvestCount: 1, missionRollCount: 0 };
-
-    const { updates } = await resolve({
-      character,
-      actionType,
-      actionTypeId: "rumeur-action",
-      today: "2026-08-05",
-      context: context({ sightings, rumors }),
-    });
-
-    assert.equal(updates.rumorJournal[0].rarity, "legendaire");
-  });
-
-  test("caps the harvest at rumorHarvestCount even when more qualify", async () => {
-    const sightings = [
-      { id: "r1", rarity: "rare" },
-      { id: "r2", rarity: "rare" },
-      { id: "r3", rarity: "rare" },
-    ];
-    const rumors = sightings.map((s) => ({ id: s.id, text: s.id }));
-    const character = { region: REGION, rumorJournal: [], talents: [] };
-    const actionType = { rumorHarvestCount: 2, missionRollCount: 0 };
-
-    const { updates } = await resolve({
-      character,
-      actionType,
-      actionTypeId: "rumeur-action",
-      today: "2026-08-05",
-      context: context({ sightings, rumors }),
-    });
-
-    assert.equal(updates.rumorJournal.length, 2);
-  });
-
+describe("recherche resolve()", () => {
   test("generates missionRollCount missions from climate/difficulty-matched Subjects paired with a type-matched Action", async () => {
-    const character = { region: REGION, rumorJournal: [], missionJournal: [], talents: [] };
-    const actionType = { rumorHarvestCount: 0, missionRollCount: 3 };
+    const character = { region: REGION, missionJournal: [], talents: [] };
+    const actionType = { missionRollCount: 3 };
 
     const { updates } = await resolve({
       character,
       actionType,
-      actionTypeId: "rumeur-action",
+      actionTypeId: "recherche-action",
       today: "2026-08-05",
       context: context({ missionSubjects: [SUBJECT_ALL_TIERS], missionActions: [ACTION] }),
     });
@@ -125,12 +53,13 @@ describe("rumeur resolve()", () => {
     }
     // Every generated mission gets its own id, even when drawn from the same Subject/Action pair.
     assert.equal(new Set(updates.missionJournal.map((m) => m.id)).size, 3);
+    // The result pop-up reads the generated missions from lastAction, not just a count.
+    assert.deepEqual(updates.lastAction.missionsGenerated, updates.missionJournal);
   });
 
   test("replaces the whole mission journal rather than appending to it", async () => {
     const character = {
       region: REGION,
-      rumorJournal: [],
       missionJournal: [
         {
           id: "stale-mission",
@@ -146,12 +75,12 @@ describe("rumeur resolve()", () => {
       ],
       talents: [],
     };
-    const actionType = { rumorHarvestCount: 0, missionRollCount: 0 };
+    const actionType = { missionRollCount: 0 };
 
     const { updates } = await resolve({
       character,
       actionType,
-      actionTypeId: "rumeur-action",
+      actionTypeId: "recherche-action",
       today: "2026-08-05",
       context: context(),
     });
@@ -160,13 +89,13 @@ describe("rumeur resolve()", () => {
   });
 
   test("stops generating missions once no Subject matches the region's climate (content gap, not an error)", async () => {
-    const character = { region: REGION, rumorJournal: [], missionJournal: [], talents: [] };
-    const actionType = { rumorHarvestCount: 0, missionRollCount: 3 };
+    const character = { region: REGION, missionJournal: [], talents: [] };
+    const actionType = { missionRollCount: 3 };
 
     const { updates } = await resolve({
       character,
       actionType,
-      actionTypeId: "rumeur-action",
+      actionTypeId: "recherche-action",
       today: "2026-08-05",
       context: context({ missionSubjects: [], missionActions: [ACTION] }),
     });
@@ -175,13 +104,13 @@ describe("rumeur resolve()", () => {
   });
 
   test("skips (but does not retry) a Subject with no type-matched Action", async () => {
-    const character = { region: REGION, rumorJournal: [], missionJournal: [], talents: [] };
-    const actionType = { rumorHarvestCount: 0, missionRollCount: 3 };
+    const character = { region: REGION, missionJournal: [], talents: [] };
+    const actionType = { missionRollCount: 3 };
 
     const { updates } = await resolve({
       character,
       actionType,
-      actionTypeId: "rumeur-action",
+      actionTypeId: "recherche-action",
       today: "2026-08-05",
       context: context({ missionSubjects: [SUBJECT_ALL_TIERS], missionActions: [] }),
     });
@@ -199,18 +128,17 @@ describe("rumeur resolve()", () => {
     };
     const character = {
       region: REGION,
-      rumorJournal: [],
       missionJournal: [],
       talents: [],
       triggeredSubjectIds: ["subj1"],
       questChainProgress: { chain1: 1 },
     };
-    const actionType = { rumorHarvestCount: 0, missionRollCount: 2 };
+    const actionType = { missionRollCount: 2 };
 
     const { updates } = await resolve({
       character,
       actionType,
-      actionTypeId: "rumeur-action",
+      actionTypeId: "recherche-action",
       today: "2026-08-05",
       context: context({ missionSubjects: [SUBJECT_ALL_TIERS], missionActions: [ACTION], chains: [chain] }),
     });

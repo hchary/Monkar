@@ -66,19 +66,18 @@ export default function ActionOutcome({ lastAction, showLoot, character }) {
         </fieldset>
       )}
 
-      {lastAction.rumorsHarvested?.length > 0 && (
+      {lastAction.missionsGenerated?.length > 0 && (
         <fieldset className="action-loot-box">
-          <legend>Rumeurs collectées</legend>
+          <legend>Missions générées</legend>
           <ul className="instance-list">
-            {lastAction.rumorsHarvested.map((rumor) => (
-              <li key={rumor.id} className={`talent-card rarity-${rumor.rarity}`}>
-                {rumor.text}
+            {lastAction.missionsGenerated.map((mission) => (
+              <li key={mission.id} className={`difficulty-text-${mission.difficulty}`}>
+                {mission.name} ({difficultyLabel(mission.difficulty)})
               </li>
             ))}
           </ul>
         </fieldset>
       )}
-      {lastAction.missionsGeneratedCount > 0 && <p>Missions générées : {lastAction.missionsGeneratedCount}</p>}
 
       {lastAction.success && (
         <ul>

@@ -26,7 +26,7 @@ async function buildInstanceTagIds(db, characterId) {
 
 // The trainerTypeIds reachable from the character's current region: every worldData/trainerTypes/
 // items entry whose locationId is one of region.adventureZoneIds - the same reachability
-// precedent functions/src/actions/rumeur.js's prepare() already uses (region doc ->
+// precedent functions/src/actions/recherche.js's prepare() already uses (region doc ->
 // adventureZoneIds). A character with no region reaches nothing, same fail-closed convention an
 // absent instanceTagIds set uses. Only loaded when a condition actually asks for it.
 async function buildReachableTrainerTypeIds(db, character) {

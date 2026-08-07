@@ -1,58 +1,33 @@
-// Handler for the "Rumeur" action (docs/TODO.md "Rumor and mission system"), registered under the
-// shared "rumeur" handlerId - like recolte.js/artisanat.js, a game can only ever need one Rumeur
-// action per world, but the convention of keying by handlerId rather than a hardcoded action
-// document id (docs/ISSUE-02-ACTION-FRAMEWORK.md D13) is kept anyway.
+// Handler for the "Se renseigner" action, registered under the shared "recherche" handlerId -
+// like recolte.js/artisanat.js, a game can only ever need one of these per world, but the
+// convention of keying by handlerId rather than a hardcoded action document id
+// (docs/ISSUE-02-ACTION-FRAMEWORK.md D13) is kept anyway. Renamed from the earlier "rumeur"
+// handlerId now that its rumor-harvesting half has been removed - only mission generation
+// remains, so the handlerId no longer names a mechanic the handler doesn't perform.
 //
-// Performing it does two things in the same resolution, neither of which can fail the action
-// outright - a content gap (no qualifying rumor, no matching mission Subject/Action) just yields
-// fewer results, the same "silently skipped rather than failing" convention
-// functions/src/missionResolution.js's drawQuestLoot already uses:
-//   - Harvests up to actionType.rumorHarvestCount rare-or-above rumor sightings from the
-//     character's current region into character.rumorJournal (denormalized copies, skipping rumor
-//     ids already owned).
-//   - Generates actionType.missionRollCount missions into character.missionJournal, replacing
-//     whatever was still sitting there unclaimed (see mission journal below).
+// Performing it generates actionType.missionRollCount missions into character.missionJournal,
+// replacing whatever was still sitting there unclaimed (see mission journal below). A content gap
+// (no matching mission Subject/Action) just yields fewer results rather than failing the action
+// outright - the same "silently skipped rather than failing" convention
+// functions/src/missionResolution.js's drawQuestLoot already uses.
 //
 // Mission generation (docs/TODO.md "Regional mission generation and journal"): a difficulty is
 // drawn first, then a random worldData/missionSubjects/items entry whose climateIds overlaps the
 // character's region's own climateIds and whose difficultyTiers list includes that difficulty,
 // then a random worldData/missionActions/items entry sharing that Subject's type, then a random
 // variation for the Subject (independent of difficulty) - the title is assembled from that draw by
-// functions/src/missionNaming.js, replacing the earlier "one random 'objectif de quête'
-// narrativeSubject + a uniformly random difficulty" mechanic (docs/TODO.md "Mission subject and
-// action catalog"'s own note on this being a separate follow-up).
+// functions/src/missionNaming.js.
 //
-// Region-to-region propagation of rumorSightings (and the periodic re-evaluation that would drive
-// it) is not implemented here - it depends on a still-undecided Interval-tick cadence mechanism,
-// see docs/TODO.md's "Still open" note. This handler only ever reads whatever sightings already
-// exist in the character's current region (seeded at a rumor's originRegionIds by
-// RumorsManager.jsx).
-//
-// Renamed "Se renseigner" in-game (docs/TODO.md "Se renseigner intermède action") - the content
-// doc's label/kindId change by hand in the Firestore console, not this handler, which keeps the
-// "rumeur" handlerId for continuity. Always available, no condition - every character can perform
-// it any time (subject only to the normal once-per-Interval action lock).
+// Always available, no condition - every character can perform it any time (subject only to the
+// normal once-per-Interval action lock).
 
 const { randomUUID } = require("crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
-const { RARITY_ORDER, DIFFICULTY_ORDER } = require("../lib/rolls");
+const { DIFFICULTY_ORDER } = require("../lib/rolls");
 const { pickRandom } = require("../lib/loot");
 const { assembleMissionName } = require("../missionNaming");
 const { findPendingChainStep } = require("../lib/questChains");
-
-// Picks up to `count` distinct items without replacement - used for both the rumor harvest (never
-// hand the same sighting twice) and, implicitly, is not needed for missions, which draw with
-// replacement (nothing stops two generated missions from sharing the same Subject/Action pair).
-function pickRandomUnique(items, count) {
-  const pool = [...items];
-  const picked = [];
-  while (pool.length > 0 && picked.length < count) {
-    const index = Math.floor(Math.random() * pool.length);
-    picked.push(pool.splice(index, 1)[0]);
-  }
-  return picked;
-}
 
 function overlaps(a, b) {
   const set = new Set(b || []);
@@ -105,50 +80,23 @@ async function prepare({ db, character }) {
   if (!regionId) throw new HttpsError("failed-precondition", "Ce personnage n'a pas de région.");
 
   const regionRef = db.collection("worldData").doc("regions").collection("items").doc(regionId);
-  const [regionSnap, sightingsSnap, rumorsSnap, missionSubjectsSnap, missionActionsSnap, chainsSnap] =
-    await Promise.all([
-      regionRef.get(),
-      regionRef.collection("rumorSightings").get(),
-      db.collection("worldData").doc("rumors").collection("items").get(),
-      db.collection("worldData").doc("missionSubjects").collection("items").get(),
-      db.collection("worldData").doc("missionActions").collection("items").get(),
-      db.collection("worldData").doc("questChains").collection("items").get(),
-    ]);
+  const [regionSnap, missionSubjectsSnap, missionActionsSnap, chainsSnap] = await Promise.all([
+    regionRef.get(),
+    db.collection("worldData").doc("missionSubjects").collection("items").get(),
+    db.collection("worldData").doc("missionActions").collection("items").get(),
+    db.collection("worldData").doc("questChains").collection("items").get(),
+  ]);
 
   const region = regionSnap.exists ? { id: regionSnap.id, ...regionSnap.data() } : null;
-  const sightings = sightingsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const rumors = rumorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const missionSubjects = missionSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const missionActions = missionActionsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const chains = chainsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { region, sightings, rumors, missionSubjects, missionActions, chains };
+  return { region, missionSubjects, missionActions, chains };
 }
 
 async function resolve({ character, actionType, actionTypeId, today, context }) {
-  const { region, sightings, rumors, missionSubjects, missionActions, chains } = context;
-
-  const rareIndex = RARITY_ORDER.indexOf("rare");
-  const ownedRumorIds = new Set((character.rumorJournal || []).map((r) => r.id));
-  const qualifyingSightings = sightings.filter(
-    (sighting) => RARITY_ORDER.indexOf(sighting.rarity) >= rareIndex && !ownedRumorIds.has(sighting.id)
-  );
-
-  const rumorHarvestCount = Number(actionType.rumorHarvestCount) || 1;
-  const newRumorEntries = pickRandomUnique(qualifyingSightings, rumorHarvestCount)
-    .map((sighting) => {
-      const rumor = rumors.find((r) => r.id === sighting.id);
-      if (!rumor) return null; // content gap - a sighting whose catalog entry was deleted
-      return {
-        id: sighting.id,
-        text: rumor.text,
-        // The rumor's effective rarity where it was harvested, not the catalog's origin rarity -
-        // a character picking it up far from its source experiences it exactly as decayed.
-        rarity: sighting.rarity,
-        receivedAt: today,
-      };
-    })
-    .filter(Boolean);
+  const { region, missionSubjects, missionActions, chains } = context;
 
   const missionRollCount = Number(actionType.missionRollCount) || 3;
   const adventureZoneIds = region?.adventureZoneIds || [];
@@ -197,23 +145,22 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
     updates: {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
-      rumorJournal: [...(character.rumorJournal || []), ...newRumorEntries],
       // A rolling offer, not a history - entirely replaced on every resolution (see the header
-      // comment), unlike rumorJournal which only ever grows.
+      // comment), unlike a growing journal.
       missionJournal: newMissions,
       lastAction: {
         actionTypeId,
         date: today,
         success: true,
         narrativeText: "",
-        rumorsHarvested: newRumorEntries,
-        missionsGeneratedCount: newMissions.length,
+        // The generated missions themselves, not just a count, so the result pop-up
+        // (ActionOutcome.jsx) can list what was just offered.
+        missionsGenerated: newMissions,
       },
     },
     logFields: {
       success: true,
       narrativeText: "",
-      rumorsHarvestedCount: newRumorEntries.length,
       missionsGeneratedCount: newMissions.length,
     },
   };

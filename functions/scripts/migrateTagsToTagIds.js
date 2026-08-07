@@ -9,7 +9,7 @@
 // ids it already carried - narrativeSubjects acting as quest objectives already had real tagIds
 // from QuestObjectivesManager.jsx) and deletes the old `tags` field.
 //
-// The reserved "objectif de quête" sentinel (functions/src/actions/rumeur.js's OBJECTIVE_TAG_ID,
+// The reserved "objectif de quête" sentinel (functions/src/actions/recherche.js's OBJECTIVE_TAG_ID,
 // src/components/creator/QuestObjectivesManager.jsx's OBJECTIVE_TAG_ID) is special-cased onto a
 // fixed tag doc id ("objectif-de-quete") instead of a name lookup, so every consumer can reference
 // it without a name-resolution step.

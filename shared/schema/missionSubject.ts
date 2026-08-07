@@ -81,7 +81,7 @@ export const MissionSubjectDocumentSchema = z.object({
         "talents/reputation/profession/region/etc. satisfy every condition has this Subject's id " +
         "added to character.triggeredSubjectIds. Null/absent (default): this Subject is never " +
         "auto-granted - it stays reachable only through the normal mission-generation draw " +
-        "(functions/src/actions/rumeur.js). No creator UI yet - authored directly in the Firestore " +
+        "(functions/src/actions/recherche.js). No creator UI yet - authored directly in the Firestore " +
         "console, same convention as quest.trigger before it (RENAMED from quest.trigger by " +
         "'Retiring quests and quest objectives for the subject-action system')."
     ),

@@ -2,7 +2,7 @@
 // difficulty-pair mission system by "Retiring quests and quest objectives for the subject-action
 // system": worldData/questChains/items/{id}.steps is now a [{ subjectId, difficulty }] list rather
 // than a worldData/quests/items id list (see shared/schema/questChain.ts). Used by
-// functions/src/actions/rumeur.js (to force a pending step into the next mission-generation batch,
+// functions/src/actions/recherche.js (to force a pending step into the next mission-generation batch,
 // the same "this exact content offered next, bypassing the normal draw" mechanic
 // functions/src/actions/partirEnQuete.js used to give a chain step before it was retired) and
 // functions/src/actions/mission.js (to advance a chain when a resolved mission completes one of
@@ -12,7 +12,7 @@
 // character.triggeredSubjectIds and character.questChainProgress[chainId] is bumped to its index
 // (see findChainAdvance below, both written together by mission.js's resolve()). While pending,
 // that exact { subjectId, difficulty } pair is guaranteed a slot in the next mission-generation
-// batch (rumeur.js's resolve()), bypassing the normal climate/difficulty draw for that one slot. If
+// batch (recherche.js's resolve()), bypassing the normal climate/difficulty draw for that one slot. If
 // more than one chain has a step pending at once, the earliest-granted one wins (earliest insertion
 // into triggeredSubjectIds).
 function findPendingChainStep({ character, chains }) {
