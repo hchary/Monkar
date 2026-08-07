@@ -189,6 +189,21 @@ describe("rumeur resolve()", () => {
     assert.deepEqual(updates.missionJournal, []);
   });
 
+  test("resets missionsSinceRenseignement to 0 on resolve", async () => {
+    const character = { region: REGION, rumorJournal: [], missionJournal: [], talents: [], missionsSinceRenseignement: 4 };
+    const actionType = { rumorHarvestCount: 0, missionRollCount: 0 };
+
+    const { updates } = await resolve({
+      character,
+      actionType,
+      actionTypeId: "rumeur-action",
+      today: "2026-08-05",
+      context: context(),
+    });
+
+    assert.equal(updates.missionsSinceRenseignement, 0);
+  });
+
   test("forces a pending composite-quest-chain step into the batch, claiming one slot", async () => {
     const chain = {
       id: "chain1",

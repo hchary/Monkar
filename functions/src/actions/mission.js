@@ -130,6 +130,9 @@ async function resolve({ character, actionTypeId, today, context }) {
     lastActionAt: FieldValue.serverTimestamp(),
     // Resolving a mission removes it from the rolling offer - any other unclaimed missions stay.
     missionJournal: (character.missionJournal || []).filter((m) => m.id !== mission.id),
+    // Counts toward "Se renseigner"'s cadence gate (docs/TODO.md "Se renseigner intermède
+    // action") - every mission resolution counts, success or failure alike.
+    missionsSinceRenseignement: (character.missionsSinceRenseignement || 0) + 1,
     lastAction: {
       actionTypeId,
       date: today,

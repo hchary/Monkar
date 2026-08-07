@@ -15,6 +15,7 @@ import {
   PROFESSION_ACTION_KIND_ID,
   TRAINING_ACTION_KIND_ID,
   PROFESSION_LEARNING_ACTION_KIND_ID,
+  RENSEIGNEMENT_ACTION_KIND_ID,
   actionKindCategoryId,
   actionKindInheritsFrom,
   actionUsesIntermedeBudget,
@@ -75,7 +76,8 @@ export function resolveTrainerTypeId(actionType) {
 //
 // Each injection is individually guarded so normalizing an already-normalized document is
 // idempotent; nothing else can produce a hasProfession/trainerReachable/professionless/
-// hasIntermedeBudget row, since none of them is offered by CONDITION_TYPES.
+// hasIntermedeBudget/renseignementAvailable row, since none of them is offered by
+// CONDITION_TYPES.
 export function resolveConditions(actionType) {
   const authored = Array.isArray(actionType?.availability?.conditions) ? actionType.availability.conditions : [];
   const kindId = resolveKindId(actionType);
@@ -103,6 +105,15 @@ export function resolveConditions(actionType) {
   // this gate implicitly - same "nobody authors this row" convention as the three above.
   if (actionUsesIntermedeBudget(kindId) && !authored.some((c) => c?.type === "hasIntermedeBudget")) {
     conditions = [...conditions, { type: "hasIntermedeBudget" }];
+  }
+
+  // "Se renseigner" (docs/TODO.md "Se renseigner intermède action") gets its mission-count gate
+  // implicitly - same "nobody authors this row" convention as the ones above.
+  if (
+    actionKindInheritsFrom(kindId, RENSEIGNEMENT_ACTION_KIND_ID) &&
+    !authored.some((c) => c?.type === "renseignementAvailable")
+  ) {
+    conditions = [...conditions, { type: "renseignementAvailable" }];
   }
 
   return conditions;

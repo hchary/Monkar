@@ -164,6 +164,18 @@ export const CharacterDocumentSchema = z.object({
         "second cron schedule. Fully decoupled from lastAction/lastActionDate: actions drawing from " +
         "this budget never touch the main action lock (functions/src/lib/actionPipeline.js)."
     ),
+  missionsSinceRenseignement: z
+    .number()
+    .default(0)
+    .describe(
+      "Missions resolved (success or failure alike) since 'Se renseigner' last resolved (docs/" +
+        "TODO.md 'Se renseigner intermède action'). Incremented by 1 on every mission resolution " +
+        "(functions/src/actions/mission.js's resolve()), reset to 0 when 'Se renseigner' itself " +
+        "resolves (functions/src/actions/rumeur.js's resolve()). Gates the implicit " +
+        "'renseignementAvailable' condition (actionConditions.js): the action only reappears once " +
+        "this reaches missionsRequiredForRenseignement(reputation) " +
+        "(functions/src/lib/missionsRequiredForRenseignement.js)."
+    ),
   lastActionDate: z.string().nullable().default(null).describe("YYYY-MM-DD of the last performed action."),
   lastActionAt: z
     .unknown()
@@ -209,6 +221,7 @@ const DEFAULTED_KEYS = [
   "woundsPermanent",
   "fatigue",
   "intermedeActionsThisInterval",
+  "missionsSinceRenseignement",
   "lastActionDate",
   "lastActionAt",
   "lastAction",

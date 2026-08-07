@@ -40,7 +40,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 28 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 24, 26 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 29 | Retiring quests and quest objectives for the subject-action system — implementation | done | 27, 28 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
 | 30 | Se renseigner intermède action — spec | done | 26, 28 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
-| 31 | Se renseigner intermède action — implementation | todo | 27, 30 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
+| 31 | Se renseigner intermède action — implementation | done | 27, 30 | [Se renseigner intermède action (spec needed)](#se-renseigner-intermède-action-spec-needed) |
 | 32 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
 | 33 | Misc small polish (profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention — `favoredQuestIds` effect dropped, no longer applicable) | todo | — | [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
 | 34 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
@@ -2255,17 +2255,11 @@ Not implemented as part of this pass, deliberately unrelated: the flavor-text ru
 
 ## Se renseigner intermède action (spec needed)
 
-Status: **spec resolved, not implemented**. Depended on
-[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed) for
-the new generation routine it calls, and on
-[Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed)
-resolving the rumor-flavor-text mechanic's fate — both are now spec-resolved, the latter confirming
-that the flavor-text rumor mechanic (region rumor sightings/propagation, `RumorBanner.jsx`, etc.)
-stays as-is, unrelated to the mission-catalog retirement. Replaces the "Rumeur" action (`kindId:
-"intermede"`, `handlerId: "rumeur"`, see [Rumor and mission system](#rumor-and-mission-system)) with
-"Se renseigner" — same Intermède-kind action slot, but no longer always available: it is only
-offered again once the character has completed a reputation-scaled number of missions since it was
-last performed.
+Status: **implemented**. Replaces the "Rumeur" action (`handlerId: "rumeur"`, see
+[Rumor and mission system](#rumor-and-mission-system)) with "Se renseigner" in-game — same handler
+(kept for continuity, only its content doc's `label`/`kindId` change), but no longer always
+available: it is only offered again once the character has completed a reputation-scaled number of
+missions since it was last performed.
 
 - **Renamed and repurposed, both halves carried over**: "Se renseigner" keeps "Rumeur"'s
   rumor-harvesting half unchanged — up to `rumorHarvestCount` sightings at or above "rare" from the
@@ -2275,20 +2269,25 @@ last performed.
   instead of the current objective+uniform-difficulty draw.
 - **Reputation-scaled cadence**: rather than being available every Interval like any other Intermède
   action, "Se renseigner" only reappears once the character has completed
-  `missionsRequiredForRenseignement(reputation)` missions since it was last performed. Decided
-  formula: `missionsRequiredForRenseignement(reputation) = clamp(5 - floor(reputation / 20), 1, 5)`
-  — 5 missions required at 0 reputation, one fewer every 20 reputation earned, floored at 1 (never
+  `missionsRequiredForRenseignement(reputation)` missions since it was last performed. Formula:
+  `missionsRequiredForRenseignement(reputation) = clamp(5 - floor(reputation / 20), 1, 5)` — 5
+  missions required at 0 reputation, one fewer every 20 reputation earned, floored at 1 (never
   fully free); a starting balance value, not playtested, tunable the same way
   `rumorHarvestCount`/`missionRollCount` already are (see
-  [Rumor and mission system](#rumor-and-mission-system)). Gated the same way as
+  [Rumor and mission system](#rumor-and-mission-system)). Implemented in
+  `functions/src/lib/missionsRequiredForRenseignement.js` ⇄ `src/lib/missionsRequiredForRenseignement.js`
+  (same mirrored-pure-function convention as `trainingCost.js`). Gated the same way as
   [Trainers](#trainers)' `trainerReachable`: a new `renseignementAvailable` predicate in
-  `actionConditions.js` (⇄ `src/lib/actionConditions.js`), injected implicitly by
-  `actionCatalog.js`'s `resolveConditions` rather than authored per action.
+  `actionConditions.js` ⇄ `src/lib/actionConditions.js`, injected implicitly by
+  `actionCatalog.js`'s `resolveConditions` whenever an action's `kindId` inherits from a new
+  `renseignement` kind (`RENSEIGNEMENT_ACTION_KIND_ID` in `actionKinds.js` ⇄
+  `src/lib/actionKinds.js`, nested under `intermede`, same "dedicated kind for a single action"
+  precedent as `commerce`) — not authored per action.
 - **Counter**: `character.missionsSinceRenseignement` (new field, same "nobody authors this row"
   convention as `character.intermedeActionsThisInterval`) increments by 1 whenever a mission
   resolves (`mission.js`'s `resolve()`), success or failure alike, and resets to 0 when "Se
-  renseigner" itself resolves — not merely when the condition first turns true, so leaving the
-  action unused past its threshold for several Intervals doesn't matter.
+  renseigner" itself resolves (`rumeur.js`'s `resolve()`) — not merely when the condition first
+  turns true, so leaving the action unused past its threshold for several Intervals doesn't matter.
 
 **Data model implications**:
 ```
@@ -2296,6 +2295,16 @@ characters/{id}
   missionsSinceRenseignement: number   -- NEW, increments by 1 on every mission resolution (success
                                          --   or failure), reset to 0 when "Se renseigner" itself
                                          --   resolves
+
+worldData/actionTypes/items/{id}
+  kindId: "renseignement"   -- NEW enum value, nested under "intermede"; the existing "Rumeur"
+                             --   content doc must be hand-edited in the Firestore console to this
+                             --   kindId (and its label to "Se renseigner") for the new cadence
+                             --   gate to actually apply - same "authored by hand" convention as
+                             --   every other worldData/actionTypes content change
 ```
 
-Not implemented yet.
+**Still open (deliberately deferred)**: the existing `worldData/actionTypes/items` "Rumeur"
+document itself is not migrated by this change — renaming its `label` to "Se renseigner" and
+setting its `kindId` to `renseignement` is a content edit for the creator to make by hand, same
+convention as every other action-type field authored directly in the Firestore console.

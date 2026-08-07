@@ -29,6 +29,7 @@ const ACTION_KINDS = [
   { value: "entrainement", label: "Entraînement", parentId: "intermede" },
   { value: "apprentissage", label: "Apprentissage", parentId: "entrainement" },
   { value: "commerce", label: "Commerce", parentId: "intermede" },
+  { value: "renseignement", label: "Renseignement", parentId: "intermede" },
 ];
 
 // The kind whose descendants are reserved to characters practising one of the action's
@@ -71,6 +72,14 @@ const PROFESSION_LEARNING_ACTION_KIND_ID = "apprentissage";
 // prerequisites (the still-undesigned messaging feature and player-announcement discoverable-hook
 // mechanism) are designed and built - see docs/TODO.md's "Still open" note.
 const INTERMEDE_BUDGET_ACTION_KIND_IDS = ["commerce"];
+
+// The kind whose descendants are gated by mission-count reachability instead of a rolled tier -
+// "Se renseigner" (docs/TODO.md "Se renseigner intermède action"). Same convention as
+// TRAINING_ACTION_KIND_ID: both the catalog (which injects the implicit renseignementAvailable
+// condition) and the "rumeur" handler (which resets the counter on resolve) ask the same
+// question. Only one action needs it today, but a dedicated kind is kept anyway, same precedent
+// as "commerce" above - the injection mechanism needs a kind to match on, not a handlerId.
+const RENSEIGNEMENT_ACTION_KIND_ID = "renseignement";
 
 function findActionKind(kindId) {
   return ACTION_KINDS.find((kind) => kind.value === kindId) || null;
@@ -128,6 +137,7 @@ module.exports = {
   TRAINING_ACTION_KIND_ID,
   PROFESSION_LEARNING_ACTION_KIND_ID,
   INTERMEDE_BUDGET_ACTION_KIND_IDS,
+  RENSEIGNEMENT_ACTION_KIND_ID,
   findActionKind,
   actionKindAncestry,
   actionKindInheritsFrom,

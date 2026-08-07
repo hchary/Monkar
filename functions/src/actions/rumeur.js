@@ -28,9 +28,14 @@
 // exist in the character's current region (seeded at a rumor's originRegionIds by
 // RumorsManager.jsx).
 //
-// Whether mission generation stays triggered by this "Rumeur" action, or moves to the still-unbuilt
-// "Se renseigner" action, is left to docs/TODO.md "Se renseigner intermède action" - not decided
-// here.
+// Renamed "Se renseigner" in-game (docs/TODO.md "Se renseigner intermède action") - the content
+// doc's label/kindId change by hand in the Firestore console, not this handler, which keeps the
+// "rumeur" handlerId for continuity. Repurposed: no longer always available - gated by the
+// implicit "renseignementAvailable" condition (functions/src/lib/actionConditions.js), injected
+// whenever the action's kindId inherits from RENSEIGNEMENT_ACTION_KIND_ID
+// (functions/src/lib/actionKinds.js). That gate reads character.missionsSinceRenseignement,
+// incremented on every mission resolution (functions/src/actions/mission.js) and reset to 0
+// below whenever this handler resolves.
 
 const { randomUUID } = require("crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
@@ -200,6 +205,8 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
       // A rolling offer, not a history - entirely replaced on every resolution (see the header
       // comment), unlike rumorJournal which only ever grows.
       missionJournal: newMissions,
+      // Resets "Se renseigner"'s own cadence gate - see the header comment.
+      missionsSinceRenseignement: 0,
       lastAction: {
         actionTypeId,
         date: today,
