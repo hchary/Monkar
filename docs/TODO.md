@@ -15,7 +15,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 1 | Retire narration (generator, catalogs, creator pages, poc) | done | — | [Narration removal](#narration-removal) |
 | 2 | Area and Monster contracts (Zod schemas, shared + functions) | done | — | [Area and Monster contracts](#area-and-monster-contracts) |
 | 3 | Monster creator page (CRUD, inheritance preview) | done | 2 | [Monster creator page](#monster-creator-page) |
-| 4 | Area creator page + `region.areaId` | todo | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
+| 4 | Area creator page + `region.areaId` | done | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
 | 5 | Content migration scripts (areas, monsters, reputation, triggers) | todo | 3, 4 | [Content migration scripts](#content-migration-scripts) |
 | 6 | Resolution engine rebuild (thresholds, bands, tier drop) | todo | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
 | 7 | `ActionResult` + `applyActionResult`, all eight handlers | todo | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
@@ -161,7 +161,21 @@ Two deliberate deviations from the paragraph above:
 
 Areas exist because mission generation matches monsters on an area *type*, and because the Métier rework wants a per-area harvest pool. **Reduced-scope fallback if the catalog proves not worth its own collection**: put `areaType` directly on `Region` and drop the `areas` collection. That costs the shared area tags and the per-area harvest pool, so the full version is the recommendation — but the fallback is a one-field change and nothing else in this roadmap is affected by it.
 
-Not implemented yet. (Rework plan §4.3.)
+Status: **implemented**, in the full version — the `areas` collection stands, the fallback was not
+taken. `src/components/creator/AreasManager.jsx` is the page: name, a `type` select over
+`AREA_TYPES`, and `tagIds` / `lootTableIds` multi-selects, seeded from `shared/schema/area.ts`'s
+`DEFAULTS` so the contract stays the single source of the field set. It sits in the `Carte` group as
+a `Zones` tab, right after `Régions`. `RegionsManager.jsx` gained a nullable `SoloSelectModalField`
+over the areas (tooltipped with each Area's type, cleared via `onClear`) writing `region.areaId`,
+and shows the chosen zone in the region list. Its `Climats` fieldset legend was `Climats (génération
+de missions)` and is now `Climats (affichage et origines)` — the schema had already demoted
+`climateIds` to display/origin matching, the label had not caught up.
+
+The area type select has no "aucun" option: `area.type` is required by the contract, unlike
+`monster.areaType`, whose empty option means "inherit from the parent". A `lootTableIds` selection is
+authored now but read by nothing until [Métier rework](#métier-rework).
+
+(Rework plan §4.3.)
 
 ## Content migration scripts
 

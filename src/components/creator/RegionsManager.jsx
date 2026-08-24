@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { collection, doc, deleteDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { matchesArea } from "./AreasManager";
+import { areaTypeLabel } from "../../../shared/lib/areaTypes";
+import SoloSelectModalField from "./SoloSelectModalField";
 
 const DIRECTIONS = [
   { value: "nord", label: "Nord" },
@@ -22,6 +25,7 @@ const emptyRegionForm = {
   nameSuggestions: "",
   description: "",
   neighbors: [],
+  areaId: null,
   climatId: "",
   climateIds: [],
   reliefIds: [],
@@ -248,6 +252,7 @@ export default function RegionsManager() {
   const [filterText, setFilterText] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
 
+  const areas = useItems("areas");
   const climats = useItems("climats");
   const reliefs = useItems("reliefs");
   const factions = useItems("factions");
@@ -269,6 +274,7 @@ export default function RegionsManager() {
       nameSuggestions: (region.nameSuggestions || []).join(", "),
       description: region.description || "",
       neighbors: region.neighbors || [],
+      areaId: region.areaId ?? null,
       climatId: region.climatId || "",
       climateIds: region.climateIds || [],
       reliefIds: region.reliefIds || [],
@@ -307,6 +313,7 @@ export default function RegionsManager() {
       nameSuggestions,
       description: form.description,
       neighbors: form.neighbors,
+      areaId: form.areaId || null,
       climatId: form.climatId,
       climateIds: form.climateIds,
       reliefIds: form.reliefIds,
@@ -337,7 +344,9 @@ export default function RegionsManager() {
         {filteredRegions.map((region) => (
           <li key={region.id}>
             <div>
-              <strong>{region.name}</strong> — noms suggérés : {(region.nameSuggestions || []).join(", ") || "aucun"}
+              <strong>{region.name}</strong> — zone :{" "}
+              {region.areaId ? areas.find((a) => a.id === region.areaId)?.name || region.areaId : "aucune"}
+              {" — "}noms suggérés : {(region.nameSuggestions || []).join(", ") || "aucun"}
               <button type="button" onClick={() => startEdit(region)}>
                 Modifier
               </button>
@@ -381,6 +390,19 @@ export default function RegionsManager() {
           onChange={(neighbors) => setForm({ ...form, neighbors })}
         />
 
+        <SoloSelectModalField
+          legend="Zone (génération de missions)"
+          options={areas}
+          selectedId={form.areaId}
+          onSelect={(id) => setForm({ ...form, areaId: id })}
+          onClear={() => setForm({ ...form, areaId: null })}
+          createLink={`/creator?section=${encodeURIComponent("Zones")}`}
+          matchesFilter={matchesArea}
+          getTooltip={(area) => areaTypeLabel(area.type)}
+          filterPlaceholder="Filtrer par nom ou type..."
+          buttonLabel="Choisir une zone"
+        />
+
         <fieldset>
           <legend>
             Climat
@@ -400,7 +422,7 @@ export default function RegionsManager() {
         </fieldset>
 
         <MultiSelectField
-          legend="Climats (génération de missions)"
+          legend="Climats (affichage et origines)"
           options={climats}
           selectedIds={form.climateIds}
           onToggle={(id) => toggleIn("climateIds", id)}

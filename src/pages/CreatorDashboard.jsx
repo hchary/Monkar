@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import RegionsManager from "../components/creator/RegionsManager";
+import AreasManager from "../components/creator/AreasManager";
 import ClimatsManager from "../components/creator/ClimatsManager";
 import ReliefsManager from "../components/creator/ReliefsManager";
 import FactionsManager from "../components/creator/FactionsManager";
@@ -25,6 +26,7 @@ const GROUPS = [
     name: "Carte",
     tabs: {
       Régions: RegionsManager,
+      Zones: AreasManager,
       Climat: ClimatsManager,
       Reliefs: ReliefsManager,
     },
