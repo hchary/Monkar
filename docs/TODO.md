@@ -18,7 +18,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 4 | Area creator page + `region.areaId` | done | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
 | 5 | Content migration scripts (areas, monsters, reputation, triggers) | done | 3, 4 | [Content migration scripts](#content-migration-scripts) |
 | 6 | Resolution engine rebuild (thresholds, bands, tier drop) | done | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
-| 7 | `ActionResult` + `applyActionResult`, all eight handlers | todo | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
+| 7 | `ActionResult` + `applyActionResult`, all eight handlers | done | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
 | 8 | Mission generation from the bestiary | todo | 5, 6 | [Mission generation from the bestiary](#mission-generation-from-the-bestiary) |
 | 9 | Monster-pool loot with difficulty rarity ceiling | todo | 8 | [Monster-pool loot](#monster-pool-loot) |
 | 10 | Per-region reputation (+ zero-sum invariant tests) | todo | 7 | [Per-region reputation](#per-region-reputation) |
@@ -328,7 +328,65 @@ The eight handlers (`mission`, `recherche`, `partirExplorer`, `recolte`, `artisa
 
 **Test**: every field applied exactly once, `injury` reaches `applyWound`, `reputationRegionId` respected.
 
-Not implemented yet. (Rework plan §4.5, §4.10.)
+Status: **implemented**. `functions/src/lib/actionResult.js` holds `createActionResult` (the eight
+fields above, each defaulting to "this action did not do that") and `applyActionResult`, with
+`actionResult.test.js` covering every field, the two ordering rules below, the content-gap skips and
+the fact that the applier never mutates the character it was handed.
+`functions/src/missionResolution.js` — the interim orchestration wrapper row 6 left standing — is
+deleted with its test; what it owned moved out: the reputation scale to the new
+`functions/src/lib/reputation.js` (still INTERIM, still the 1→300 table, still waiting on
+[Per-region reputation](#per-region-reputation)), the talent roll into
+`rollTalentEvolutionIds`, the loot draw straight into the two handlers, and `applyWound` into the
+applier. `drawQuestLoot` and `resolveQuestOutcome` are gone with it; `missionLoot.js`'s
+`drawMissionLoot` is now the only loot draw.
+
+Decisions this pass settled, beyond what the entry above had already fixed:
+
+- **`talentEvolution.js` splits selection from application.** `rollTalentEvolutions` (which both
+  rolled *and* applied) becomes `rollTalentEvolutionIds({ characterTalents, catalogTalents, tagIds,
+  objectiveRarity, difficulty }) → { trainedIds, gainedIds }`, feeding the result's `talentTrained`
+  / `talentsGained` straight through. `evolutionChance` and `bumpTalentQuality` are untouched — the
+  chance curve is [Talent training roll and monster talent reward](#talent-training-roll-and-monster-talent-reward)'s
+  to rewrite, not this row's.
+- **The applier's output is a patch, not a form.** Only fields the result actually moved appear, so
+  an action that gained nothing returns `{}` and a failed mission carries no `reputationGained: 0`.
+  `updates.lastAction` holds the player-visible half of the same effects and the handler spreads it
+  into its own `lastAction`.
+- **Region is applied before reputation**, so a move that also pays credits the destination, on top
+  of the seed-at-1 an unvisited region gets. A gain with no region to land in is dropped rather than
+  written under an empty key.
+- **Two options the pure applier cannot derive** join `today`/`circumstance` in the options bag:
+  `talentCatalog` (a `talentsGained` id has to be resolved against something) and `regionName`
+  (`character.region` stores `{ id, name }`).
+- **Three handlers build no `ActionResult` at all** — `apprentissage.js`, `recherche.js`,
+  `faireDuCommerce.js`. Their whole effect set is a profession grant, the mission journal, and gold
+  plus the Intermède counter; the eight-field vocabulary names none of those, so routing them
+  through the applier would add a call that applies nothing. Each says so in its header. The other
+  five (`mission`, `partirExplorer`, `recolte`, `artisanat`, `sEntrainer`) do go through it.
+- **`artisanat`'s produced items moved onto the shared `lastAction.loot` channel** rather than
+  keeping their own `craftResults` list, and its consumed ingredients ride `itemsLost` (recorded,
+  not deleted — the deletion stays in the handler's transaction, which is where the
+  reads-before-writes ordering lives). `commit()` and `CraftResult.jsx` read `craftResults` as a
+  fallback so a craft still running at deploy time still materializes.
+- **`partirExplorer` draws monsters now.** `region.areaId` → `worldData/areas/items` → `area.type`,
+  matched against each monster's *resolved* areaType, which needed the server copy of the
+  inheritance walk: `functions/src/lib/monsters.js` (+ test), mirroring the client twin
+  `src/lib/monsters.js`, landed here rather than with
+  [Mission generation from the bestiary](#mission-generation-from-the-bestiary), which is its second
+  consumer. Each round applies its own `ActionResult` to the character the previous round left
+  behind, so a mid-run talent gain genuinely raises the next roll. The location is still drawn, for
+  flavour only. Per-round difficulty still comes from `actionType.questDifficultyWeights`, now
+  defaulting to the engine's own `DIFFICULTY_WEIGHTS` (25/45/20/6/3/1) instead of the retired
+  quest-era table. An area no monster covers resolves zero rounds — a content gap, not a failure.
+
+Left standing for later rows, deliberately: `mission.js` still reads `mission.tagIds` /
+`mission.subjectId` and writes `triggeredSubjectIds` (rows 8 and 12 re-key that off the monster);
+loot still comes from tag-matched loot tables rather than the monster's `lootItemIds`
+([Monster-pool loot](#monster-pool-loot)); and nothing sets `newRegionId` until
+[Travel action (Voyager)](#travel-action-voyager) — the field and its seeding rule are built and
+tested, just unused.
+
+(Rework plan §4.5, §4.10.)
 
 ## Mission generation from the bestiary
 
@@ -404,7 +462,7 @@ Not implemented yet. (Rework plan §4.6.)
 
 ## Talent training roll and monster talent reward
 
-`functions/src/lib/talentEvolution.js` is rewritten. `evolutionChance` and `rollTalentEvolutions` are deleted — the rarity-curve unlock goes with them. `bumpTalentQuality` is **kept unchanged**: it already caps quality at 5 and re-applies `rarityFloor`, so talent rarity keeps rising with quality and the pop-up's rarity sort and `rarity-*` CSS classes keep working. `sEntrainer.js` already calls it and is unaffected.
+`functions/src/lib/talentEvolution.js` is rewritten. `evolutionChance` and `rollTalentEvolutionIds` (named `rollTalentEvolutions` when this was written, split into selection-only by [ActionResult and the single applier](#actionresult-and-the-single-applier)) are deleted — the rarity-curve unlock goes with them. `bumpTalentQuality` is **kept unchanged**: it already caps quality at 5 and re-applies `rarityFloor`, so talent rarity keeps rising with quality and the pop-up's rarity sort and `rarity-*` CSS classes keep working. `sEntrainer.js` reaches it through the applier and is unaffected.
 
 Talent acquisition splits into two paths by role, replacing the three competing designs the analysis found:
 
@@ -478,7 +536,7 @@ Non-mission actions keep the bare `Succès` / `Échec`. `ActionOutcome.jsx` drop
 
 - reputation rendered **signed** (`+2` / `−3`), since failure now moves it — the current `reputationGained > 0` guard hides every loss;
 - the region the reputation landed in, now that it is per-region;
-- `Talent entraîné` alongside the existing `Amélioration de talent` list, since training and granting are now two distinct effects (the old `rollTalentEvolutions` returned both through one list).
+- `Talent entraîné` alongside the existing `Amélioration de talent` list, since training and granting are now two distinct effects (the old `rollTalentEvolutions` returned both through one list; the applier still merges them into `lastAction.talentEvolutions`, tagged `kind`).
 
 Other front-end follow-ups in the same pass: `MissionPicker.jsx` reads `targetMonsterId` (the difficulty accent is unchanged), `CharacterBanner.jsx` / `CharacterTabs.jsx` show per-region reputation, and `src/lib/actionConditions.js`'s `minReputation` twin stays in step with the server copy.
 

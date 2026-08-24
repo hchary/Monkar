@@ -34,7 +34,14 @@ function baseContext(overrides = {}) {
 }
 
 function baseCharacter(overrides = {}) {
-  return { talents: [], missionJournal: [MISSION], ...overrides };
+  // A region is required for reputation to land anywhere: the applier credits a named region, and
+  // drops a gain it has nowhere to put rather than writing it under an empty key.
+  return {
+    talents: [],
+    missionJournal: [MISSION],
+    region: { id: "region1", name: "Vaubourg" },
+    ...overrides,
+  };
 }
 
 describe("mission resolve()", () => {
@@ -70,8 +77,16 @@ describe("mission resolve()", () => {
     assert.equal(typeof updates.lastAction.score, "number");
     assert.equal(typeof updates.lastAction.threshold, "number");
     assert.equal(typeof updates.lastAction.success, "boolean");
-    assert.equal(typeof updates.lastAction.reputationGained, "number");
-    if (!updates.lastAction.success) assert.equal(updates.lastAction.reputationGained, 0);
+    // The applier only writes an effect that happened, so a failed mission carries no reputation
+    // key at all rather than a zero (docs/TODO.md "ActionResult and the single applier").
+    if (updates.lastAction.success) {
+      assert.ok(updates.lastAction.reputationGained > 0);
+      assert.equal(updates.lastAction.reputationRegionId, "region1");
+      assert.equal(updates.reputations.region1, updates.lastAction.reputationGained);
+    } else {
+      assert.equal("reputationGained" in updates.lastAction, false);
+      assert.equal(updates.reputations, undefined);
+    }
   });
 
   test("guarantees success when the character's relevant talents raise the roll past the threshold", async () => {

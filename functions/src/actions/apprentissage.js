@@ -24,6 +24,10 @@
 // as sEntrainer.js's talent catalog check. Player-mutable state (whether the character still has
 // no profession) is re-read fresh in resolve() from the transactionally re-read character, never
 // trusted from prepare()'s pre-transaction snapshot.
+//
+// No ActionResult here (docs/TODO.md "ActionResult and the single applier"): granting a profession
+// is handler-specific state, and the applier's eight-field vocabulary has no word for it. Building
+// an empty result to route around would add a call and apply nothing.
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");

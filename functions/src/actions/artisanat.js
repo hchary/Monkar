@@ -12,15 +12,21 @@
 //
 // Ingredients are consumed immediately in resolve() - the same transaction that starts the action,
 // so they leave the character's inventory the moment "Commencer" is clicked - while the produced
-// results are frozen onto lastAction.craftResults and only turned into instances in commit(), once
-// the player acknowledges the result pop-up. That split (consume at resolve, produce at commit) is
-// the one difference from the crafting mechanic's original single-shot sketch
-// (functions/src/lib/crafting.js's hasIngredients/craftResults, still reused here for the actual
-// check and the flattening of results into one entry per unit).
+// results ride the ActionResult's `itemsGained` channel onto lastAction.loot and only turn into
+// instances in commit(), once the player acknowledges the result pop-up. That split (consume at
+// resolve, produce at commit) is the one difference from the crafting mechanic's original
+// single-shot sketch (functions/src/lib/crafting.js's hasIngredients/craftResults, still reused
+// here for the actual check and the flattening of results into one entry per unit).
+//
+// The consumed ingredients ride the `itemsLost` channel, which records them on the result rather
+// than deleting anything: the deletion has to stay in this transaction, where the
+// reads-before-writes ordering the instance query needs is available (docs/TODO.md "ActionResult
+// and the single applier").
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
 const { hasIngredients, craftResults } = require("../lib/crafting");
+const { createActionResult, applyActionResult } = require("../lib/actionResult");
 
 async function prepare({ db, character, actionType, payload }) {
   const recetteId = payload?.recetteId;
@@ -47,7 +53,7 @@ async function prepare({ db, character, actionType, payload }) {
   return { recette, objects };
 }
 
-async function resolve({ tx, db, characterRef, actionTypeId, today, context }) {
+async function resolve({ tx, db, character, characterRef, actionTypeId, today, context }) {
   const { recette, objects } = context;
   const ingredients = recette.ingredients || [];
 
@@ -85,10 +91,21 @@ async function resolve({ tx, db, characterRef, actionTypeId, today, context }) {
     };
   });
 
+  const { updates: effects } = applyActionResult(
+    character,
+    createActionResult({
+      itemsGained: results,
+      itemsLost: ingredients.flatMap((ingredient) => Array(ingredient.qty).fill(ingredient.objectId)),
+    }),
+    { today, circumstance: `en fabriquant ${recette.name}` }
+  );
+  const { lastAction: effectSummary = {}, ...stateUpdates } = effects;
+
   return {
     updates: {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
+      ...stateUpdates,
       lastAction: {
         actionTypeId,
         date: today,
@@ -96,7 +113,7 @@ async function resolve({ tx, db, characterRef, actionTypeId, today, context }) {
         narrativeText: "Vous reposez vos outils et contemplez votre oeuvre.",
         recetteId: recette.id,
         recetteName: recette.name,
-        craftResults: results,
+        ...effectSummary,
       },
     },
     logFields: {
@@ -109,10 +126,13 @@ async function resolve({ tx, db, characterRef, actionTypeId, today, context }) {
 }
 
 // Runs when the player closes the result pop-up ("Terminer" - see acknowledgeAction in
-// functions/src/index.js) - turns the results frozen onto lastAction.craftResults during resolve()
-// into Instance documents the character actually owns, identical in shape to recolte.js's commit().
+// functions/src/index.js) - turns the results frozen onto lastAction.loot during resolve() into
+// Instance documents the character actually owns, identical in shape to recolte.js's commit().
 async function commit({ tx, db, characterRef, lastAction, uid, today }) {
-  for (const item of lastAction.craftResults || []) {
+  // `craftResults` is the pre-ActionResult name of this list, kept as a read-time fallback so a
+  // craft still running when that change deployed still materializes - same treatment
+  // actionLifecycle.js gives the retired `lootClaimed` flag. Nothing writes it any more.
+  for (const item of lastAction.loot || lastAction.craftResults || []) {
     const instanceRef = db.collection("instances").doc();
     tx.set(instanceRef, {
       objectId: item.objectId,

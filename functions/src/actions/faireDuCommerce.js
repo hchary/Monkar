@@ -20,6 +20,11 @@
 // creator content - same asymmetry as sEntrainer.js's talent catalog check. The instance itself is
 // player-mutable state (it could be sold twice in a race, or already gone), so its ownership is
 // re-checked fresh in resolve() via a transactional read right before it's deleted.
+//
+// No ActionResult here (docs/TODO.md "ActionResult and the single applier"): the sale moves gold
+// and the Intermède counter, neither of which the effect vocabulary names, and the sold instance is
+// deleted transactionally rather than recorded - an Intermède action writes no lastAction for the
+// applier's summary to land on in the first place.
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { salePrice } = require("../lib/salePrice");

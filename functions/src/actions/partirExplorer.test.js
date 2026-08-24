@@ -3,22 +3,27 @@ const assert = require("node:assert/strict");
 const { resolve } = require("./partirExplorer");
 const { LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 
-const LOCATION = { id: "loc1", name: "Forêt sombre", tagIds: ["tag-x"] };
+const LOCATION = { id: "loc1", name: "Forêt sombre", tagIds: ["tag-flavour"] };
 
-// difficultyToRarity("facile") -> "commun" (docs/TODO.md "Mission loot and rarity mapping") - the
-// same positional mapping missions use, now shared by exploration's own synthetic per-round
-// objective (docs/TODO.md "Retiring quests and quest objectives for the subject-action system").
+// Rounds are drawn against the bestiary now (docs/TODO.md "ActionResult and the single applier"),
+// so the tags that drive talent matching and loot come from the monster, not from the location -
+// which is why the location above carries a tag nothing matches.
+const MONSTERS = [{ id: "mon1", name: "loup des cendres", difficulty: "facile", tagIds: ["tag-x"], lootItemIds: [] }];
+
+// difficultyToRarity("facile") -> "commun" (docs/TODO.md "Mission loot and rarity mapping").
 const LOOT_TABLES = [{ id: "table1", rarity: "commun", tagIds: ["tag-x"], itemIds: ["obj-sword"] }];
 const OBJECTS = [{ id: "obj-sword", name: "Épée", rarity: "commun", type: "arme", tagIds: [] }];
 
 // A single-entry weight table forces the difficulty draw deterministically, regardless of
-// Math.random - the score roll inside resolveQuestOutcome is what the per-test Math.random
-// override then controls.
+// Math.random - the d100 roll inside resolveMission is what the per-test Math.random override then
+// controls.
 const FACILE_ONLY_WEIGHTS = [{ difficulty: "facile", weight: 100 }];
 
 function baseContext(overrides = {}) {
   return {
     location: LOCATION,
+    areaType: "grotte",
+    candidateMonsters: MONSTERS,
     lootTables: LOOT_TABLES,
     objects: OBJECTS,
     talents: [],
@@ -44,7 +49,7 @@ function baseActionType(overrides = {}) {
 }
 
 describe("partirExplorer resolve()", () => {
-  test("resolves encounterCount rounds, one full resolveQuestOutcome roll each", async () => {
+  test("resolves encounterCount rounds, one monster encounter each", async () => {
     const { updates } = await resolve({
       character: baseCharacter(),
       actionType: baseActionType(),
@@ -56,6 +61,8 @@ describe("partirExplorer resolve()", () => {
     assert.equal(updates.lastAction.rounds.length, 3);
     for (const round of updates.lastAction.rounds) {
       assert.equal(round.difficulty, "facile");
+      assert.equal(round.monsterId, "mon1");
+      assert.equal(round.monsterName, "loup des cendres");
       assert.equal(typeof round.score, "number");
       assert.equal(typeof round.threshold, "number");
       assert.equal(typeof round.success, "boolean");
@@ -67,7 +74,7 @@ describe("partirExplorer resolve()", () => {
   test("sums reputation and flattens loot/talentEvolutions across every round on forced successes", async () => {
     const originalRandom = Math.random;
     try {
-      // Score 100 always clears "facile"'s threshold of 30 - every round succeeds and grants
+      // A roll of 99 always clears "facile"'s threshold of 10 - every round succeeds and grants
       // reputation and loot deterministically.
       Math.random = () => 0.999;
 
@@ -85,6 +92,9 @@ describe("partirExplorer resolve()", () => {
         updates.lastAction.rounds.reduce((sum, r) => sum + r.reputationGained, 0)
       );
       assert.ok(updates.lastAction.totalReputationGained > 0);
+      // Credited to the region the character stands in, and kept in step with the legacy scalar
+      // until docs/TODO.md "Per-region reputation" retires it.
+      assert.equal(updates.reputations.region1, updates.lastAction.totalReputationGained);
       assert.equal(updates.reputation, updates.lastAction.totalReputationGained);
       // "facile" draws 1 loot item per LOOT_COUNT_BY_DIFFICULTY, three rounds -> 3 items.
       assert.equal(LOOT_COUNT_BY_DIFFICULTY.facile, 1);
@@ -97,11 +107,11 @@ describe("partirExplorer resolve()", () => {
   test("stops the round loop early once a wound kills the character, recording fewer rounds", async () => {
     const originalRandom = Math.random;
     try {
-      // Score 1 always lands exactly on "facile"'s floored permanent-wound threshold (1) - every
-      // resolved round inflicts a permanent wound. Starting at 2 permanent wounds, the first round
-      // pushes to 3 (not dead yet - the death check reads the count *before* this wound), and the
-      // second round's death check then reads 3 and kills the character, stopping the loop with
-      // only 2 of the 5 requested rounds recorded.
+      // A roll of 0 lands exactly on "facile"'s permanent-wound threshold (0), which wounds because
+      // the band compares with <= - every resolved round inflicts a permanent wound. Starting at 2
+      // permanent wounds, the first round pushes to 3 (not dead yet - the death check reads the
+      // count *before* this wound), and the second round's death check then reads 3 and kills the
+      // character, stopping the loop with only 2 of the 5 requested rounds recorded.
       Math.random = () => 0;
 
       const { updates } = await resolve({
@@ -121,7 +131,23 @@ describe("partirExplorer resolve()", () => {
     }
   });
 
-  test("synthesizes an untagged objective and a null location when none was drawn", async () => {
+  test("resolves zero rounds when no monster covers the region's area", async () => {
+    const { updates } = await resolve({
+      character: baseCharacter(),
+      actionType: baseActionType(),
+      actionTypeId: "partir-explorer-action",
+      today: "2026-08-06",
+      context: baseContext({ areaType: null, candidateMonsters: [] }),
+    });
+
+    // A content gap, not an error: the action still resolves, it just met nothing.
+    assert.deepEqual(updates.lastAction.rounds, []);
+    assert.equal(updates.lastAction.success, false);
+    assert.equal(updates.fatigue, 0);
+    assert.deepEqual(updates.lastAction.loot, []);
+  });
+
+  test("records a null location when none was drawn, and still fights", async () => {
     const { updates } = await resolve({
       character: baseCharacter(),
       actionType: baseActionType({ encounterCount: 1 }),
@@ -132,7 +158,5 @@ describe("partirExplorer resolve()", () => {
 
     assert.equal(updates.lastAction.location, null);
     assert.equal(updates.lastAction.rounds.length, 1);
-    // No location tags to draw loot against - a content gap, not an error.
-    assert.deepEqual(updates.lastAction.loot, []);
   });
 });

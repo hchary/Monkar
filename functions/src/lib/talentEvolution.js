@@ -14,9 +14,10 @@ function evolutionChance({ difficulty, talentRarity }) {
 }
 
 // Applies a single quality-up step: +1 capped at 5, with rarityFloor re-applied so rarity only
-// ever rises alongside it, never drops. Shared by the quest-luck path (rollTalentEvolutions below)
-// and the training-driven path (functions/src/actions/sEntrainer.js) - see docs/TODO.md
-// "Trainers"'s note that s'entraîner reuses this exact mechanism rather than a second RNG system.
+// ever rises alongside it, never drops. Called from one place now - functions/src/lib/actionResult.js's
+// applier, for both the resolution-luck path (rollTalentEvolutionIds below) and the trainer path
+// (functions/src/actions/sEntrainer.js) - see docs/TODO.md "Trainers"'s note that s'entraîner reuses
+// this exact mechanism rather than a second RNG system.
 function bumpTalentQuality(talent, { today, circumstance }) {
   const quality = Math.min(5, (talent.quality || 1) + 1);
   return {
@@ -28,60 +29,44 @@ function bumpTalentQuality(talent, { today, circumstance }) {
   };
 }
 
-// On a successful quest, for every talent sharing a tag with the quest or its (randomly chosen)
-// objective, rolls a chance to bump it (already-owned talents, rank <= objective's rarity) or to
-// unlock it (catalog talents the character doesn't have yet, rank strictly below the objective's
-// rarity). Returns the character's talents array with any changes applied (the same reference if
-// nothing changed) plus the list of changes to show in the end-of-quest popup.
-function rollTalentEvolutions({ characterTalents, catalogTalents, quest, objective, difficulty, today, circumstance }) {
-  if (!objective) return { talents: characterTalents, evolutions: [] };
+// Which talents a successful resolution moves - selection only, no application: the bump and the
+// grant are `functions/src/lib/actionResult.js`'s applier's job now, so an effect is written in one
+// place (docs/TODO.md "ActionResult and the single applier"). For every owned talent sharing a tag
+// with the resolution and ranking at or below `objectiveRarity`, rolls a chance to train it; for
+// every catalog talent the character does not own, sharing a tag and ranking strictly below that
+// rarity, rolls the same chance to grant it.
+//
+// `tagIds` is the resolution's single tag list - a monster's resolved tags once docs/TODO.md
+// "Mission generation from the bestiary" lands, and until then the mission's or location's own.
+function rollTalentEvolutionIds({ characterTalents, catalogTalents, tagIds, objectiveRarity, difficulty }) {
+  const objectiveRankIndex = RARITY_ORDER.indexOf(objectiveRarity);
+  if (objectiveRankIndex < 0) return { trainedIds: [], gainedIds: [] };
 
-  const objectiveRankIndex = RARITY_ORDER.indexOf(objective.rarity);
-  if (objectiveRankIndex < 0) return { talents: characterTalents, evolutions: [] };
+  const relevantTagIds = new Set(tagIds || []);
+  const sharesTag = (ids) => (ids || []).some((id) => relevantTagIds.has(id));
 
-  const relevantTagIds = new Set([...(quest.tagIds || []), ...(objective.tagIds || [])]);
-  const sharesTag = (tagIds) => (tagIds || []).some((id) => relevantTagIds.has(id));
+  const trainedIds = [];
+  const gainedIds = [];
 
-  const evolutions = [];
-  let changed = false;
-
-  const nextTalents = characterTalents.map((talent) => {
-    if (!sharesTag(talent.tagIds)) return talent;
+  for (const talent of characterTalents || []) {
+    if (!sharesTag(talent.tagIds)) continue;
     const rankIndex = RARITY_ORDER.indexOf(talent.rarity);
-    if (rankIndex < 0 || rankIndex > objectiveRankIndex) return talent;
-    if (Math.random() >= evolutionChance({ difficulty, talentRarity: talent.rarity })) return talent;
+    if (rankIndex < 0 || rankIndex > objectiveRankIndex) continue;
+    if (Math.random() >= evolutionChance({ difficulty, talentRarity: talent.rarity })) continue;
+    trainedIds.push(talent.id);
+  }
 
-    changed = true;
-    const evolved = bumpTalentQuality(talent, { today, circumstance });
-    evolutions.push({ talentId: evolved.id, name: evolved.name, kind: "evolution", quality: evolved.quality, rarity: evolved.rarity });
-    return evolved;
-  });
-
-  const ownedIds = new Set(characterTalents.map((t) => t.id));
-  for (const talent of catalogTalents) {
+  const ownedIds = new Set((characterTalents || []).map((t) => t.id));
+  for (const talent of catalogTalents || []) {
     if (ownedIds.has(talent.id)) continue;
     if (!sharesTag(talent.tagIds)) continue;
     const rankIndex = RARITY_ORDER.indexOf(talent.rarity);
     if (rankIndex < 0 || rankIndex >= objectiveRankIndex) continue;
     if (Math.random() >= evolutionChance({ difficulty, talentRarity: talent.rarity })) continue;
-
-    changed = true;
-    const granted = {
-      id: talent.id,
-      name: talent.name,
-      quality: 1,
-      trainable: !!talent.trainable,
-      rarity: rarityFloor(talent.rarity, 1),
-      effect: talent.effect || "",
-      tagIds: talent.tagIds || [],
-      lastChangeDate: today,
-      lastChangeCircumstance: circumstance,
-    };
-    nextTalents.push(granted);
-    evolutions.push({ talentId: granted.id, name: granted.name, kind: "unlock", quality: granted.quality, rarity: granted.rarity });
+    gainedIds.push(talent.id);
   }
 
-  return { talents: changed ? nextTalents : characterTalents, evolutions };
+  return { trainedIds, gainedIds };
 }
 
-module.exports = { evolutionChance, bumpTalentQuality, rollTalentEvolutions };
+module.exports = { evolutionChance, bumpTalentQuality, rollTalentEvolutionIds };
