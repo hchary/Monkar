@@ -15,7 +15,9 @@ import { ActionAvailabilityConditionSchema } from "./actionType";
 // Monsters inherit prototypally through `parentId` ("dragon ancien" is a child of "dragon").
 // Inheritance is resolved at READ time, in the Cloud Function (functions/src/lib/monsters.js's
 // resolveMonster), with a cycle guard and a depth cap of 8 - never flattened at write time, which
-// would force the creator to re-flatten every descendant on each parent edit. Per-field rules are
+// would force the creator to re-flatten every descendant on each parent edit. The creator page has
+// its own copy of that resolution (src/lib/monsters.js) feeding its read-only "hérité du parent"
+// panel; it landed first, the Cloud Function's copy arrives with mission generation. Per-field rules are
 // on each field below: array fields concatenate down the chain, scalars take the first non-null.
 
 export const MonsterDocumentSchema = z.object({

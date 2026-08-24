@@ -7,6 +7,9 @@ export default function SoloSelectModalField({
   options,
   selectedId,
   onSelect,
+  // Optional: a nullable field passes this to get a "Retirer" control, since a radio list alone
+  // can never go back to "nothing selected" (MonstersManager's parentId / talentRewardId).
+  onClear,
   createLink,
   getTooltip,
   filterPlaceholder = "Filtrer...",
@@ -79,6 +82,17 @@ export default function SoloSelectModalField({
             ))}
           </ul>
           <div className="modal-select-actions">
+            {onClear && selectedOption && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClear();
+                  dialogRef.current?.close();
+                }}
+              >
+                Retirer
+              </button>
+            )}
             {createLink && (
               <Link to={createLink} target="_blank" rel="noopener noreferrer">
                 Créer un nouvel élément
