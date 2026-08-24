@@ -55,7 +55,9 @@ async function prepare({ db, actionType }) {
 // Turns a table draw's raw object ids into the same loot-entry shape missionLoot.js's
 // drawMissionLoot produces, so the ActionResult's `itemsGained` channel carries harvest and
 // mission loot identically and neither ActionOutcome.jsx's "Butin obtenu" box nor the commit-time
-// Instance write needs a récolte-specific branch. Repeated ids from the same draw simply produce
+// Instance write needs a récolte-specific branch. `tableId`/`tableName` are the one difference:
+// harvest still comes from a table, mission loot comes from a monster (docs/TODO.md "Monster-pool
+// loot") and carries neither - nothing renders them either way. Repeated ids from the same draw simply produce
 // several entries, one per harvested unit - each becomes its own Instance on commit, exactly like
 // distinct mission loot.
 function toLootEntries({ objectIds, objects, table }) {

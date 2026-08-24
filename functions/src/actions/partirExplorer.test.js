@@ -1,17 +1,18 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const { resolve } = require("./partirExplorer");
-const { LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 
 const LOCATION = { id: "loc1", name: "Forêt sombre", tagIds: ["tag-flavour"] };
 
 // Rounds are drawn against the bestiary now (docs/TODO.md "ActionResult and the single applier"),
 // so the tags that drive talent matching and loot come from the monster, not from the location -
 // which is why the location above carries a tag nothing matches.
-const MONSTERS = [{ id: "mon1", name: "loup des cendres", difficulty: "facile", tagIds: ["tag-x"], lootItemIds: [] }];
+// Loot comes from the monster's own resolved pool too (docs/TODO.md "Monster-pool loot"), so the
+// fixture below carries its drop rather than relying on a loot table matched by rarity and tag.
+const MONSTERS = [
+  { id: "mon1", name: "loup des cendres", difficulty: "facile", tagIds: ["tag-x"], lootItemIds: ["obj-sword"] },
+];
 
-// difficultyToRarity("facile") -> "commun" (docs/TODO.md "Mission loot and rarity mapping").
-const LOOT_TABLES = [{ id: "table1", rarity: "commun", tagIds: ["tag-x"], itemIds: ["obj-sword"] }];
 const OBJECTS = [{ id: "obj-sword", name: "Épée", rarity: "commun", type: "arme", tagIds: [] }];
 
 // A single-entry weight table forces the difficulty draw deterministically, regardless of
@@ -24,7 +25,6 @@ function baseContext(overrides = {}) {
     location: LOCATION,
     areaType: "grotte",
     candidateMonsters: MONSTERS,
-    lootTables: LOOT_TABLES,
     objects: OBJECTS,
     talents: [],
     ...overrides,
@@ -96,9 +96,9 @@ describe("partirExplorer resolve()", () => {
       // until docs/TODO.md "Per-region reputation" retires it.
       assert.equal(updates.reputations.region1, updates.lastAction.totalReputationGained);
       assert.equal(updates.reputation, updates.lastAction.totalReputationGained);
-      // "facile" draws 1 loot item per LOOT_COUNT_BY_DIFFICULTY, three rounds -> 3 items.
-      assert.equal(LOOT_COUNT_BY_DIFFICULTY.facile, 1);
-      assert.equal(updates.lastAction.loot.length, 3);
+      // A successful round draws 3 items from its monster's pool, three rounds -> 9 items.
+      assert.equal(updates.lastAction.loot.length, 9);
+      for (const item of updates.lastAction.loot) assert.equal(item.objectId, "obj-sword");
     } finally {
       Math.random = originalRandom;
     }

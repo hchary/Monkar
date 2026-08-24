@@ -2,11 +2,11 @@ const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const { FieldValue } = require("firebase-admin/firestore");
 const { resolve } = require("./mission");
-const { LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 
-// difficultyToRarity("difficile") -> "rare" (docs/TODO.md "Mission loot and rarity mapping"), so
-// the loot table below must match "rare" (not the objective's own rarity, since a mission has no
-// objective any more - it reads its rarity from its own difficulty).
+// Loot comes from the target monster's own resolved pool now (docs/TODO.md "Monster-pool loot"),
+// so the fixture below is a monster carrying one drop rather than a loot table matched by rarity
+// and tag. prepare() is what walks the parent chain, so the context here holds an already-resolved
+// monster.
 const MISSION = {
   id: "mission1",
   targetMonsterId: "mon-dragon",
@@ -18,14 +18,23 @@ const MISSION = {
   generatedAt: "2026-08-01",
 };
 
-const LOOT_TABLES = [{ id: "table1", rarity: "rare", tagIds: ["tag-x"], itemIds: ["obj-sword"] }];
+const TARGET_MONSTER = {
+  id: "mon-dragon",
+  name: "dragon",
+  difficulty: "difficile",
+  areaType: "montagne",
+  tagIds: ["tag-x"],
+  lootItemIds: ["obj-sword"],
+  talentRewardId: null,
+  trigger: null,
+};
 const OBJECTS = [{ id: "obj-sword", name: "Épée", rarity: "rare", type: "arme", tagIds: [] }];
 
 function baseContext(overrides = {}) {
   return {
     mission: MISSION,
     locationName: null,
-    lootTables: LOOT_TABLES,
+    targetMonster: TARGET_MONSTER,
     objects: OBJECTS,
     talents: [],
     ...overrides,
@@ -44,15 +53,10 @@ function baseCharacter(overrides = {}) {
 }
 
 describe("mission resolve()", () => {
-  test("draws loot at the mission's own full difficulty, without the removed reward discount", async () => {
-    // "difficile" draws 2 items per LOOT_COUNT_BY_DIFFICULTY - no longer scaled down to "moyen"'s 1
-    // the way the retired rewardDifficulty discount used to (docs/TODO.md "Mission and quest
-    // resolution algorithm": "a balance mistake... removed"). The single fixture loot table
-    // matches "rare" (difficile's rarity equivalence), so both a success (exact match) and a
-    // failure (floored at "commun" after the two-rank degrade would miss it) - see the next test
-    // for the failure case - this one only asserts the success-path count.
-    assert.equal(LOOT_COUNT_BY_DIFFICULTY.difficile, 2);
-
+  test("draws loot from the target monster's pool, three items on a success and one on a failure", async () => {
+    // The count follows the outcome, not the difficulty (docs/TODO.md "Monster-pool loot"), and
+    // both counts draw the same undegraded pool - the fixture's rare sword is exactly at
+    // "difficile"'s ceiling, so it is drawable either way.
     const { updates } = await resolve({
       character: baseCharacter(),
       actionTypeId: "mission-action",
@@ -62,7 +66,22 @@ describe("mission resolve()", () => {
 
     assert.equal(updates.lastAction.mission.difficulty, "difficile");
     assert.equal(updates.lastAction.mission.name, "Chasse dragon");
-    if (updates.lastAction.success) assert.equal(updates.lastAction.loot.length, 2);
+    assert.equal(updates.lastAction.loot.length, updates.lastAction.success ? 3 : 1);
+    for (const item of updates.lastAction.loot) assert.equal(item.objectId, "obj-sword");
+  });
+
+  test("pays no loot when the journal entry names a monster the bestiary no longer holds", async () => {
+    const { updates } = await resolve({
+      character: baseCharacter(),
+      actionTypeId: "mission-action",
+      today: "2026-08-05",
+      context: baseContext({ targetMonster: null }),
+    });
+
+    // A content gap costs the reward, not the resolution: the mission still succeeds or fails
+    // normally, it just brings nothing back.
+    assert.equal(typeof updates.lastAction.success, "boolean");
+    assert.equal("loot" in updates.lastAction, false);
   });
 
   test("surfaces the score-roll outcome fields on lastAction", async () => {
@@ -110,7 +129,7 @@ describe("mission resolve()", () => {
 
     assert.equal(updates.lastAction.success, true);
     assert.ok(updates.lastAction.reputationGained > 0);
-    assert.equal(updates.lastAction.loot.length, 2);
+    assert.equal(updates.lastAction.loot.length, 3);
   });
 
   test("removes only the resolved mission from missionJournal, keeping any others untouched", async () => {

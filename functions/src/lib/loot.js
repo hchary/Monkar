@@ -27,14 +27,8 @@ function drawLootTableItemId(table) {
   return pickRandom(itemIds);
 }
 
-// A quest's difficulty (not the objective's rarity) sets how many loot items are rolled.
-const LOOT_COUNT_BY_DIFFICULTY = {
-  facile: 1,
-  moyen: 1,
-  difficile: 2,
-  tres_difficile: 2,
-  epique: 3,
-  mythique: 3,
-};
+// LOOT_COUNT_BY_DIFFICULTY lived here until docs/TODO.md "Monster-pool loot": a mission's loot
+// count now follows its outcome (3 on a success, 1 on a failure, see missionLoot.js) rather than
+// its difficulty, and harvest sizes its own draw from the character's mastery instead.
 
-module.exports = { pickRandom, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY };
+module.exports = { pickRandom, drawLootTableItemId };

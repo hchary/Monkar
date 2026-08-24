@@ -7,13 +7,15 @@ import { z } from "zod";
 // requires).
 
 export const LootTableDocumentSchema = z.object({
-  name: z.string().describe("Table display name. Snapshotted as `tableName` on each loot entry."),
+  name: z.string().describe("Table display name. Snapshotted as `tableName` on each harvest loot entry."),
   rarity: z
     .string()
     .default("commun")
     .describe(
       "One of the 8 RARITIES: commun | peu_commun | rare | tres_rare | legendaire | mythique | divin | " +
-        "unique. Matched EXACTLY against the drawing action's rarity - there is no fallback to a nearby tier."
+        "unique. Matched EXACTLY against the drawing action's rarity - there is no fallback to a nearby tier. " +
+        "Read by harvest only since docs/TODO.md 'Monster-pool loot' moved mission loot onto the monster's " +
+        "own lootItemIds."
     ),
   tagIds: z
     .array(z.string())

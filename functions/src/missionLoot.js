@@ -1,16 +1,19 @@
-// Selects loot for a generated mission occurrence - see docs/TODO.md "Mission loot and rarity
-// mapping". Rarity + tag matching, resolved once per occurrence rather than re-rolled per item: a
-// mission's difficulty and tags are already fixed at generation time, so there is no second
-// candidate to draw from the way the retired quest engine's several possible objectives used to
-// allow. Only the loot table pick and the drawLootTableItemId draw within it vary per item.
+// Selects loot for a resolved mission or exploration round - see docs/TODO.md "Monster-pool loot".
+// The draw is over the *target monster's own* lootItemIds (its parent chain's included, resolved by
+// lib/monsters.js), not over the loot tables it used to match by rarity + tag: a monster carries
+// what it drops, so a hunt's reward is a property of what was hunted rather than of a separate
+// catalog that happened to share a tag with it.
 //
 // Called straight from functions/src/actions/mission.js's and functions/src/actions/
 // partirExplorer.js's resolve(), which put what it returns on their ActionResult's `itemsGained`
-// (docs/TODO.md "ActionResult and the single applier"). docs/TODO.md "Monster-pool loot" replaces
-// this whole draw with one over the target monster's own lootItemIds.
+// (docs/TODO.md "ActionResult and the single applier").
+//
+// `worldData/lootTables/items` keeps no mission consumer after this: it survives for harvest
+// (recolte.js), so its creator page, schema and collection all stay, but weightMode / itemWeights
+// no longer touch mission loot, whose draw is uniform.
 
 const { RARITY_ORDER, DIFFICULTY_ORDER } = require("./lib/rolls");
-const { pickRandom, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("./lib/loot");
+const { pickRandom } = require("./lib/loot");
 
 // Positional equivalence between the 6-tier DIFFICULTIES scale and the shared 8-tier rarity scale
 // (docs/TODO.md "Quest difficulty"), the same mapping functions/src/lib/talentEvolution.js's
@@ -20,51 +23,59 @@ function difficultyToRarity(difficulty) {
   return index === -1 ? null : RARITY_ORDER[index];
 }
 
-// `tagIds`: the union of the difficulty-tier tagIds and variation tagIds drawn for the mission's
-// Subject at generation time (docs/TODO.md "Mission subject and action catalog"). Tables with no
-// matching rarity/tag, or an empty draw within a matching table, are silently skipped rather than
-// failing the mission itself - a content gap costs an item, not the resolution.
+// How rich this draw is allowed to get, as an index into RARITY_ORDER: the higher of the mission's
+// own difficulty and the target monster's. An unknown difficulty on either side contributes nothing
+// (index -1) rather than a "commun" ceiling, so a monster authored without a difficulty doesn't
+// silently cap a mythique hunt at commons; two unknowns leave the ceiling below the scale, which
+// the empty-pool fallback below then turns into an unfiltered draw.
 //
-// `rarityOffset` (default 0) shifts the target rarity down that many ranks on the shared 8-tier
-// scale, floored at "commun" - used by mission.js/partirExplorer.js to draw the degraded-rarity
-// consolation loot a failed resolution grants (docs/TODO.md "Mission and quest resolution
-// algorithm").
-function drawMissionLoot({ difficulty, tagIds, lootTables, objects, rarityOffset = 0 }) {
-  const baseRarity = difficultyToRarity(difficulty);
-  if (!baseRarity) return [];
+// This is a ceiling, not an exact match: a mythique mission against a common-loot monster still
+// draws commons. The retired table match guaranteed the tier, this only permits it.
+function rarityCeilingIndex({ difficulty, monsterDifficulty }) {
+  return Math.max(DIFFICULTY_ORDER.indexOf(difficulty), DIFFICULTY_ORDER.indexOf(monsterDifficulty));
+}
 
-  const targetRarityIndex = Math.max(RARITY_ORDER.indexOf(baseRarity) - rarityOffset, 0);
-  const targetRarity = RARITY_ORDER[targetRarityIndex] ?? baseRarity;
+function toLootEntry(object) {
+  return {
+    objectId: object.id,
+    name: object.name,
+    rarity: object.rarity,
+    type: object.type,
+    tagIds: object.tagIds || [],
+    // The catalog description, unmodified: the "[Obtenue lorsque ...]" provenance clause went
+    // with the narrative generator (docs/TODO.md "Narration removal").
+    description: object.description || "",
+  };
+}
 
-  const relevantTagIds = new Set(tagIds || []);
-  const candidateTables = lootTables.filter(
-    (table) => table.rarity === targetRarity && (table.tagIds || []).some((id) => relevantTagIds.has(id))
-  );
+// `success` drives the count (3 on a success, 1 on a failure) - the outcome moves how *much* is
+// paid, not how rare it is, so a failure now pays undegraded loot at a smaller haul where the web
+// previously degraded rarity on a full-size one. The old `rarityOffset` lever is gone rather than
+// left dangling.
+//
+// `lootItemIds` is the monster's *resolved* pool (lib/monsters.js's resolveMonster), and
+// `monsterDifficulty` its *resolved* difficulty. A pool with nothing under the ceiling degrades to
+// the unfiltered pool rather than paying nothing - a content gap costs the rarity guarantee, not
+// the reward - and a monster with no loot authored at all yields []. Nothing here throws.
+function drawMissionLoot({ success, difficulty, monsterDifficulty, lootItemIds, objects }) {
+  const resolvedPool = (lootItemIds || [])
+    .map((objectId) => (objects || []).find((o) => o.id === objectId))
+    .filter(Boolean);
+  if (resolvedPool.length === 0) return [];
 
-  const count = LOOT_COUNT_BY_DIFFICULTY[difficulty] || 0;
+  const ceilingIndex = rarityCeilingIndex({ difficulty, monsterDifficulty });
+  const filteredPool = resolvedPool.filter((object) => RARITY_ORDER.indexOf(object.rarity) <= ceilingIndex);
+  const pool = filteredPool.length > 0 ? filteredPool : resolvedPool;
+
+  // With replacement: the pool is what the monster carries, not a stack of distinct trophies, so
+  // the same drop twice is two Instance documents on commit - exactly like recolte.js's repeated ids.
+  const count = success ? 3 : 1;
   const loot = [];
   for (let i = 0; i < count; i++) {
-    const table = pickRandom(candidateTables);
-    if (!table) continue;
-
-    const objectId = drawLootTableItemId(table);
-    const object = objects.find((o) => o.id === objectId);
-    if (!object) continue;
-
-    loot.push({
-      objectId: object.id,
-      name: object.name,
-      rarity: object.rarity,
-      type: object.type,
-      tagIds: object.tagIds || [],
-      tableId: table.id,
-      tableName: table.name,
-      // The catalog description, unmodified: the "[Obtenue lorsque ...]" provenance clause went
-      // with the narrative generator (docs/TODO.md "Narration removal").
-      description: object.description || "",
-    });
+    const object = pickRandom(pool);
+    if (object) loot.push(toLootEntry(object));
   }
   return loot;
 }
 
-module.exports = { difficultyToRarity, drawMissionLoot };
+module.exports = { difficultyToRarity, rarityCeilingIndex, drawMissionLoot };

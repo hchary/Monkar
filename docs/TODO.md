@@ -20,7 +20,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 6 | Resolution engine rebuild (thresholds, bands, tier drop) | done | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
 | 7 | `ActionResult` + `applyActionResult`, all eight handlers | done | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
 | 8 | Mission generation from the bestiary | done | 5, 6 | [Mission generation from the bestiary](#mission-generation-from-the-bestiary) |
-| 9 | Monster-pool loot with difficulty rarity ceiling | todo | 8 | [Monster-pool loot](#monster-pool-loot) |
+| 9 | Monster-pool loot with difficulty rarity ceiling | done | 8 | [Monster-pool loot](#monster-pool-loot) |
 | 10 | Per-region reputation (+ zero-sum invariant tests) | todo | 7 | [Per-region reputation](#per-region-reputation) |
 | 11 | Talent training roll + monster talent reward | todo | 7, 8 | [Talent training roll and monster talent reward](#talent-training-roll-and-monster-talent-reward) |
 | 12 | Quest chains on monsters + chain completion rewards | todo | 8, 10 | [Quest chains on monsters](#quest-chains-on-monsters) |
@@ -471,7 +471,31 @@ Deliberate consequences:
 
 **Test** (`missionLoot.test.js`, rewritten): count follows outcome, the rarity ceiling applies, an empty pool degrades to unfiltered and then to `[]`, and nothing ever throws.
 
-Not implemented yet. (Rework plan §4.4.)
+Status: **implemented**. `drawMissionLoot({ success, difficulty, monsterDifficulty, lootItemIds,
+objects })` draws uniformly and with replacement over the target monster's resolved pool: 3 items on
+a success, 1 on a failure, filtered by `rarityCeilingIndex` (`max` of the two difficulties on the
+shared 8-tier scale), degrading to the unfiltered pool and then to `[]`. `rarityOffset` and
+`LOOT_COUNT_BY_DIFFICULTY` are both gone; `difficultyToRarity` stays, since the talent roll's
+`objectiveRarity` still reads it. `mission.js` now fetches the bestiary in `prepare()` and resolves
+`mission.targetMonsterId` through `lib/monsters.js`; `partirExplorer.js` already had a resolved
+monster per round. Both stopped fetching `worldData/lootTables/items` entirely, so `recolte.js` is
+that collection's one remaining reader — said so in both `lootTable.ts` schema files and in
+`docs/ARCHITECTURE.md`, rather than left to be discovered.
+
+Three things this row settled that its own text left implicit:
+
+- **An unknown difficulty on either side contributes nothing to the ceiling, rather than a `commun`
+  one.** A monster authored without a difficulty would otherwise silently cap a `mythique` hunt at
+  commons — the opposite of "difficulty raises the ceiling". Two unknowns leave the ceiling below the
+  scale, which the empty-pool fallback then turns into an unfiltered draw.
+- **Mission loot entries lost `tableId` / `tableName`.** There is no table behind them any more, and
+  nothing rendered the pair; harvest entries (`recolte.js`) keep theirs, which is now the one
+  difference between the two shapes the `itemsGained` channel carries.
+- **A journal entry naming a monster the bestiary no longer holds still resolves.** `targetMonster`
+  is null, the roll happens normally, and the hunt simply pays no loot — the same "a content gap
+  costs the reward, not the resolution" line the row already takes for an empty pool.
+
+(Rework plan §4.4.)
 
 ## Per-region reputation
 
