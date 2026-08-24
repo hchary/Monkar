@@ -13,7 +13,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | # | Item | Status | Blocked by | Entry |
 |---|------|--------|------------|-------|
 | 1 | Retire narration (generator, catalogs, creator pages, poc) | done | — | [Narration removal](#narration-removal) |
-| 2 | Area and Monster contracts (Zod schemas, shared + functions) | todo | — | [Area and Monster contracts](#area-and-monster-contracts) |
+| 2 | Area and Monster contracts (Zod schemas, shared + functions) | done | — | [Area and Monster contracts](#area-and-monster-contracts) |
 | 3 | Monster creator page (CRUD, inheritance preview) | todo | 2 | [Monster creator page](#monster-creator-page) |
 | 4 | Area creator page + `region.areaId` | todo | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
 | 5 | Content migration scripts (areas, monsters, reputation, triggers) | todo | 3, 4 | [Content migration scripts](#content-migration-scripts) |
@@ -102,7 +102,31 @@ trigger        {conditions}|null  Moved verbatim from missionSubject.trigger.
 
 Stored enum *values* do not change anywhere in this rework. The Python model renames three difficulty labels (`moyen → normal`, `epique → extrême`, `mythique → impossible`); only the French labels in `src/lib/difficulties.js` change, the stored keys stay, which avoids a migration across `missionJournal[].difficulty`, `questChain.steps[].difficulty`, `monster.difficulty` and every `difficulty-text-{value}` CSS class. The 8-tier `RARITY_ORDER` also stays in full, even though the Python model drops `divin` and `unique` — nothing in the mission pipeline could ever reach them anyway, and dropping them would invalidate authored objects and `salePrice`'s two top rows for no mechanical gain.
 
-Not implemented yet. (Rework plan §3.4, §6.)
+Status: **implemented**. `shared/lib/areaTypes.ts` holds `AREA_TYPES` (the eight keys above, with
+French labels and an `areaTypeLabel` helper); `shared/schema/area.ts` and `shared/schema/monster.ts`
+are the new contracts, each re-exported by a `functions/src/schema/` file carrying the
+collection-level header. `region.ts` gained `areaId` (and its `climateIds`/`reliefIds` descriptions
+now say display/origin-matching only); `character.ts` gained `reputations` and
+`triggeredMonsterIds`, with `reputation` / `triggeredSubjectIds` / `missionJournal[].subjectId` /
+`missionJournal[].actionId` documented as legacy (the last two now `.optional()`, with the required
+`targetMonsterId` alongside); `questChain.ts` moved `steps[]` to `monsterId` and gained the four
+chain-level reward fields. `missionSubject.ts` and `missionAction.ts` are deleted on both sides.
+
+Two deliberate interim states this leaves behind, both closed by later rows:
+
+- **The live code reads shapes these contracts no longer describe.** `recherche.js` still draws from
+  `worldData/missionSubjects/items`, the trigger sweep still writes `triggeredSubjectIds`, and
+  `questChains.js` still reads `steps[].subjectId` — all until rows 5-8 and 12. `questTriggers.js`
+  and `questChains.js` carry an `INTERIM` header note saying so, since their schema files now
+  describe the target shape rather than the current one. The two retired collections are therefore
+  live but undocumented between here and row 5; the archived entries in
+  [docs/archives/TODO-2026-08-24-pre-python-rework.md](archives/TODO-2026-08-24-pre-python-rework.md)
+  and the deleted files' git history are the reference in the meantime.
+- **`character.reputation` stays required and is still written once** by `createCharacter`, because
+  nothing reads `reputations` yet. New characters get `reputations: {}` from `DEFAULTS`; seeding it
+  from the origin's `reputationStart` is [Per-region reputation](#per-region-reputation)'s job.
+
+(Rework plan §3.4, §6.)
 
 ## Monster creator page
 

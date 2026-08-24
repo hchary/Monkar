@@ -41,7 +41,15 @@ characters/{characterId}
   background: { id, name, profession }
   title: string                    -- empty until the creator/game grants one (stub)
   profession: string               -- starts equal to background.profession
-  reputation: number                -- starts at background.reputationStart, +N per tier.reputationGain
+  reputation: number                -- LEGACY, superseded by `reputations` below: a single global
+                                     -- score, starting at background.reputationStart. Still the one
+                                     -- every handler reads and writes today
+  reputations: { [regionId]: number } -- per-region reputation (docs/TODO.md "Per-region
+                                     -- reputation"). Declared and written empty at creation; not
+                                     -- read by any handler yet
+  triggeredMonsterIds: [string]     -- worldData/monsters/items ids granted by the trigger sweep,
+                                     -- replacing triggeredSubjectIds (which the sweep still writes
+                                     -- until the bestiary generation lands)
   legendLevel: number | null        -- null until the first tier.legendary roll, then increments
   alive: boolean                   -- false = permadeath; the player creates a new character
   gold: number
@@ -120,6 +128,11 @@ worldData/tags/items/{id}          -- standalone label catalog, "Tags" creator t
 worldData/regions/items/{id}
   name: string
   nameSuggestions: [string]         -- shown to the player when naming their character
+  areaId: string | null             -- worldData/areas/items id, the terrain this region sits in;
+                                     -- what mission generation filters the bestiary on once
+                                     -- docs/TODO.md "Mission generation from the bestiary" lands.
+                                     -- climateIds/reliefIds stay, but only for display and origin
+                                     -- matching - they no longer drive generation
 
 worldData/regions/items/{regionId}/backgrounds/{id}
   name, profession, weight, reputationStart, startingGold, startingItems: [{name, qty}]
@@ -157,6 +170,36 @@ worldData/adventureZones/items/{id}   -- displayed as "Lieu(x) de quête" in the
   tagIds: [string]                    -- worldData/tags/items ids describing this location's flavour
                                        -- (forest, coastal village, ruins, ...); read by
                                        -- partirExplorer.js for each round's objective and loot pool
+
+worldData/areas/items/{id}         -- terrain catalog: the type of place a region sits in.
+  name: string                     -- French display name, e.g. "Marais de Ravenholm"
+  type: string                     -- one of AREA_TYPES (shared/lib/areaTypes.ts): ville | marais |
+                                    -- grotte | plaine | montagne | desert | ruines_anciennes |
+                                    -- volcan. Several regions can share one Area, and two Areas
+                                    -- with the same type draw from the same monsters
+  tagIds: [string]                 -- worldData/tags/items ids, flavour only
+  lootTableIds: [string]           -- worldData/lootTables/items ids, the harvest pool for jobs run
+                                    -- here (docs/TODO.md "Métier rework")
+
+worldData/monsters/items/{id}      -- the bestiary: what a generated mission hunts, replacing the
+  name: string                     -- missionSubject x missionAction pair
+  difficulty: string               -- a DIFFICULTIES tier. NOT a gate on generation - it only raises
+                                    -- the loot rarity ceiling (docs/TODO.md "Monster-pool loot")
+  areaType: string | null          -- one of AREA_TYPES; matched against the region's Area type.
+                                    -- null = inherited from the parent chain
+  parentId: string | null          -- worldData/monsters/items id: prototypal inheritance, resolved
+                                    -- at read time with a cycle guard and a depth cap of 8, never
+                                    -- flattened in Firestore. Array fields concatenate down the
+                                    -- chain, scalars take the first non-null
+  tagIds: [string]                 -- worldData/tags/items ids; talent matching. Concatenated
+  lootItemIds: [string]            -- worldData/objects/items ids; the mission loot pool, replacing
+                                    -- loot-table selection for missions. Concatenated
+  talentRewardId: string | null    -- worldData/talents/items id granted at quality 1 on a
+                                    -- successful hunt if not already owned
+  trigger: { conditions } | null   -- same shape and sweep as the retired missionSubject.trigger
+  -- CONTRACT ONLY so far: shared/schema/{area,monster}.ts and their functions/src/schema/
+  -- re-exports exist, but no creator page writes these collections and no handler reads them yet -
+  -- see docs/TODO.md rows 3-5 and 8
 
 -- worldData/quests/items - RETIRED by "Retiring quests and quest objectives for the subject-action
 -- system" (docs/TODO.md), along with QuestsManager.jsx and the "Partir en quête" handler. Missions
@@ -255,7 +298,7 @@ Quests and "Partir en quête" are retired (docs/TODO.md "Retiring quests and que
 
 ### Composite quests: chained `worldData/questChains/items`
 
-`worldData/questChains/items/{id}` (no creator UI, authored directly in the Firestore console) holds an ordered `steps: [{ subjectId, difficulty }]` array, step 1 first — ported from a `questIds: string[]` list of hand-authored quests by "Retiring quests and quest objectives for the subject-action system" (docs/TODO.md). Step 1 is just an ordinary mission draw, discoverable however missions normally are; a chain only starts mattering once step 1 resolves successfully. Logic lives in `functions/src/lib/questChains.js` (`findPendingChainStep`/`findChainAdvance`), shared by `recherche.js` (generation) and `mission.js` (advancement).
+`worldData/questChains/items/{id}` (no creator UI, authored directly in the Firestore console) holds an ordered `steps: [{ monsterId, difficulty }]` array, step 1 first, plus the chain-level `rewardItemIds` / `rewardTalentIds` / `rewardReputation` / `rewardRegionId` paid out on its last step (contract only so far - `questChains.js` still reads the previous `subjectId` shape and pays no rewards, until docs/TODO.md "Quest chains on monsters") — ported from a `questIds: string[]` list of hand-authored quests by "Retiring quests and quest objectives for the subject-action system" (docs/TODO.md). Step 1 is just an ordinary mission draw, discoverable however missions normally are; a chain only starts mattering once step 1 resolves successfully. Logic lives in `functions/src/lib/questChains.js` (`findPendingChainStep`/`findChainAdvance`), shared by `recherche.js` (generation) and `mission.js` (advancement).
 
 `recherche.js`'s `resolve` calls `findPendingChainStep({ character, chains })` before its normal mission-generation loop: it looks for a chain whose `character.questChainProgress[chainId]` names a step index beyond 0 whose `subjectId` is also present in `character.triggeredSubjectIds` (i.e. a step already granted but not yet resolved). If found, that step's `{ subjectId, difficulty }` pair claims one guaranteed slot of the batch — its Subject and difficulty are fixed, only the type-matched Action and variation are still drawn randomly — and the remaining slots draw normally. If more than one chain has a step pending, the earliest-granted one wins (earliest index in `triggeredSubjectIds`).
 

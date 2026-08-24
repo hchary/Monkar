@@ -7,6 +7,10 @@
 // functions/src/actions/partirEnQuete.js used to give a chain step before it was retired) and
 // functions/src/actions/mission.js (to advance a chain when a resolved mission completes one of
 // its steps).
+//
+// INTERIM: the contract has already moved on - shared/schema/questChain.ts now declares
+// steps[].monsterId plus chain-level rewards - while this module still reads steps[].subjectId and
+// pays no rewards. Both are rewired by docs/TODO.md "Quest chains on monsters".
 
 // A chain step beyond the first becomes "pending" the moment it's pushed into
 // character.triggeredSubjectIds and character.questChainProgress[chainId] is bumped to its index
