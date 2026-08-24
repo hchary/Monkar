@@ -14,7 +14,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 |---|------|--------|------------|-------|
 | 1 | Retire narration (generator, catalogs, creator pages, poc) | done | — | [Narration removal](#narration-removal) |
 | 2 | Area and Monster contracts (Zod schemas, shared + functions) | done | — | [Area and Monster contracts](#area-and-monster-contracts) |
-| 3 | Monster creator page (CRUD, inheritance preview) | todo | 2 | [Monster creator page](#monster-creator-page) |
+| 3 | Monster creator page (CRUD, inheritance preview) | done | 2 | [Monster creator page](#monster-creator-page) |
 | 4 | Area creator page + `region.areaId` | todo | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
 | 5 | Content migration scripts (areas, monsters, reputation, triggers) | todo | 3, 4 | [Content migration scripts](#content-migration-scripts) |
 | 6 | Resolution engine rebuild (thresholds, bands, tier drop) | todo | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
@@ -146,7 +146,14 @@ Plus one thing no existing manager has and this one needs: a **read-only "hérit
 
 `CreatorDashboard.jsx`: the `Missions` group's two tabs (`Actions de mission`, `Sujets de mission`) are replaced by a single `Monstres` tab. **Run the migration script before deleting those tabs, not after** — anyone mid-authoring in them loses their working set otherwise.
 
-Not implemented yet. (Rework plan §4.3.)
+Status: **implemented**. `src/components/creator/MonstersManager.jsx` is the page, with every control in the table above; `src/lib/monsters.js` holds the client-side resolution (`monsterChain`, `resolveMonster`, `resolveInheritedFrom`, `selfAndDescendantIds`, a cycle guard and a depth cap of 8) that feeds the read-only "Hérité du parent" panel — the server twin `functions/src/lib/monsters.js` lands with [Mission generation from the bestiary](#mission-generation-from-the-bestiary), keep the two in step. `SoloSelectModalField` gained an optional `onClear` prop, since a radio list alone can never return a nullable field (`parentId`, `talentRewardId`) to "nothing selected". A blank form is seeded from `shared/schema/monster.ts`'s `DEFAULTS`, so the contract stays the single source of the field set.
+
+Two deliberate deviations from the paragraph above:
+
+- **The `Monstres` tab is added next to the two mission tabs, not in place of them.** Deleting them is the migration's job per this entry's own warning, and [Content migration scripts](#content-migration-scripts) hasn't run — `CreatorDashboard.jsx` carries a comment saying so. That row deletes both tabs and both managers.
+- **`trigger` has no control**, exactly as it had none on `MissionSubjectsManager` (it is authored by script). The form round-trips whatever the document holds, so editing a migrated monster never drops its trigger.
+
+(Rework plan §4.3.)
 
 ## Area creator page and region.areaId
 

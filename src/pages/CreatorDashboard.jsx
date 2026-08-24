@@ -16,6 +16,7 @@ import ActionsManager from "../components/creator/ActionsManager";
 import RecettesManager from "../components/creator/RecettesManager";
 import MissionActionsManager from "../components/creator/MissionActionsManager";
 import MissionSubjectsManager from "../components/creator/MissionSubjectsManager";
+import MonstersManager from "../components/creator/MonstersManager";
 
 const DEFAULT_SECTION = "Régions";
 
@@ -37,6 +38,10 @@ const GROUPS = [
   {
     name: "Missions",
     tabs: {
+      Monstres: MonstersManager,
+      // The two catalog tabs below are retired by docs/TODO.md "Monster creator page", but only
+      // once "Content migration scripts" has actually carried their content over to Monstres -
+      // deleting them first would strand anyone mid-authoring in them.
       "Actions de mission": MissionActionsManager,
       "Sujets de mission": MissionSubjectsManager,
     },
