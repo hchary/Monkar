@@ -30,7 +30,7 @@ function difficultyToRarity(difficulty) {
 // scale, floored at "commun" - mirrors missionResolution.js's drawQuestLoot, used the same way by
 // mission.js/partirExplorer.js to draw the degraded-rarity consolation loot a failed resolution
 // grants (docs/TODO.md "Mission and quest resolution algorithm").
-function drawMissionLoot({ difficulty, tagIds, lootTables, objects, accomplishmentMessage, rarityOffset = 0 }) {
+function drawMissionLoot({ difficulty, tagIds, lootTables, objects, rarityOffset = 0 }) {
   const baseRarity = difficultyToRarity(difficulty);
   if (!baseRarity) return [];
 
@@ -60,7 +60,9 @@ function drawMissionLoot({ difficulty, tagIds, lootTables, objects, accomplishme
       tagIds: object.tagIds || [],
       tableId: table.id,
       tableName: table.name,
-      description: `${object.description || ""} [Obtenue lorsque ${accomplishmentMessage}]`.trim(),
+      // The catalog description, unmodified - see drawQuestLoot's own note: the provenance clause
+      // went with the narrative generator (docs/TODO.md "Narration removal").
+      description: object.description || "",
     });
   }
   return loot;

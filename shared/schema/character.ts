@@ -107,11 +107,12 @@ export const CharacterDocumentSchema = z.object({
         "'recherche' handler resolves again, and an entry is removed once the 'mission' handler resolves it. " +
         "subjectId/actionId are the worldData/missionSubjects/items and worldData/missionActions/items ids " +
         "drawn at generation time (docs/TODO.md 'Regional mission generation and journal'); name is the " +
-        "already-assembled title (functions/src/missionNaming.js's assembleMissionName) so resolution never " +
-        "needs to re-fetch either catalog entry, and tagIds is the union of that draw's difficulty-tier and " +
-        "variation tagIds - LEGACY: entries generated before this shipped carried objectiveId (a " +
-        "worldData/narrativeSubjects/items id) instead; those are stale rolling-offer data that get " +
-        "overwritten by the next 'recherche' resolution, not migrated."
+        "already-assembled title (functions/src/actions/recherche.js's assembleMissionName) so resolution " +
+        "never needs to re-fetch either catalog entry, and tagIds is the union of that draw's " +
+        "difficulty-tier and variation tagIds - LEGACY: entries generated before this shipped carried " +
+        "objectiveId (an id in the retired worldData/narrativeSubjects/items collection) instead; those " +
+        "are stale rolling-offer data that get overwritten by the next 'recherche' resolution, not " +
+        "migrated."
     ),
   triggeredSubjectIds: z
     .array(z.string())

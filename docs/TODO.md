@@ -12,7 +12,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 
 | # | Item | Status | Blocked by | Entry |
 |---|------|--------|------------|-------|
-| 1 | Retire narration (generator, catalogs, creator pages, poc) | todo | — | [Narration removal](#narration-removal) |
+| 1 | Retire narration (generator, catalogs, creator pages, poc) | done | — | [Narration removal](#narration-removal) |
 | 2 | Area and Monster contracts (Zod schemas, shared + functions) | todo | — | [Area and Monster contracts](#area-and-monster-contracts) |
 | 3 | Monster creator page (CRUD, inheritance preview) | todo | 2 | [Monster creator page](#monster-creator-page) |
 | 4 | Area creator page + `region.areaId` | todo | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
@@ -55,7 +55,9 @@ Directive 4 of the rework: the procedural narrative generator and everything aut
 
 Tests deleted with the code: `textGeneration.test.js`, `missionNaming.test.js`.
 
-Not implemented yet. (Rework plan §3.)
+**Mission naming, in the interim.** `missionNaming.js` is deleted here because its five-slot assembly mirrors the grammar engine's, but its consumer outlives it: `recherche.js` still draws missions from the subject/action catalogs until [Mission generation from the bestiary](#mission-generation-from-the-bestiary) rewrites it, and deleting the assembly outright would leave every generated mission unnamed for the whole of waves 1-2. So `assembleMissionName` moves into `recherche.js` as a local helper, marked interim, and goes away with the rest of that draw path when the bestiary generation lands.
+
+Status: **implemented**. Generator, catalogs, schemas, creator page and `narrative-poc/` are gone; `missionResolution.js` and `missionLoot.js` no longer narrate or embed loot provenance; `resolveQuestOutcome` lost `narrativeSubjects` / `verbPhrases` / `narrate` / the four `default*Text`/`Clause` parameters and returns `narrativeText: ""`; the creator dashboard's `Narration` group is now `Système`, holding the `Tag` tab. `narrativeText` is deliberately kept as an always-`""` field on `lastAction`/`actionsLog` so pre-removal history stays readable — `CharactersOverview.jsx` still renders it when present. `dropNarrativeCollections.js` is written but, like every script in that directory, **still has to be run by hand** against Firestore. (Rework plan §3.)
 
 ## Area and Monster contracts
 

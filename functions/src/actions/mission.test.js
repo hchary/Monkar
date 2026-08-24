@@ -26,8 +26,6 @@ function baseContext(overrides = {}) {
   return {
     mission: MISSION,
     locationName: null,
-    narrativeSubjects: [],
-    verbPhrases: [],
     lootTables: LOOT_TABLES,
     objects: OBJECTS,
     talents: [],

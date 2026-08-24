@@ -84,6 +84,8 @@ function CharacterDetail({ character, onBack }) {
           {history.map((entry) => (
             <li key={entry.id}>
               {entry.date} — {entry.success ? "(succès)" : "(échec)"}
+              {/* Only ever set on entries logged before docs/TODO.md "Narration removal" - kept so
+                  the existing history stays readable, never written any more. */}
               {entry.narrativeText && ` — ${entry.narrativeText}`}
             </li>
           ))}

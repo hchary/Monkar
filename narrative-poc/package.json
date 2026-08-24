@@ -1,9 +1,0 @@
-{
-  "name": "narrative-poc",
-  "private": true,
-  "type": "commonjs",
-  "description": "Proof-of-concept for tag-driven procedural narrative generation, evaluated independently of the main app.",
-  "scripts": {
-    "demo": "node demo.js"
-  }
-}

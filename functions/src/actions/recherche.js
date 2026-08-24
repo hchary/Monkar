@@ -16,7 +16,7 @@
 // character's region's own climateIds and whose difficultyTiers list includes that difficulty,
 // then a random worldData/missionActions/items entry sharing that Subject's type, then a random
 // variation for the Subject (independent of difficulty) - the title is assembled from that draw by
-// functions/src/missionNaming.js.
+// assembleMissionName below.
 //
 // Always available, no condition - every character can perform it any time (subject only to the
 // normal once-per-Interval action lock).
@@ -26,7 +26,6 @@ const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
 const { DIFFICULTY_ORDER } = require("../lib/rolls");
 const { pickRandom } = require("../lib/loot");
-const { assembleMissionName } = require("../missionNaming");
 const { findPendingChainStep } = require("../lib/questChains");
 
 function overlaps(a, b) {
@@ -36,6 +35,34 @@ function overlaps(a, b) {
 
 function findDifficultyTier(subject, difficulty) {
   return (subject.difficultyTiers || []).find((tier) => tier.difficulty === difficulty) || null;
+}
+
+// difficulty-tier prefix, then variation prefix, then the subject's base name, then variation
+// suffix, then difficulty-tier suffix, all behind the Action's phrase - per docs/TODO.md's own
+// worked example ("Vaincre" + "dragon" at épique with tier suffix "liche" and variation suffix
+// "rouge" -> "Vaincre dragon rouge liche"). Any absent slot is simply skipped.
+//
+// Lifted here from the deleted functions/src/missionNaming.js, whose slot-assembly style mirrored
+// the retired narrative generator's (docs/TODO.md "Narration removal"). Interim: this whole
+// subject/action draw is replaced by a monster-catalog draw naming missions `Chasse {monster.name}`
+// (docs/TODO.md "Mission generation from the bestiary"), which takes this helper with it.
+const SUBJECT_SLOT_ORDER = ["tierPrefix", "variationPrefix", "name", "variationSuffix", "tierSuffix"];
+
+function assembleMissionName({ action, subject, difficulty, variation }) {
+  const tier = findDifficultyTier(subject, difficulty);
+  const slots = {
+    tierPrefix: tier?.prefix || null,
+    variationPrefix: variation?.prefix || null,
+    name: subject.name,
+    variationSuffix: variation?.suffix || null,
+    tierSuffix: tier?.suffix || null,
+  };
+
+  const subjectString = SUBJECT_SLOT_ORDER.map((slot) => slots[slot])
+    .filter(Boolean)
+    .join(" ");
+
+  return `${action.phrase} ${subjectString}`;
 }
 
 // Shared by drawMission's normal random draw and the forced composite-quest-chain draw below: a

@@ -90,4 +90,4 @@ See that script for the exact document shapes (`worldData/regions/items/{id}`, n
 - Done: `performAction` Cloud Function with daily lock and weighted roll
 - Done: Firestore rules (player = own data only, creator = everything)
 - Pending: creator dashboard page exists but the CRUD (factions, regions, gods, creatures) isn't built yet
-- Pending: narrative texts, visual theme, roll balancing
+- Pending: visual theme, roll balancing

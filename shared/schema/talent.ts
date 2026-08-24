@@ -37,9 +37,8 @@ export const TalentDocumentSchema = z.object({
     .array(z.string())
     .default([])
     .describe(
-      "Ids in worldData/tags/items. Their NAMES decide which quests can progress the talent and which " +
-        "verb phrases may narrate that progression, so they must be spelled exactly like the free-text " +
-        "tags on verbPhrases."
+      "Ids in worldData/tags/items. They decide which quests and missions can progress the talent - " +
+        "functions/src/lib/talentEvolution.js matches them against the resolution's own tagIds."
     ),
   ancestorIds: z
     .array(z.string())

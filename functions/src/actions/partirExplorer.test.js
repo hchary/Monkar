@@ -19,8 +19,6 @@ const FACILE_ONLY_WEIGHTS = [{ difficulty: "facile", weight: 100 }];
 function baseContext(overrides = {}) {
   return {
     location: LOCATION,
-    narrativeSubjects: [],
-    verbPhrases: [],
     lootTables: LOOT_TABLES,
     objects: OBJECTS,
     talents: [],

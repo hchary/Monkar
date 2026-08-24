@@ -13,6 +13,11 @@
 // src/components/creator/QuestObjectivesManager.jsx's OBJECTIVE_TAG_ID) is special-cased onto a
 // fixed tag doc id ("objectif-de-quete") instead of a name lookup, so every consumer can reference
 // it without a name-resolution step.
+//
+// HISTORICAL: both collections this script migrates - worldData/narrativeSubjects/items and
+// worldData/verbPhrases/items - were retired by docs/TODO.md "Narration removal" and are deleted by
+// scripts/dropNarrativeCollections.js. The script is kept as-is, unrun-able but accurate about the
+// migration it performed at the time, rather than rewritten after the fact.
 const admin = require("firebase-admin");
 
 admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: "monkar-rpg" });

@@ -50,14 +50,15 @@ describe("drawMissionLoot", () => {
       tagIds: ["feu"],
       lootTables: [MATCHING_TABLE, NON_MATCHING_RARITY_TABLE, NON_MATCHING_TAG_TABLE],
       objects: [SWORD],
-      accomplishmentMessage: "vous vainquez le dragon",
     });
 
     assert.equal(loot.length, 2); // LOOT_COUNT_BY_DIFFICULTY.difficile
     for (const item of loot) {
       assert.equal(item.objectId, "sword");
       assert.equal(item.tableId, "table-rare-feu");
-      assert.equal(item.description, "Une épée. [Obtenue lorsque vous vainquez le dragon]");
+      // The catalog description verbatim - the "[Obtenue lorsque ...]" provenance clause went with
+      // the narrative generator (docs/TODO.md "Narration removal").
+      assert.equal(item.description, "Une épée.");
     }
   });
 
@@ -67,7 +68,6 @@ describe("drawMissionLoot", () => {
       tagIds: ["glace"],
       lootTables: [MATCHING_TABLE],
       objects: [SWORD],
-      accomplishmentMessage: "vous vainquez le dragon",
     });
     assert.deepEqual(loot, []);
   });
@@ -78,7 +78,6 @@ describe("drawMissionLoot", () => {
       tagIds: ["feu"],
       lootTables: [MATCHING_TABLE],
       objects: [SWORD],
-      accomplishmentMessage: "vous vainquez le dragon",
     });
     assert.deepEqual(loot, []);
   });
@@ -92,7 +91,6 @@ describe("drawMissionLoot", () => {
       tagIds: ["feu"],
       lootTables: [MATCHING_TABLE, commonTable],
       objects: [SWORD],
-      accomplishmentMessage: "vous rentrez bredouille",
       rarityOffset: 2,
     });
 
@@ -109,7 +107,6 @@ describe("drawMissionLoot", () => {
       tagIds: ["feu"],
       lootTables: [commonTable],
       objects: [SWORD],
-      accomplishmentMessage: "vous rentrez bredouille",
       rarityOffset: 5,
     });
 
