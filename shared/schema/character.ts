@@ -53,8 +53,10 @@ export const CharacterDocumentSchema = z.object({
       "LEGACY. The single global reputation score, starting at origin.reputationStart. Superseded by " +
         "`reputations` below, which is per-region (docs/TODO.md 'Per-region reputation'); kept as a " +
         "field so documents written before the migration stay schema-valid, and so " +
-        "functions/scripts/migrateReputationToPerRegion.js has something to read. Still written once by " +
-        "createCharacter (functions/src/index.ts) until that migration lands; nothing else reads it."
+        "functions/scripts/migrateReputationToPerRegion.js has something to read. Written by createCharacter " +
+        "(functions/src/index.ts) and kept in step with `reputations` by functions/src/lib/actionResult.js's " +
+        "applier, so the readers that have not moved to the map yet (CharacterBanner.jsx, the minReputation " +
+        "condition) do not see a frozen score; both writes go away with docs/TODO.md 'Per-region reputation'."
     ),
   reputations: z
     .record(z.string(), z.number())
@@ -65,7 +67,8 @@ export const CharacterDocumentSchema = z.object({
         "starting region's id, and seeded to 1 for a region the character travels to for the first " +
         "time (docs/TODO.md 'Travel action (Voyager)'). Gains and losses are zero-sum across regions " +
         "and always name the region they apply to; the `minReputation` condition and every UI reading " +
-        "reputation use the entry for the region the character currently stands in."
+        "reputation use the entry for the region the character currently stands in. Written by " +
+        "functions/src/lib/actionResult.js's applier, the single place any action's reputation lands."
     ),
   legendLevel: z.number().nullable().default(null).describe("Legendary tier, null until the first legendary roll."),
   alive: z.boolean().default(true).describe("False once the character has died."),

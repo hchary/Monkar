@@ -1,12 +1,13 @@
 // Resolves what a monster inherits along its `parentId` chain.
 //
-// Client twin of the resolution the Cloud Function will run at generation time
-// (functions/src/lib/monsters.js, landing with docs/TODO.md "Mission generation from the
-// bestiary"): here it only feeds the creator's read-only "hérité du parent" panel, so an author can
+// Client twin of the resolution the Cloud Functions run at draw time
+// (functions/src/lib/monsters.js, landed with docs/TODO.md "ActionResult and the single applier"):
+// here it only feeds the creator's read-only "hérité du parent" panel, so an author can
 // see what a monster actually carries without opening its ancestors. Duplicating a pure module is
 // the established answer in this repo - functions/ is CommonJS with no build step shared with the
 // Vite app (same convention as actionConditions.js / lootTables.js / salePrice.js). Keep both in
-// step once the server copy exists; the server one is the one covered by tests.
+// step; the server one is the one covered by tests. The two helpers below resolveMonster are
+// creator-only and have no server counterpart.
 //
 // Per-field rules come from shared/schema/monster.ts: array fields concatenate down the chain
 // (deduplicated), scalars take the first non-null starting at the monster itself, `name` and
@@ -45,8 +46,8 @@ function firstSet(chain, field) {
   return null;
 }
 
-// Every id the chain contributes, ancestors first so the panel reads inherited-then-own, without
-// duplicates.
+// Every id the chain contributes, ancestors first, without duplicates - so the panel reads
+// inherited-then-own.
 function concatDeduped(chain, field) {
   const ids = [];
   for (const monster of [...chain].reverse()) {
@@ -61,6 +62,7 @@ function concatDeduped(chain, field) {
 export function resolveMonster(monster, monstersById) {
   const chain = monsterChain(monster, monstersById);
   return {
+    id: monster?.id || null,
     name: monster?.name || "",
     difficulty: firstSet(chain, "difficulty"),
     areaType: firstSet(chain, "areaType"),

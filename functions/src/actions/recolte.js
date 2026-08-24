@@ -17,6 +17,7 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { harvestFromLootTable } = require("../lib/harvest");
 const { pickRandom } = require("../lib/loot");
+const { createActionResult, applyActionResult } = require("../lib/actionResult");
 
 // Only known professions count - a character missing some of the action's associated métiers
 // still harvests, just for less: the professions it doesn't know contribute zero to the sum,
@@ -51,11 +52,12 @@ async function prepare({ db, actionType }) {
   return { candidateTables, objects };
 }
 
-// Turns a table draw's raw object ids into the same loot-entry shape missionResolution.js's
-// drawQuestLoot uses, so ActionOutcome.jsx's "Butin obtenu" box and the commit-time Instance write
-// need no récolte-specific branch. Repeated ids from the same draw simply produce several entries,
-// one per harvested unit - each becomes its own Instance on commit, exactly like distinct mission
-// loot.
+// Turns a table draw's raw object ids into the same loot-entry shape missionLoot.js's
+// drawMissionLoot produces, so the ActionResult's `itemsGained` channel carries harvest and
+// mission loot identically and neither ActionOutcome.jsx's "Butin obtenu" box nor the commit-time
+// Instance write needs a récolte-specific branch. Repeated ids from the same draw simply produce
+// several entries, one per harvested unit - each becomes its own Instance on commit, exactly like
+// distinct mission loot.
 function toLootEntries({ objectIds, objects, table }) {
   return objectIds
     .map((objectId) => objects.find((o) => o.id === objectId))
@@ -85,16 +87,27 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
     }
   }
 
+  // A harvest's whole outcome is what it gathered, so its ActionResult carries one field - but it
+  // goes through the same applier as everything else (docs/TODO.md "ActionResult and the single
+  // applier"), which is what keeps `lastAction.loot` and the commit-time materialization identical
+  // across every action that grants an item.
+  const { updates: effects } = applyActionResult(character, createActionResult({ itemsGained: loot }), {
+    today,
+    circumstance: `lors d'une récolte (${actionType.label || actionTypeId})`,
+  });
+  const { lastAction: effectSummary = {}, ...stateUpdates } = effects;
+
   return {
     updates: {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
+      ...stateUpdates,
       lastAction: {
         actionTypeId,
         date: today,
         success: true,
         narrativeText: "",
-        loot,
+        ...effectSummary,
       },
     },
     logFields: {

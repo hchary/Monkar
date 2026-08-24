@@ -23,7 +23,7 @@
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
-const { bumpTalentQuality } = require("../lib/talentEvolution");
+const { createActionResult, applyActionResult } = require("../lib/actionResult");
 const { trainingCost } = require("../lib/trainingCost");
 
 async function prepare({ db, character, actionType, payload }) {
@@ -62,30 +62,33 @@ async function resolve({ character, actionType, actionTypeId, today, payload }) 
     throw new HttpsError("failed-precondition", "Or insuffisant pour cet entraînement.");
   }
 
-  const evolved = bumpTalentQuality(talent, { today, circumstance: `Entraînement : ${actionType.label}` });
-  const nextTalents = talents.map((t, i) => (i === index ? evolved : t));
-  const talentEvolutions = [
-    { talentId: evolved.id, name: evolved.name, kind: "evolution", quality: evolved.quality, rarity: evolved.rarity },
-  ];
+  // The bump itself is the applier's (docs/TODO.md "ActionResult and the single applier"): this
+  // handler only names the talent and pays for it. Gold is not part of the effect vocabulary - it
+  // stays handler-specific state, written alongside the applier's patch.
+  const { updates: effects } = applyActionResult(character, createActionResult({ talentTrained: [talentId] }), {
+    today,
+    circumstance: `Entraînement : ${actionType.label}`,
+  });
+  const { lastAction: effectSummary = {}, ...stateUpdates } = effects;
 
   return {
     updates: {
       lastActionDate: today,
       lastActionAt: FieldValue.serverTimestamp(),
       gold: (character.gold || 0) - cost,
-      talents: nextTalents,
+      ...stateUpdates,
       lastAction: {
         actionTypeId,
         date: today,
         success: true,
         narrativeText: "Vous vous entraînez avec ardeur.",
-        talentEvolutions,
+        ...effectSummary,
         goldSpent: cost,
       },
     },
     logFields: {
       success: true,
-      talentId: evolved.id,
+      talentId,
       goldSpent: cost,
     },
   };

@@ -1,16 +1,17 @@
 // The mission resolution engine (docs/TODO.md "Resolution engine rebuild"): one d100 roll per
 // mission, raised by the character's relevant talents, compared against a single difficulty-indexed
 // success threshold, with that same roll read a second time against the tier's injury bands. It
-// replaces the old two-scale engine (`questResolution.js`, deleted here) and, once docs/TODO.md
-// "ActionResult and the single applier" lands, the whole of `functions/src/missionResolution.js`
-// too - which is why the "quest"/"objective" vocabulary is gone: one name, *mission*, everywhere.
+// replaced the old two-scale engine (`questResolution.js`) and, with docs/TODO.md "ActionResult and
+// the single applier", the orchestration wrapper that used to sit above it
+// (`functions/src/missionResolution.js`) - which is why the "quest"/"objective" vocabulary is gone:
+// one name, *mission*, everywhere.
 //
 // Pure math, no Firestore, no catalog reads: everything here is unit-testable against a seeded
 // `Math.random`, the property the old engine had and this one keeps. Wound *application* is not
 // here - `wounds.js` still owns the escalation ladder, and this file only names a severity.
 //
-// INTERIM: until that ActionResult row rewires the handlers, `functions/src/missionResolution.js`
-// (the outer file, same basename, different directory) stays as a wrapper calling into this one.
+// Handlers call `resolveMission` directly and turn what it returns into an ActionResult
+// (`lib/actionResult.js`), which is the one place its `injury` triple is applied.
 
 const { DIFFICULTY_ORDER } = require("./rolls");
 

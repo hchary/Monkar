@@ -1,14 +1,13 @@
 // Selects loot for a generated mission occurrence - see docs/TODO.md "Mission loot and rarity
-// mapping". Reuses the exact rarity + tag matching mechanism functions/src/missionResolution.js's
-// drawQuestLoot uses, but resolves the target rarity and tag pool once per mission occurrence
-// instead of re-rolling them per item: a mission's difficulty, Subject, difficulty-tier and
-// variation are all already fixed at generation time, so there is no second candidate to draw from
-// the way a quest's several possible objectives used to allow. Only the loot table pick and the
-// drawLootTableItemId draw within it vary per item.
+// mapping". Rarity + tag matching, resolved once per occurrence rather than re-rolled per item: a
+// mission's difficulty and tags are already fixed at generation time, so there is no second
+// candidate to draw from the way the retired quest engine's several possible objectives used to
+// allow. Only the loot table pick and the drawLootTableItemId draw within it vary per item.
 //
-// Wired into functions/src/actions/mission.js's and functions/src/actions/partirExplorer.js's
-// resolve(), passed as missionResolution.js's resolveQuestOutcome's `drawLoot` override (docs/
-// TODO.md "Regional mission generation and journal").
+// Called straight from functions/src/actions/mission.js's and functions/src/actions/
+// partirExplorer.js's resolve(), which put what it returns on their ActionResult's `itemsGained`
+// (docs/TODO.md "ActionResult and the single applier"). docs/TODO.md "Monster-pool loot" replaces
+// this whole draw with one over the target monster's own lootItemIds.
 
 const { RARITY_ORDER, DIFFICULTY_ORDER } = require("./lib/rolls");
 const { pickRandom, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("./lib/loot");
@@ -24,12 +23,12 @@ function difficultyToRarity(difficulty) {
 // `tagIds`: the union of the difficulty-tier tagIds and variation tagIds drawn for the mission's
 // Subject at generation time (docs/TODO.md "Mission subject and action catalog"). Tables with no
 // matching rarity/tag, or an empty draw within a matching table, are silently skipped rather than
-// failing the mission itself - the same content-gap precedent drawQuestLoot already set.
+// failing the mission itself - a content gap costs an item, not the resolution.
 //
 // `rarityOffset` (default 0) shifts the target rarity down that many ranks on the shared 8-tier
-// scale, floored at "commun" - mirrors missionResolution.js's drawQuestLoot, used the same way by
-// mission.js/partirExplorer.js to draw the degraded-rarity consolation loot a failed resolution
-// grants (docs/TODO.md "Mission and quest resolution algorithm").
+// scale, floored at "commun" - used by mission.js/partirExplorer.js to draw the degraded-rarity
+// consolation loot a failed resolution grants (docs/TODO.md "Mission and quest resolution
+// algorithm").
 function drawMissionLoot({ difficulty, tagIds, lootTables, objects, rarityOffset = 0 }) {
   const baseRarity = difficultyToRarity(difficulty);
   if (!baseRarity) return [];
@@ -60,8 +59,8 @@ function drawMissionLoot({ difficulty, tagIds, lootTables, objects, rarityOffset
       tagIds: object.tagIds || [],
       tableId: table.id,
       tableName: table.name,
-      // The catalog description, unmodified - see drawQuestLoot's own note: the provenance clause
-      // went with the narrative generator (docs/TODO.md "Narration removal").
+      // The catalog description, unmodified: the "[Obtenue lorsque ...]" provenance clause went
+      // with the narrative generator (docs/TODO.md "Narration removal").
       description: object.description || "",
     });
   }

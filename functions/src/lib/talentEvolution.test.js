@@ -1,11 +1,12 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { evolutionChance, bumpTalentQuality, rollTalentEvolutions } = require("./talentEvolution");
+const { evolutionChance, bumpTalentQuality, rollTalentEvolutionIds } = require("./talentEvolution");
 
 const TODAY = "2026-07-28";
 
-// Shared by rollTalentEvolutions (quest-luck path) and functions/src/actions/sEntrainer.js
-// (training path) - see docs/TODO.md "Trainers".
+// The one quality-up step, applied from functions/src/lib/actionResult.js for both the
+// resolution-luck path (rollTalentEvolutionIds) and the trainer path
+// (functions/src/actions/sEntrainer.js) - see docs/TODO.md "Trainers".
 describe("bumpTalentQuality", () => {
   test("bumps quality by exactly 1", () => {
     const bumped = bumpTalentQuality(
@@ -83,166 +84,81 @@ describe("evolutionChance", () => {
   });
 });
 
-describe("rollTalentEvolutions", () => {
-  const quest = { tagIds: ["feu"] };
-  const objective = { rarity: "rare", tagIds: [] };
+describe("rollTalentEvolutionIds", () => {
+  const TAG_IDS = ["feu"];
 
-  test("no objective means no roll at all", () => {
+  // Selection only: this function names the talents a resolution moves, it never applies the move -
+  // that is the applier's job (docs/TODO.md "ActionResult and the single applier"), covered in
+  // actionResult.test.js.
+  function roll(overrides = {}) {
+    return rollTalentEvolutionIds({
+      characterTalents: [],
+      catalogTalents: [],
+      tagIds: TAG_IDS,
+      objectiveRarity: "rare",
+      difficulty: "difficile",
+      ...overrides,
+    });
+  }
+
+  test("an unknown objective rarity means no roll at all", () => {
     const characterTalents = [{ id: "t1", name: "Résistance au feu", quality: 1, rarity: "commun", tagIds: ["feu"] }];
-    const { talents, evolutions } = rollTalentEvolutions({
-      characterTalents,
-      catalogTalents: [],
-      quest,
-      objective: null,
-      difficulty: "difficile",
-      today: TODAY,
-      circumstance: "test",
-    });
+    const { trainedIds, gainedIds } = roll({ characterTalents, objectiveRarity: null });
 
-    assert.equal(talents, characterTalents);
-    assert.deepStrictEqual(evolutions, []);
+    assert.deepStrictEqual(trainedIds, []);
+    assert.deepStrictEqual(gainedIds, []);
   });
 
-  test("skips a talent sharing no tag with the quest or objective", () => {
+  test("skips a talent sharing no tag with the resolution", (t) => {
+    t.mock.method(Math, "random", () => 0);
     const characterTalents = [{ id: "t1", name: "Sans rapport", quality: 1, rarity: "commun", tagIds: ["glace"] }];
-    const { talents, evolutions } = rollTalentEvolutions({
-      characterTalents,
-      catalogTalents: [],
-      quest,
-      objective,
-      difficulty: "difficile",
-      today: TODAY,
-      circumstance: "test",
-    });
 
-    assert.equal(talents, characterTalents);
-    assert.deepStrictEqual(evolutions, []);
+    assert.deepStrictEqual(roll({ characterTalents }).trainedIds, []);
   });
 
-  test("skips an owned talent whose rank exceeds the objective's rarity", () => {
-    const characterTalents = [
-      { id: "t1", name: "Maîtrise du feu", quality: 5, rarity: "legendaire", tagIds: ["feu"] },
-    ];
-    const { talents, evolutions } = rollTalentEvolutions({
-      characterTalents,
-      catalogTalents: [],
-      quest,
-      objective, // rarity: "rare", lower than legendaire
-      difficulty: "mythique",
-      today: TODAY,
-      circumstance: "test",
-    });
+  test("skips an owned talent whose rank exceeds the objective's rarity", (t) => {
+    t.mock.method(Math, "random", () => 0);
+    const characterTalents = [{ id: "t1", name: "Maîtrise du feu", quality: 5, rarity: "legendaire", tagIds: ["feu"] }];
 
-    assert.equal(talents, characterTalents);
-    assert.deepStrictEqual(evolutions, []);
+    // objectiveRarity "rare" sits below "legendaire".
+    assert.deepStrictEqual(roll({ characterTalents, difficulty: "mythique" }).trainedIds, []);
   });
 
-  test("bumps quality by +1 and re-applies the rarity floor when the roll succeeds", (t) => {
+  test("names an eligible owned talent for training when the roll succeeds", (t) => {
     t.mock.method(Math, "random", () => 0); // always "succeeds" the roll
-    const characterTalents = [
-      { id: "t1", name: "Résistance au feu", quality: 2, rarity: "commun", tagIds: ["feu"] },
-    ];
-    const { talents, evolutions } = rollTalentEvolutions({
-      characterTalents,
-      catalogTalents: [],
-      quest,
-      objective, // rarity: "rare" >= talent's "commun", eligible for evolution
-      difficulty: "difficile",
-      today: TODAY,
-      circumstance: "en affrontant les flammes",
-    });
+    const characterTalents = [{ id: "t1", name: "Résistance au feu", quality: 2, rarity: "commun", tagIds: ["feu"] }];
 
-    assert.notEqual(talents, characterTalents);
-    assert.deepStrictEqual(talents[0], {
-      id: "t1",
-      name: "Résistance au feu",
-      quality: 3,
-      rarity: "rare", // rarityFloor bumps commun -> rare at quality 3
-      tagIds: ["feu"],
-      lastChangeDate: TODAY,
-      lastChangeCircumstance: "en affrontant les flammes",
-    });
-    assert.deepStrictEqual(evolutions, [
-      { talentId: "t1", name: "Résistance au feu", kind: "evolution", quality: 3, rarity: "rare" },
-    ]);
+    assert.deepStrictEqual(roll({ characterTalents }).trainedIds, ["t1"]);
   });
 
-  test("caps quality at 5", (t) => {
+  test("a failed roll names nothing", (t) => {
+    t.mock.method(Math, "random", () => 0.99);
+    const characterTalents = [{ id: "t1", name: "Résistance au feu", quality: 2, rarity: "commun", tagIds: ["feu"] }];
+
+    assert.deepStrictEqual(roll({ characterTalents }).trainedIds, []);
+  });
+
+  test("names a not-yet-owned catalog talent strictly below the objective's rarity as gained", (t) => {
     t.mock.method(Math, "random", () => 0);
-    const characterTalents = [{ id: "t1", name: "Maîtrise", quality: 5, rarity: "rare", tagIds: ["feu"] }];
-    const { talents } = rollTalentEvolutions({
-      characterTalents,
-      catalogTalents: [],
-      quest,
-      objective,
-      difficulty: "difficile",
-      today: TODAY,
-      circumstance: "test",
-    });
+    const catalogTalents = [{ id: "t2", name: "Instinct des flammes", rarity: "peu_commun", tagIds: ["feu"] }];
 
-    assert.equal(talents[0].quality, 5);
+    assert.deepStrictEqual(roll({ catalogTalents, difficulty: "epique" }).gainedIds, ["t2"]);
   });
 
-  test("unlocks a not-yet-owned catalog talent strictly below the objective's rarity", (t) => {
+  test("does not name a catalog talent whose rarity equals the objective's (gain requires strictly higher)", (t) => {
     t.mock.method(Math, "random", () => 0);
-    const catalogTalents = [{ id: "t2", name: "Instinct des flammes", rarity: "peu_commun", tagIds: ["feu"], effect: "...", trainable: true }];
-    const { talents, evolutions } = rollTalentEvolutions({
-      characterTalents: [],
-      catalogTalents,
-      quest,
-      objective, // rarity: "rare" > "peu_commun"
-      difficulty: "epique",
-      today: TODAY,
-      circumstance: "en dominant les flammes",
-    });
-
-    assert.deepStrictEqual(talents, [
-      {
-        id: "t2",
-        name: "Instinct des flammes",
-        quality: 1,
-        trainable: true,
-        rarity: "peu_commun",
-        effect: "...",
-        tagIds: ["feu"],
-        lastChangeDate: TODAY,
-        lastChangeCircumstance: "en dominant les flammes",
-      },
-    ]);
-    assert.deepStrictEqual(evolutions, [
-      { talentId: "t2", name: "Instinct des flammes", kind: "unlock", quality: 1, rarity: "peu_commun" },
-    ]);
-  });
-
-  test("does not unlock a talent whose rarity equals the objective's (unlock requires strictly higher)", () => {
     const catalogTalents = [{ id: "t2", name: "Talent égal", rarity: "rare", tagIds: ["feu"] }];
-    const { talents, evolutions } = rollTalentEvolutions({
-      characterTalents: [],
-      catalogTalents,
-      quest,
-      objective, // rarity: "rare", same as catalog talent
-      difficulty: "mythique",
-      today: TODAY,
-      circumstance: "test",
-    });
 
-    assert.deepStrictEqual(talents, []);
-    assert.deepStrictEqual(evolutions, []);
+    assert.deepStrictEqual(roll({ catalogTalents, difficulty: "mythique" }).gainedIds, []);
   });
 
-  test("does not re-unlock a talent the character already owns", () => {
+  test("does not name a talent the character already owns as gained", (t) => {
+    t.mock.method(Math, "random", () => 0);
     const characterTalents = [{ id: "t2", name: "Déjà acquis", quality: 1, rarity: "commun", tagIds: ["feu"] }];
     const catalogTalents = [{ id: "t2", name: "Déjà acquis", rarity: "commun", tagIds: ["feu"] }];
-    const { evolutions } = rollTalentEvolutions({
-      characterTalents,
-      catalogTalents,
-      quest,
-      objective,
-      difficulty: "mythique",
-      today: TODAY,
-      circumstance: "test",
-    });
 
-    assert.equal(evolutions.some((e) => e.kind === "unlock"), false);
+    const { trainedIds, gainedIds } = roll({ characterTalents, catalogTalents, difficulty: "mythique" });
+    assert.deepStrictEqual(gainedIds, []);
+    assert.deepStrictEqual(trainedIds, ["t2"]);
   });
 });

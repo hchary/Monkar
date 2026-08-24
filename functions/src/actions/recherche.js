@@ -8,8 +8,8 @@
 // Performing it generates actionType.missionRollCount missions into character.missionJournal,
 // replacing whatever was still sitting there unclaimed (see mission journal below). A content gap
 // (no matching mission Subject/Action) just yields fewer results rather than failing the action
-// outright - the same "silently skipped rather than failing" convention
-// functions/src/missionResolution.js's drawQuestLoot already uses.
+// outright - the same "silently skipped rather than failing" convention functions/src/missionLoot.js's
+// drawMissionLoot already uses for a missing loot table.
 //
 // Mission generation (docs/TODO.md "Regional mission generation and journal"): a difficulty is
 // drawn first, then a random worldData/missionSubjects/items entry whose climateIds overlaps the
@@ -20,6 +20,10 @@
 //
 // Always available, no condition - every character can perform it any time (subject only to the
 // normal once-per-Interval action lock).
+//
+// No ActionResult here (docs/TODO.md "ActionResult and the single applier"): generating missions
+// writes the mission journal and nothing else, and the applier's eight-field vocabulary has no word
+// for the journal. Building an empty result to route around would add a call and apply nothing.
 
 const { randomUUID } = require("crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
@@ -69,7 +73,7 @@ function assembleMissionName({ action, subject, difficulty, variation }) {
 // Subject and difficulty are already picked, only the type-matched Action and the independent
 // variation remain random. Returns null on a content gap (no matching Action for that Subject's
 // type) - the caller skips this roll rather than retrying it, the same "silently skipped, not
-// retried" precedent drawQuestLoot set for per-item content gaps.
+// retried" precedent drawMissionLoot set for per-item content gaps.
 function buildMission({ subject, difficulty, missionActions }) {
   const candidateActions = missionActions.filter((action) => action.type === subject.type);
   const action = pickRandom(candidateActions);
