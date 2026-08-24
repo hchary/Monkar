@@ -19,7 +19,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 5 | Content migration scripts (areas, monsters, reputation, triggers) | done | 3, 4 | [Content migration scripts](#content-migration-scripts) |
 | 6 | Resolution engine rebuild (thresholds, bands, tier drop) | done | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
 | 7 | `ActionResult` + `applyActionResult`, all eight handlers | done | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
-| 8 | Mission generation from the bestiary | todo | 5, 6 | [Mission generation from the bestiary](#mission-generation-from-the-bestiary) |
+| 8 | Mission generation from the bestiary | done | 5, 6 | [Mission generation from the bestiary](#mission-generation-from-the-bestiary) |
 | 9 | Monster-pool loot with difficulty rarity ceiling | todo | 8 | [Monster-pool loot](#monster-pool-loot) |
 | 10 | Per-region reputation (+ zero-sum invariant tests) | todo | 7 | [Per-region reputation](#per-region-reputation) |
 | 11 | Talent training roll + monster talent reward | todo | 7, 8 | [Talent training roll and monster talent reward](#talent-training-roll-and-monster-talent-reward) |
@@ -215,9 +215,11 @@ than guessing silently.
   `arrayUnion`, legacy array left in place, ids with no monster behind them reported instead of
   written as dangling references.
 - `dropMissionCatalogs.js` — deletes the two retired catalogs. **Deliberately not run yet**: its
-  header spells out the order, because `recherche.js`, `questTriggers.js` and
-  `ActionResultDialog.jsx` all still read `worldData/missionSubjects/items` until
-  [Mission generation from the bestiary](#mission-generation-from-the-bestiary) repoints them.
+  header spells out the order. `recherche.js` has since moved onto the bestiary
+  ([Mission generation from the bestiary](#mission-generation-from-the-bestiary)), leaving
+  `questTriggers.js` and `ActionResultDialog.jsx` as the last two readers of
+  `worldData/missionSubjects/items` until [Quest chains on monsters](#quest-chains-on-monsters)
+  repoints them.
 
 Three deliberate calls this entry's own table did not specify:
 
@@ -237,8 +239,10 @@ Three deliberate calls this entry's own table did not specify:
   catalogs are readable only from the Firestore console.
 
 Still to do by hand, unchanged from above: re-author `questChains` `steps[].subjectId` as
-`steps[].monsterId`, and do the authoring pass (area types, monster loot) before
-[Mission generation from the bestiary](#mission-generation-from-the-bestiary) ships. A creator-side
+`steps[].monsterId` — `questChains.js` now reads `monsterId` only, so an un-re-authored chain simply
+stops matching anything — and do the authoring pass (area types, monster loot), which
+[Mission generation from the bestiary](#mission-generation-from-the-bestiary) has now made the one
+thing standing between the bestiary draw and a playable journal. A creator-side
 warning listing area types with no monsters, and monsters with no loot, is still worth building and
 is not part of this row.
 
@@ -413,7 +417,36 @@ tagIds     = resolveMonster(target).tagIds                   // parent chain con
 
 **Test**: concatenation down the chain, first-non-null scalars, cycle guard, depth cap. Rewritten test files: `recherche.test.js`, `mission.test.js`.
 
-Not implemented yet. (Rework plan §4.2.)
+Status: **implemented**. `recherche.js` draws from the bestiary: `region.areaId` →
+`worldData/areas/items` → `area.type`, matched against each monster's resolved `areaType` through
+`monstersForAreaType`, with the difficulty drawn independently off the engine's own
+`DIFFICULTY_WEIGHTS`. Journal entries are `{ id, targetMonsterId, name, difficulty, tagIds,
+locationId, regionId, generatedAt }` — `subjectId`/`actionId` are gone, `name` is
+`Chasse {monster.name}`, and `assembleMissionName` went with the Subject draw. Region-locking, the
+location draw and `missionRollCount` are all unchanged, and every content gap (no area, no covering
+monster, empty bestiary) yields fewer missions rather than an error.
+
+Three things this row settled that its own text left implicit:
+
+- **`lib/monsters.js` was already there.** [ActionResult and the single applier](#actionresult-and-the-single-applier)
+  built it (and its tests) to rewire `partirExplorer.js`, so this row consumed it rather than
+  writing it. It returns no `chain` field — nothing needs the walk itself, only what it resolves to.
+- **The forced chain slot bypasses the area filter too, not just the difficulty draw.** A step names
+  a monster; honouring the area pool as well would silently drop a chain whose next target lives
+  elsewhere. A step naming a monster no longer in the bestiary is skipped and the slot falls back to
+  a normal draw.
+- **`questChains.js` is re-keyed here, not in [Quest chains on monsters](#quest-chains-on-monsters).**
+  `steps[].monsterId` and `findChainAdvance({ monsterId })` had to move with the journal entry or
+  chains would have gone quietly dead. What stayed for that row: the chain-level rewards, the
+  `triggeredSubjectIds` → `triggeredMonsterIds` rename (the grant channel keeps its legacy name
+  while the trigger sweep still writes it; the ids in it are already monster ids, since the
+  migration gave each monster its Subject's own id), the sweep itself, and `ActionResultDialog.jsx`.
+
+So `worldData/missionSubjects/items` now has exactly two readers left — `questTriggers.js` and
+`ActionResultDialog.jsx` — and `dropMissionCatalogs.js` still waits on
+[Quest chains on monsters](#quest-chains-on-monsters), not on this row. **The authoring pass is now
+the blocker on this being playable**: a region with no `areaId`, an area type no monster covers, or
+a bestiary still missing `areaType` generates an empty journal. (Rework plan §4.2.)
 
 ## Monster-pool loot
 
@@ -491,7 +524,7 @@ Not implemented yet. (Rework plan §4.7.)
 
 ## Quest chains on monsters
 
-`functions/src/lib/questChains.js` keys on `monsterId` instead of `subjectId`, and `character.triggeredSubjectIds` becomes `triggeredMonsterIds`. `questChainProgress` is unchanged: it stays an id-keyed map, because Firestore needs an id key.
+`character.triggeredSubjectIds` becomes `triggeredMonsterIds`. `questChainProgress` is unchanged: it stays an id-keyed map, because Firestore needs an id key. (`functions/src/lib/questChains.js` already keys on `monsterId`: [Mission generation from the bestiary](#mission-generation-from-the-bestiary) had to move it with the journal entry, or chains would have gone quietly dead. What is left here is the rename, the sweep, the dialog and the rewards below.)
 
 - **New: completing the last step fires the chain's rewards** through an `ActionResult` — `rewardItemIds`, `rewardTalentIds`, `rewardReputation` and `rewardRegionId`. The web has no counterpart for this today; `rewardRegionId` is what stops a chain spanning several regions from crediting whichever one the character happens to be standing in.
 - `ActionResultDialog.jsx`'s page 2 fetches `worldData/monsters/items` instead of `missionSubjects`, and its localStorage key becomes `shownTriggeredMonsters:{characterId}`.
