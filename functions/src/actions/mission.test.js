@@ -9,9 +9,8 @@ const { LOOT_COUNT_BY_DIFFICULTY } = require("../lib/loot");
 // objective any more - it reads its rarity from its own difficulty).
 const MISSION = {
   id: "mission1",
-  subjectId: "subj1",
-  actionId: "act1",
-  name: "Vaincre dragon",
+  targetMonsterId: "mon-dragon",
+  name: "Chasse dragon",
   difficulty: "difficile",
   tagIds: ["tag-x"],
   locationId: "",
@@ -62,7 +61,7 @@ describe("mission resolve()", () => {
     });
 
     assert.equal(updates.lastAction.mission.difficulty, "difficile");
-    assert.equal(updates.lastAction.mission.name, "Vaincre dragon");
+    assert.equal(updates.lastAction.mission.name, "Chasse dragon");
     if (updates.lastAction.success) assert.equal(updates.lastAction.loot.length, 2);
   });
 
@@ -130,12 +129,12 @@ describe("mission resolve()", () => {
     );
   });
 
-  test("advances a composite-quest chain and grants the next step's subject on a matching success", async () => {
+  test("advances a composite-quest chain and grants the next step's monster on a matching success", async () => {
     const chain = {
       id: "chain1",
       steps: [
-        { subjectId: "subj1", difficulty: "difficile" },
-        { subjectId: "subj-next", difficulty: "epique" },
+        { monsterId: "mon-dragon", difficulty: "difficile" },
+        { monsterId: "mon-next", difficulty: "epique" },
       ],
     };
     const originalRandom = Math.random;
@@ -151,14 +150,14 @@ describe("mission resolve()", () => {
 
       assert.equal(updates.lastAction.success, true);
       assert.deepEqual(updates.questChainProgress, { chain1: 1 });
-      assert.deepStrictEqual(updates.triggeredSubjectIds, FieldValue.arrayUnion("subj-next"));
+      assert.deepStrictEqual(updates.triggeredSubjectIds, FieldValue.arrayUnion("mon-next"));
     } finally {
       Math.random = originalRandom;
     }
   });
 
-  test("does not advance any chain when the mission's subject/difficulty matches no step", async () => {
-    const chain = { id: "chain1", steps: [{ subjectId: "unrelated", difficulty: "difficile" }] };
+  test("does not advance any chain when the mission's monster/difficulty matches no step", async () => {
+    const chain = { id: "chain1", steps: [{ monsterId: "unrelated", difficulty: "difficile" }] };
     const originalRandom = Math.random;
     try {
       Math.random = () => 0.999;

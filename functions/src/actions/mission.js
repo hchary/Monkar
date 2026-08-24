@@ -148,18 +148,23 @@ async function resolve({ character, actionTypeId, today, context }) {
     },
   };
 
-  // Composite quests (docs/TODO.md "Composite quests", ported by "Retiring quests and quest
-  // objectives for the subject-action system"): a successful step advances its chain and, unless
-  // it was the chain's last step, grants the next one through the same triggeredSubjectIds
+  // Composite quests (docs/TODO.md "Composite quests"): a successful step advances its chain and,
+  // unless it was the chain's last step, grants the next one through the same triggeredSubjectIds
   // arrayUnion convention functions/src/lib/questTriggers.js's scheduled sweep already uses for a
-  // normal trigger match - reusing the whole reveal/notification pipeline for free. Chain progress
-  // is handler-specific state: the ActionResult vocabulary has no word for it, and docs/TODO.md
-  // "Quest chains on monsters" is what re-keys it off the monster.
+  // normal trigger match - reusing the whole reveal/notification pipeline for free. Steps are keyed
+  // on the mission's target monster since "Mission generation from the bestiary"; the character
+  // field they are granted through keeps its legacy name until "Quest chains on monsters" moves the
+  // sweep too. Chain progress is handler-specific state: the ActionResult vocabulary has no word
+  // for it, which is also why the chain's own completion rewards are still unpaid here.
   if (outcome.success) {
-    const advance = findChainAdvance({ subjectId: mission.subjectId, difficulty: mission.difficulty, chains: chains || [] });
+    const advance = findChainAdvance({
+      monsterId: mission.targetMonsterId,
+      difficulty: mission.difficulty,
+      chains: chains || [],
+    });
     if (advance) {
       updates.questChainProgress = { ...(character.questChainProgress || {}), [advance.chainId]: advance.nextStepIndex };
-      if (advance.nextSubjectId) updates.triggeredSubjectIds = FieldValue.arrayUnion(advance.nextSubjectId);
+      if (advance.nextMonsterId) updates.triggeredSubjectIds = FieldValue.arrayUnion(advance.nextMonsterId);
     }
   }
 

@@ -15,7 +15,9 @@ const { evaluateConditions, conditionsNeedInstances } = require("./actionConditi
 // A Subject with no trigger, or an empty conditions list, is never auto-granted - the same rule the
 // field carries in its new home, shared/schema/monster.ts's `trigger`. INTERIM: this sweep still
 // reads worldData/missionSubjects/items and writes character.triggeredSubjectIds; it is repointed at
-// the bestiary by docs/TODO.md "Mission generation from the bestiary".
+// the bestiary by docs/TODO.md "Quest chains on monsters", which owns that field's rename. Mission
+// generation itself has already moved off the Subject catalog (see recherche.js), so this sweep is
+// the last handler-side reader of it.
 function subjectsWithTriggers(subjects) {
   return subjects.filter((subject) => Array.isArray(subject?.trigger?.conditions) && subject.trigger.conditions.length > 0);
 }

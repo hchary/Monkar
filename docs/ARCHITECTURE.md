@@ -120,7 +120,7 @@ worldData/actionTypes/items/{id}
 -- functions/scripts/dropNarrativeCollections.js. The design record is archived under docs/retired/.
 
 worldData/tags/items/{id}          -- standalone label catalog, "Tags" creator tab -- referenced by id
-  name: string                        from tagIds on missionSubjects, objects, lootTables, talents
+  name: string                        from tagIds on monsters, areas, objects, lootTables, talents
                                        and recettes; deleting a tag
                                        strips its id from every referencing document before deleting
                                        the tag doc itself
@@ -182,7 +182,8 @@ worldData/areas/items/{id}         -- terrain catalog: the type of place a regio
                                     -- here (docs/TODO.md "Métier rework")
   -- Written by AreasManager.jsx (the "Zones" creator tab) and bootstrapped from the existing
   -- regions by functions/scripts/seedAreasFromRegions.js; a region points at one through its
-  -- areaId above. No handler reads it yet - see docs/TODO.md row 8
+  -- areaId above. Read by recherche.js and partirExplorer.js, both of which resolve the character's
+  -- region to this document's `type` and match the bestiary against it
 
 worldData/monsters/items/{id}      -- the bestiary: what a generated mission hunts, replacing the
   name: string                     -- missionSubject x missionAction pair
@@ -202,15 +203,20 @@ worldData/monsters/items/{id}      -- the bestiary: what a generated mission hun
   trigger: { conditions } | null   -- same shape and sweep as the retired missionSubject.trigger
   -- Written by MonstersManager.jsx (the "Monstres" creator tab, docs/TODO.md "Monster creator
   -- page") and seeded from the retired mission Subjects by
-  -- functions/scripts/migrateSubjectsToMonsters.js; no handler reads it yet - see docs/TODO.md
-  -- row 8
+  -- functions/scripts/migrateSubjectsToMonsters.js; read by recherche.js (mission generation) and
+  -- partirExplorer.js (encounter draws), both through lib/monsters.js
 
 -- worldData/quests/items - RETIRED by "Retiring quests and quest objectives for the subject-action
 -- system" (docs/TODO.md), along with QuestsManager.jsx and the "Partir en quête" handler. Missions
--- (worldData/missionSubjects/items x worldData/missionActions/items, generated on the fly by
--- recherche.js) are the sole Aventure-branch content generator now - see mission.js below and docs/
--- TODO.md "Regional mission generation and journal". Any leftover worldData/quests/items documents
--- in a live Firestore project are orphaned data, not read by any code path any more.
+-- (drawn from worldData/monsters/items on the fly by recherche.js since docs/TODO.md "Mission
+-- generation from the bestiary") are the sole Aventure-branch content generator now - see
+-- recherche.js and mission.js below. Any leftover worldData/quests/items documents in a live
+-- Firestore project are orphaned data, not read by any code path any more.
+--
+-- worldData/missionSubjects/items and worldData/missionActions/items - RETIRED by the same rework:
+-- the bestiary replaced the Subject x Action pair. Only the trigger sweep still reads the Subjects,
+-- until docs/TODO.md "Quest chains on monsters" moves it onto monster.trigger;
+-- functions/scripts/dropMissionCatalogs.js deletes both collections once it has.
 
 worldData/objects/items/{id}       -- general item catalog: weapons, armor, components, knowledge
   name: string                     -- tomes, magic items, currency, property deeds, etc.
@@ -319,9 +325,17 @@ Pure math, no Firestore, shared by every Aventure-branch encounter. One `rollD10
 
 An unknown difficulty resolves as a wound-free failure rather than throwing (a content gap, the same convention loot drawing uses). Written by docs/TODO.md "Resolution engine rebuild", which deleted the previous two-scale engine (`questResolution.js`: threshold reductions per tag-sharing talent, exact-equality wound thresholds, the 1→300 reputation scale).
 
+### `recherche.js`: generating the mission journal
+
+The "Se renseigner" action fills `character.missionJournal` with `actionType.missionRollCount` fresh missions, replacing whatever was still sitting there unclaimed — a rolling offer, not a history. Since docs/TODO.md "Mission generation from the bestiary" each draw is two independent picks: a difficulty off the engine's own `DIFFICULTY_WEIGHTS` (25/45/20/6/3/1 across `facile..mythique`), and a monster picked uniformly from the pool `monstersForAreaType` returns for the character's region (`region.areaId` → `worldData/areas/items` → `area.type`, matched against each monster's *resolved* `areaType`) — the same pool `partirExplorer.js` draws its encounters from. `monster.difficulty` does **not** gate which monsters appear at which difficulty; it only raises the loot rarity ceiling later (docs/TODO.md "Monster-pool loot").
+
+A journal entry is `{ id, targetMonsterId, name, difficulty, tagIds, locationId, regionId, generatedAt }`: `name` is `Chasse {monster.name}` (the difficulty is its own field, rendered with the `difficulty-text-*` accent class, and is deliberately not part of the title), `tagIds` are the monster's resolved tags (its own concatenated with its parent chain's), and `locationId` is still drawn from the region's `adventureZoneIds` for flavour. `regionId` is what region-locks the mission: `mission.js` refuses to resolve it anywhere else, so travelling strands unclaimed entries.
+
+Every content gap yields *fewer* missions rather than an error — a region with no area, an area no monster covers, an empty bestiary. That is the same "silently skipped rather than failing" convention loot drawing uses, and it is what stops an unauthored area type from breaking the action outright.
+
 ### `mission.js`: resolving a generated mission
 
-Quests and "Partir en quête" are retired (docs/TODO.md "Retiring quests and quest objectives for the subject-action system"); `mission.js` is now the sole Aventure-branch content resolver. A mission is generated ahead of time by `recherche.js` into `character.missionJournal` (see docs/TODO.md "Regional mission generation and journal") — `mission.js`'s `prepare` just looks the chosen `payload.missionId` up in that journal and region-locks it (`mission.regionId` must match the character's current region).
+Quests and "Partir en quête" are retired (docs/TODO.md "Retiring quests and quest objectives for the subject-action system"); `mission.js` is now the sole Aventure-branch content resolver. A mission is generated ahead of time by `recherche.js` into `character.missionJournal` (see the section just above) — `mission.js`'s `prepare` just looks the chosen `payload.missionId` up in that journal and region-locks it (`mission.regionId` must match the character's current region).
 
 `resolve` assembles the resolution itself rather than delegating to a wrapper: `resolveMission` (the engine above) against the mission's own `tagIds` and difficulty, `rollTalentEvolutionIds` for the talent luck a success earns, `missionLoot.js`'s `drawMissionLoot` for the items (two rarity ranks lower on a failure), and `lib/reputation.js`'s interim `rollReputationReward` for the score — all of it collected into one `ActionResult` and written by `applyActionResult`. `lastAction.score` is the *raised* roll, the number actually compared against `lastAction.threshold`, with the raw `roll` and the `talentBonus` that raised it kept alongside. Nothing is narrated — the generator was removed by "Narration removal" (docs/TODO.md) — so a mission's result pop-up shows only "Succès"/"Échec". The resolved mission (`id`, `name`, `difficulty`, `locationId`, `locationName`) is recorded on both `lastAction.mission` and the `actionsLog` entry, and the resolved entry is removed from `character.missionJournal`. The mission journal and the quest chain's progress are the only things this handler writes outside the applier.
 
@@ -329,11 +343,13 @@ Quests and "Partir en quête" are retired (docs/TODO.md "Retiring quests and que
 
 ### Composite quests: chained `worldData/questChains/items`
 
-`worldData/questChains/items/{id}` (no creator UI, authored directly in the Firestore console) holds an ordered `steps: [{ monsterId, difficulty }]` array, step 1 first, plus the chain-level `rewardItemIds` / `rewardTalentIds` / `rewardReputation` / `rewardRegionId` paid out on its last step (contract only so far - `questChains.js` still reads the previous `subjectId` shape and pays no rewards, until docs/TODO.md "Quest chains on monsters") — ported from a `questIds: string[]` list of hand-authored quests by "Retiring quests and quest objectives for the subject-action system" (docs/TODO.md). Step 1 is just an ordinary mission draw, discoverable however missions normally are; a chain only starts mattering once step 1 resolves successfully. Logic lives in `functions/src/lib/questChains.js` (`findPendingChainStep`/`findChainAdvance`), shared by `recherche.js` (generation) and `mission.js` (advancement).
+`worldData/questChains/items/{id}` (no creator UI, authored directly in the Firestore console) holds an ordered `steps: [{ monsterId, difficulty }]` array, step 1 first, plus the chain-level `rewardItemIds` / `rewardTalentIds` / `rewardReputation` / `rewardRegionId` paid out on its last step (declared but still paid by nobody, until docs/TODO.md "Quest chains on monsters") — ported from a `questIds: string[]` list of hand-authored quests by "Retiring quests and quest objectives for the subject-action system" (docs/TODO.md). Step 1 is just an ordinary mission draw, discoverable however missions normally are; a chain only starts mattering once step 1 resolves successfully. Logic lives in `functions/src/lib/questChains.js` (`findPendingChainStep`/`findChainAdvance`), shared by `recherche.js` (generation) and `mission.js` (advancement).
 
-`recherche.js`'s `resolve` calls `findPendingChainStep({ character, chains })` before its normal mission-generation loop: it looks for a chain whose `character.questChainProgress[chainId]` names a step index beyond 0 whose `subjectId` is also present in `character.triggeredSubjectIds` (i.e. a step already granted but not yet resolved). If found, that step's `{ subjectId, difficulty }` pair claims one guaranteed slot of the batch — its Subject and difficulty are fixed, only the type-matched Action and variation are still drawn randomly — and the remaining slots draw normally. If more than one chain has a step pending, the earliest-granted one wins (earliest index in `triggeredSubjectIds`).
+`recherche.js`'s `resolve` calls `findPendingChainStep({ character, chains })` before its normal mission-generation loop: it looks for a chain whose `character.questChainProgress[chainId]` names a step index beyond 0 whose `monsterId` is also present in `character.triggeredSubjectIds` (i.e. a step already granted but not yet resolved). If found, that step's `{ monsterId, difficulty }` pair claims one guaranteed slot of the batch, bypassing *both* halves of the normal draw — the forced slot ignores the area filter as well as the difficulty roll, so a chain can send the character after a monster that does not live in their region. If more than one chain has a step pending, the earliest-granted one wins (earliest index in `triggeredSubjectIds`). A step naming a monster that no longer exists is skipped, and the slot falls back to a normal draw.
 
-`mission.js`'s `resolve` calls `findChainAdvance({ subjectId: mission.subjectId, difficulty: mission.difficulty, chains })` after a successful resolution: if the resolved mission's `{ subjectId, difficulty }` pair belongs to a chain step, `character.questChainProgress[chainId]` is bumped to the next step index, and — unless it was the chain's last step — the next step's subject id is pushed into `character.triggeredSubjectIds` via the same `arrayUnion` convention `sweepQuestTriggers` uses for a normal trigger match (see below), reusing that entire reveal/notification pipeline for free. A failed step advances nothing, so the same step stays pending and is offered again next time. Progress is still bumped (with no next subject id to grant) when the *last* step succeeds, so a finished chain's final step stops being reported as pending.
+`mission.js`'s `resolve` calls `findChainAdvance({ monsterId: mission.targetMonsterId, difficulty: mission.difficulty, chains })` after a successful resolution: if the resolved mission's `{ monsterId, difficulty }` pair belongs to a chain step, `character.questChainProgress[chainId]` is bumped to the next step index, and — unless it was the chain's last step — the next step's monster id is pushed into `character.triggeredSubjectIds` via the same `arrayUnion` convention `sweepQuestTriggers` uses for a normal trigger match (see below), reusing that entire reveal/notification pipeline for free. A failed step advances nothing, so the same step stays pending and is offered again next time. Progress is still bumped (with no next monster id to grant) when the *last* step succeeds, so a finished chain's final step stops being reported as pending.
+
+The grant channel is still the `triggeredSubjectIds` field, whose name the trigger sweep below has not moved off yet — the ids it now carries for chains are monster ids, which the migration made identical to the old Subject ids anyway. docs/TODO.md "Quest chains on monsters" renames the field once the sweep moves too.
 
 ### `partirExplorer.js`: multiple encounters in one action
 
@@ -373,9 +389,9 @@ The move from the subject/action mission catalogs to the Area + bestiary content
 | `migrateSubjectsToMonsters.js` | One `worldData/monsters/items` document per retired mission Subject, **keeping the Subject's document id** so every id stored elsewhere stays valid. Carries `name`, the union of the per-tier and per-variation `tagIds`, and `trigger` verbatim; `difficulty` becomes the lowest tier the Subject was authored for, and `areaType`/`lootItemIds` have no source at all — they are written null/empty and listed under "TO AUTHOR" | Any time |
 | `migrateReputationToPerRegion.js` | `character.reputation` → `character.reputations[character.region.id]`, leaving the legacy scalar in place | Any time; re-run just before "Per-region reputation" goes live |
 | `migrateTriggeredSubjectsToMonsters.js` | `character.triggeredSubjectIds` → `character.triggeredMonsterIds` (`arrayUnion`), skipping and reporting ids with no monster behind them. Leaves the legacy array in place | After `migrateSubjectsToMonsters.js` |
-| `dropMissionCatalogs.js` | Deletes `worldData/missionSubjects/items` and `worldData/missionActions/items` | **Not yet** — three live paths still read the Subjects (`recherche.js`, `questTriggers.js`, `ActionResultDialog.jsx`) until docs/TODO.md "Mission generation from the bestiary" repoints them |
+| `dropMissionCatalogs.js` | Deletes `worldData/missionSubjects/items` and `worldData/missionActions/items` | **Not yet** — `recherche.js` has moved onto the bestiary, but `questTriggers.js` and `ActionResultDialog.jsx` still read the Subjects until docs/TODO.md "Quest chains on monsters" repoints them |
 
-`worldData/questChains/items` is **not** scripted: its `steps[].subjectId` → `steps[].monsterId` rename is re-authored by hand, the same call the previous migration made for chains authored against `quests`. Because the monsters keep their Subjects' ids, that is a field rename, not a value remap.
+`worldData/questChains/items` is **not** scripted: its `steps[].subjectId` → `steps[].monsterId` rename is re-authored by hand, the same call the previous migration made for chains authored against `quests`. Because the monsters keep their Subjects' ids, that is a field rename, not a value remap. `questChains.js` reads `monsterId` only, so a chain left un-re-authored simply stops matching anything — it never half-matches.
 
 The real cost of this wave is the authoring pass, not the code: until a monster has an `areaType` it is never drawn, and until it has `lootItemIds` its missions pay nothing.
 
