@@ -31,14 +31,18 @@ describe("resolveQuestOutcome", () => {
   test("draws degraded-rarity loot (two ranks down, floored at commun) and grants no reputation on a forced failure", () => {
     const originalRandom = Math.random;
     try {
-      // "mythique" has a success threshold of 100; a score fixed at 1 (Math.random -> 0) can
-      // never reach it, guaranteeing failure deterministically without a statistical loop.
+      // "mythique" has a success threshold of 100 and the roll's domain is 0..99, so a talentless
+      // character cannot clear it at all (docs/TODO.md "Resolution engine rebuild") - a roll fixed
+      // at 0 (Math.random -> 0) fails deterministically without a statistical loop.
       Math.random = () => 0;
 
       const outcome = resolveQuestOutcome(baseArgs());
 
       assert.equal(outcome.success, false);
-      assert.equal(outcome.score, 1);
+      assert.equal(outcome.score, 0);
+      // A roll of 0 is inside "mythique"'s permanent band (70), and the wound is applied here.
+      assert.equal(outcome.wound, "permanent");
+      assert.equal(outcome.woundResult.woundsPermanent, 1);
       assert.equal(outcome.reputationGained, 0);
       assert.deepEqual(outcome.talentEvolutions, []);
       // Objective rarity "rare" (index 2) minus 2 ranks -> "commun" (index 0), not "rare".

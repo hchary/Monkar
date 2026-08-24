@@ -74,14 +74,16 @@ describe("mission resolve()", () => {
     if (!updates.lastAction.success) assert.equal(updates.lastAction.reputationGained, 0);
   });
 
-  test("guarantees success when talent tag overlap drops the threshold to the floor", async () => {
-    // "difficile" bases at 80 with requiredTalentLevel 2; 79 quality-1 talents sharing the
-    // mission's own tagIds each contribute -1, driving the threshold to 1 - low enough that any
-    // 1-100 score roll succeeds, without needing to mock Math.random.
-    const talents = Array.from({ length: 79 }, (_, i) => ({
+  test("guarantees success when the character's relevant talents raise the roll past the threshold", async () => {
+    // Talents raise the roll rather than lower the bar (docs/TODO.md "Resolution engine rebuild"),
+    // and at "difficile" (index 2) only talents of quality >= 2 count at all. Fourteen quality-5
+    // talents sharing the mission's own tagIds are worth +70 on the roll, and their count also
+    // drops the tier all the way to "facile" (threshold 10) - so any 0-99 roll succeeds, without
+    // needing to mock Math.random.
+    const talents = Array.from({ length: 14 }, (_, i) => ({
       id: `t${i}`,
       name: `Talent ${i}`,
-      quality: 1,
+      quality: 5,
       tagIds: ["tag-x"],
     }));
 

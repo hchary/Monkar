@@ -17,7 +17,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 3 | Monster creator page (CRUD, inheritance preview) | done | 2 | [Monster creator page](#monster-creator-page) |
 | 4 | Area creator page + `region.areaId` | done | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
 | 5 | Content migration scripts (areas, monsters, reputation, triggers) | done | 3, 4 | [Content migration scripts](#content-migration-scripts) |
-| 6 | Resolution engine rebuild (thresholds, bands, tier drop) | todo | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
+| 6 | Resolution engine rebuild (thresholds, bands, tier drop) | done | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
 | 7 | `ActionResult` + `applyActionResult`, all eight handlers | todo | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
 | 8 | Mission generation from the bestiary | todo | 5, 6 | [Mission generation from the bestiary](#mission-generation-from-the-bestiary) |
 | 9 | Monster-pool loot with difficulty rarity ceiling | todo | 8 | [Monster-pool loot](#monster-pool-loot) |
@@ -282,7 +282,16 @@ const DIFFICULTY_WEIGHTS = [25, 45, 20, 6, 3, 1];
 
 **New test coverage this row owes**: the threshold/tier-drop pair including "one level-5 talent never drops a tier"; injury bands mutually exclusive and `roll === permanentThreshold` *does* wound; success never wounds for the current tables; `mythique` unwinnable at zero talents and winnable at one point of bonus. Deleted with the old code: `questResolution.test.js`. Rewritten: `missionResolution.test.js`.
 
-Not implemented yet. (Rework plan §4.1.)
+Status: **implemented**. `functions/src/lib/missionResolution.js` holds the engine — the three tables, `rollD100` (0..99), `isWinnableWithoutTalents`, `checkAgainstTalents`, `updateDifficulty`, `injuryFromRoll`, `woundFromInjury` and `resolveMission` — with `functions/src/lib/missionResolution.test.js` covering every property listed above. `questResolution.js` and its test are deleted, `wounds.js` and `wounds.test.js` are untouched as planned, and an unknown difficulty resolves as a wound-free failure (the old Infinity-threshold behaviour, kept deliberately as the content-gap convention).
+
+Two notes on what this row did *not* take, both closed by later rows:
+
+- **`functions/src/missionResolution.js` survives as an interim wrapper.** Deleting it outright is [ActionResult and the single applier](#actionresult-and-the-single-applier)'s job (row 7): it is what feeds the two handlers their outcome object, and it still owns the loot draw, the talent-evolution roll, `applyWound` and the reputation reward. Its resolution *math* is gone — it now calls `resolveMission` — and it carries an `INTERIM` header saying so. The old `REPUTATION_REWARDS` / `rollReputationReward` moved into it rather than being deleted with the engine, because the signed per-region formula that replaces them belongs to [Per-region reputation](#per-region-reputation) (row 10); deleting them here would have left every successful mission paying nothing for two rows. Same interim treatment "Narration removal" gave `assembleMissionName`.
+- **`lastAction.score` is now the *raised* roll** (`updatedRoll`), so `ActionOutcome.jsx`'s existing "Jet : X (seuil de réussite : Y)" line keeps comparing the two numbers the engine actually compared; the raw 0..99 roll and the talent bonus are also on the outcome for [Result pop-up rework](#result-pop-up-rework) (row 14) to show separately if it wants them. `mission.test.js`'s "guarantees success" case was rewritten from 79 quality-1 talents (which now contribute nothing at `difficile`) to 14 quality-5 ones.
+
+**One discrepancy in the source analysis, resolved in favour of the pseudo-code.** `python-model-logic-diff.md` §1.1 gives both the `updateDifficulty` pseudo-code and a worked-example table, and three of that table's eighteen cells disagree with the pseudo-code it sits under — including one cell (`difficulty 4`, 5 perfect talents) that contradicts the table's own "count needed for the first step" column. This implements the pseudo-code, which is the version both this entry and the rework plan quote, and which satisfies the one property both documents state explicitly ("a single level-5 talent never drops a tier"). Worth a second look if the tier drop ever feels a step too generous.
+
+(Rework plan §4.1.)
 
 ## ActionResult and the single applier
 
