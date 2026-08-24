@@ -16,7 +16,7 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 | 2 | Area and Monster contracts (Zod schemas, shared + functions) | done | — | [Area and Monster contracts](#area-and-monster-contracts) |
 | 3 | Monster creator page (CRUD, inheritance preview) | done | 2 | [Monster creator page](#monster-creator-page) |
 | 4 | Area creator page + `region.areaId` | done | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
-| 5 | Content migration scripts (areas, monsters, reputation, triggers) | todo | 3, 4 | [Content migration scripts](#content-migration-scripts) |
+| 5 | Content migration scripts (areas, monsters, reputation, triggers) | done | 3, 4 | [Content migration scripts](#content-migration-scripts) |
 | 6 | Resolution engine rebuild (thresholds, bands, tier drop) | todo | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
 | 7 | `ActionResult` + `applyActionResult`, all eight handlers | todo | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
 | 8 | Mission generation from the bestiary | todo | 5, 6 | [Mission generation from the bestiary](#mission-generation-from-the-bestiary) |
@@ -150,7 +150,7 @@ Status: **implemented**. `src/components/creator/MonstersManager.jsx` is the pag
 
 Two deliberate deviations from the paragraph above:
 
-- **The `Monstres` tab is added next to the two mission tabs, not in place of them.** Deleting them is the migration's job per this entry's own warning, and [Content migration scripts](#content-migration-scripts) hasn't run — `CreatorDashboard.jsx` carries a comment saying so. That row deletes both tabs and both managers.
+- **The `Monstres` tab was added next to the two mission tabs, not in place of them**, because deleting them is the migration's job per this entry's own warning. [Content migration scripts](#content-migration-scripts) has since done it: both tabs and both managers are gone, and running `migrateSubjectsToMonsters.js` before deploying that front end is what keeps the ordering honest.
 - **`trigger` has no control**, exactly as it had none on `MissionSubjectsManager` (it is authored by script). The form round-trips whatever the document holds, so editing a migrated monster never drops its trigger.
 
 (Rework plan §4.3.)
@@ -194,7 +194,57 @@ Retired collections, dropped once the above have run: `worldData/missionSubjects
 
 **Content re-authoring is the real cost of this wave, not the code.** Until a monster has loot its missions pay nothing; until it has an `areaType` it is never drawn; a region whose area type no monster covers generates an empty journal. Budget an authoring pass before [Mission generation from the bestiary](#mission-generation-from-the-bestiary) ships, and consider a creator-side warning listing area types with no monsters and monsters with no loot.
 
-Not implemented yet. (Rework plan §6.)
+Status: **implemented** — the scripts are written; like every script in `functions/scripts/` they
+still have to be **run by hand** against Firestore, and none of them has been. All five are
+idempotent (a re-run never clobbers authoring done in between) and all print a review list rather
+than guessing silently.
+
+- `seedAreasFromRegions.js` — one Area per distinct `climateIds`/`reliefIds` combination, with a
+  deterministic `zone-<slug>` id, then sets each region's `areaId` (regions that already have one
+  are skipped). `type` is guessed from the climate's `bannerKey` first — the only signal in the old
+  data that actually names a terrain kind — then from keywords in the climate/relief names, falling
+  back to `plaine`; every guess is printed under "TO REVIEW". `tagIds`/`lootTableIds` are left empty.
+- `migrateSubjectsToMonsters.js` — one monster per Subject, carrying `name`, the union of the
+  per-tier and per-variation `tagIds`, and `trigger` verbatim. `difficulty` takes the lowest tier
+  the Subject was authored for (difficulty no longer gates generation, it only raises the loot
+  rarity ceiling, so low is the conservative guess); `areaType` and `lootItemIds` are written
+  null/empty and every migrated monster is listed under "TO AUTHOR".
+- `migrateReputationToPerRegion.js` — `reputation` → `reputations[region.id]`, scalar left in place.
+  Characters with no `region.id` are reported, not guessed at.
+- `migrateTriggeredSubjectsToMonsters.js` — `triggeredSubjectIds` → `triggeredMonsterIds` via
+  `arrayUnion`, legacy array left in place, ids with no monster behind them reported instead of
+  written as dangling references.
+- `dropMissionCatalogs.js` — deletes the two retired catalogs. **Deliberately not run yet**: its
+  header spells out the order, because `recherche.js`, `questTriggers.js` and
+  `ActionResultDialog.jsx` all still read `worldData/missionSubjects/items` until
+  [Mission generation from the bestiary](#mission-generation-from-the-bestiary) repoints them.
+
+Three deliberate calls this entry's own table did not specify:
+
+- **The id map is the identity.** `migrateSubjectsToMonsters.js` gives each monster its Subject's
+  own document id instead of a fresh one plus a lookup table, so
+  `migrateTriggeredSubjectsToMonsters.js` needs no map file, every id already stored elsewhere stays
+  valid, and the `questChains` re-authoring below is a field rename rather than a value remap. That
+  script only validates each id against the bestiary and reports the ones with no monster behind
+  them.
+- **`dropMissionCatalogs.js` is new here**, since the retirement this entry describes in prose needs
+  a script like the narration one did, and holding it back is safer than leaving the deletion
+  undocumented.
+- **The `Actions de mission` / `Sujets de mission` creator tabs and their two managers are deleted**,
+  which is what [Monster creator page](#monster-creator-page) deferred to this row. That entry's
+  warning — run the migration before deleting the tabs — still stands and is now the *author's* to
+  honour: run `migrateSubjectsToMonsters.js` before deploying this front end, since after it the old
+  catalogs are readable only from the Firestore console.
+
+Still to do by hand, unchanged from above: re-author `questChains` `steps[].subjectId` as
+`steps[].monsterId`, and do the authoring pass (area types, monster loot) before
+[Mission generation from the bestiary](#mission-generation-from-the-bestiary) ships. A creator-side
+warning listing area types with no monsters, and monsters with no loot, is still worth building and
+is not part of this row.
+
+Not fixed here, and pre-existing: `TagsManager.jsx`'s delete sweep still strips a deleted tag from
+the retired `quests` / `narrativeSubjects` / `verbPhrases` collections and never touches `monsters`
+or `areas`. (Rework plan §6.)
 
 ## Resolution engine rebuild
 
