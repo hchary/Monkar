@@ -1,29 +1,44 @@
-// The shared score-roll resolution engine behind every Aventure-branch encounter - "Mission"
-// (mission.js) and "Partir explorer"'s per-round encounters (partirExplorer.js) - originally built
-// inside the now-retired "Partir en quête" handler (docs/TODO.md "Retiring quests and quest
-// objectives for the subject-action system") and moved here once that handler was deleted, since
-// this engine had to keep serving its siblings. The "quest"/"objective" vocabulary in this file's
-// parameter names is a leftover, generic shape - callers pass in whatever quest- or mission-shaped
-// stand-in fits (see mission.js's missionAsQuest/missionObjective, partirExplorer.js's per-round
-// synthetic quest/objective) - not a dependency on the retired worldData/quests/items catalog.
+// INTERIM. The orchestration layer around every Aventure-branch encounter - "Mission"
+// (mission.js) and "Partir explorer"'s per-round encounters (partirExplorer.js): it draws the
+// loot, rolls the talent evolutions, applies the wound and hands the handler one outcome object.
+// The resolution *math* is no longer here - docs/TODO.md "Resolution engine rebuild" moved it to
+// `functions/src/lib/missionResolution.js` (same basename, different directory), which this file
+// now calls into.
 //
-// Draws one objective, rolls one score, compares it against the two independent difficulty-derived
-// scales, and rewards accordingly (docs/TODO.md "Mission and quest resolution algorithm" - carried
-// over unchanged by the retirement migration). Outcomes are no longer narrated: the procedural
-// narrative generator and its catalogs were removed by docs/TODO.md "Narration removal", so
-// `narrativeText` is always "" and every caller's default success/failure sentence is gone with it.
+// This whole file, including the "quest"/"objective" vocabulary its parameter names still carry,
+// disappears with docs/TODO.md "ActionResult and the single applier": the handlers stop being fed
+// an outcome object and start returning an `ActionResult` built on the engine directly. Until then
+// it stays as the one place the old shape is adapted to the new engine, so the two handlers keep
+// working unchanged - the same interim treatment "Narration removal" gave `assembleMissionName`.
+//
+// Outcomes are not narrated: the procedural narrative generator and its catalogs were removed by
+// docs/TODO.md "Narration removal", so `narrativeText` is always "".
 
 const { RARITY_ORDER } = require("./lib/rolls");
 const { pickRandom: pickRandomLoot, drawLootTableItemId, LOOT_COUNT_BY_DIFFICULTY } = require("./lib/loot");
 const { rollTalentEvolutions } = require("./lib/talentEvolution");
 const { applyWound } = require("./lib/wounds");
-const {
-  rollScore,
-  rollReputationReward,
-  computeSuccessThreshold,
-  computeWoundThresholds,
-  determineWoundSeverity,
-} = require("./lib/questResolution");
+const { resolveMission } = require("./lib/missionResolution");
+
+// INTERIM, and the last survivor of the old engine's tables: the 1→300 random reputation scale.
+// docs/TODO.md "Per-region reputation" replaces it with the signed `1 + difficultyIndex` /
+// `-(4 - difficultyIndex)` pair credited to a named region, which is a different feature from this
+// row's engine rebuild - so rather than leave successful missions paying nothing in the meantime,
+// the scale moved here to die with the rest of this file.
+const REPUTATION_REWARDS = {
+  facile: { base: 1, diceMax: 2 },
+  moyen: { base: 5, diceMax: 4 },
+  difficile: { base: 10, diceMax: 6 },
+  tres_difficile: { base: 20, diceMax: 10 },
+  epique: { base: 80, diceMax: 20 },
+  mythique: { base: 200, diceMax: 100 },
+};
+
+function rollReputationReward(difficulty) {
+  const cfg = REPUTATION_REWARDS[difficulty];
+  if (!cfg) return 0;
+  return cfg.base + Math.floor(Math.random() * (cfg.diceMax + 1));
+}
 
 const DEFAULT_QUEST_DIFFICULTY_WEIGHTS = [
   { difficulty: "facile", weight: 55 },
@@ -102,12 +117,21 @@ function resolveQuestOutcome({
   // objective draw inside drawQuestLoot.
   const objective = pickRandomLoot(questObjectives);
 
-  const score = rollScore();
-  const threshold = computeSuccessThreshold({ character, objective, difficulty: quest.difficulty });
-  const success = score >= threshold;
+  // The engine matches talents against one tag list, the way a monster's resolved tags will be
+  // passed once docs/TODO.md "Mission generation from the bestiary" lands. Both current callers
+  // build their synthetic objective from the very tagIds they also put on the quest, so the
+  // objective's list is the mission's list.
+  const outcome = resolveMission({
+    character,
+    tagIds: objective?.tagIds || quest.tagIds || [],
+    difficulty: quest.difficulty,
+  });
 
-  const woundThresholds = computeWoundThresholds({ character, objective, difficulty: quest.difficulty });
-  const wound = determineWoundSeverity({ score, thresholds: woundThresholds });
+  // `score` is the *raised* roll - the number actually compared against the threshold, and the one
+  // the result pop-up's "Jet : X (seuil de réussite : Y)" line has to show for the comparison to
+  // read true. The raw 0..99 roll and the talent bonus that raised it stay on the outcome for
+  // docs/TODO.md "Result pop-up rework" to display separately if it wants them.
+  const { roll, relevantSum, updatedRoll: score, threshold, success, wound } = outcome;
   const woundResult = wound ? applyWound(character, wound) : null;
 
   // Talent evolution was never gated by the retired tiers roll, only by "the quest succeeds" - it
@@ -140,6 +164,8 @@ function resolveQuestOutcome({
   });
 
   return {
+    roll,
+    relevantSum,
     score,
     threshold,
     success,
