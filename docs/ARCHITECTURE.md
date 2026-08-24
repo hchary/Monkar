@@ -168,8 +168,9 @@ worldData/adventureZones/items/{id}   -- displayed as "Lieu(x) de quête" in the
   description: string                 -- referenced by worldData/regions/items (adventureZoneIds, a
                                        -- region's available locations) and a mission's locationId
   tagIds: [string]                    -- worldData/tags/items ids describing this location's flavour
-                                       -- (forest, coastal village, ruins, ...); read by
-                                       -- partirExplorer.js for each round's objective and loot pool
+                                       -- (forest, coastal village, ruins, ...); flavour only since
+                                       -- the bestiary rewiring - a round's tags and loot pool both
+                                       -- come from the monster it meets, not from where it happens
 
 worldData/areas/items/{id}         -- terrain catalog: the type of place a region sits in.
   name: string                     -- French display name, e.g. "Marais de Ravenholm"
@@ -228,14 +229,16 @@ worldData/objects/items/{id}       -- general item catalog: weapons, armor, comp
   tagIds: [string]                 -- worldData/tags/items ids
   -- not yet consumed by any Cloud Function or linked to a character's inventory, see docs/TODO.md
 
-worldData/lootTables/items/{id}    -- loot table catalog: a named, tagged pool of objects a mission
-  name: string                     -- (or any other consumer) can draw from
+worldData/lootTables/items/{id}    -- loot table catalog: a named, tagged pool of objects a harvest
+  name: string                     -- action can draw from
   rarity: string                   -- one of the 8-tier rarity enum shared with talents, above
   tagIds: [string]                 -- worldData/tags/items ids
   itemIds: [string]                -- worldData/objects/items ids; draw is uniform over this list
                                     -- (see drawLootTableItemId, src/lib/lootTables.js)
   -- which table is used is resolved dynamically per draw (rarity + tag overlap), not referenced by
-  -- id from any other document - see functions/src/missionLoot.js
+  -- id from any other document - see functions/src/actions/recolte.js
+  -- HARVEST ONLY since docs/TODO.md "Monster-pool loot": mission and exploration loot draws from
+  -- the target monster's own lootItemIds, so rarity/weightMode/itemWeights no longer reach it
 
 worldData/recettes/items/{id}      -- crafting recipe catalog: ingredients consumed to produce results
   name: string
@@ -337,9 +340,11 @@ Every content gap yields *fewer* missions rather than an error — a region with
 
 Quests and "Partir en quête" are retired (docs/TODO.md "Retiring quests and quest objectives for the subject-action system"); `mission.js` is now the sole Aventure-branch content resolver. A mission is generated ahead of time by `recherche.js` into `character.missionJournal` (see the section just above) — `mission.js`'s `prepare` just looks the chosen `payload.missionId` up in that journal and region-locks it (`mission.regionId` must match the character's current region).
 
-`resolve` assembles the resolution itself rather than delegating to a wrapper: `resolveMission` (the engine above) against the mission's own `tagIds` and difficulty, `rollTalentEvolutionIds` for the talent luck a success earns, `missionLoot.js`'s `drawMissionLoot` for the items (two rarity ranks lower on a failure), and `lib/reputation.js`'s interim `rollReputationReward` for the score — all of it collected into one `ActionResult` and written by `applyActionResult`. `lastAction.score` is the *raised* roll, the number actually compared against `lastAction.threshold`, with the raw `roll` and the `talentBonus` that raised it kept alongside. Nothing is narrated — the generator was removed by "Narration removal" (docs/TODO.md) — so a mission's result pop-up shows only "Succès"/"Échec". The resolved mission (`id`, `name`, `difficulty`, `locationId`, `locationName`) is recorded on both `lastAction.mission` and the `actionsLog` entry, and the resolved entry is removed from `character.missionJournal`. The mission journal and the quest chain's progress are the only things this handler writes outside the applier.
+`prepare` also fetches the bestiary and resolves `mission.targetMonsterId` through its parent chain (`lib/monsters.js`), since loot is now drawn from that monster's own pool.
 
-`missionLoot.js`'s `drawMissionLoot` resolves the target rarity and tag pool once per occurrence (from the resolution's own `tagIds` and its difficulty's rarity equivalence, `difficultyToRarity`), then draws one loot table per item (count set by difficulty via `LOOT_COUNT_BY_DIFFICULTY`) among those matching, and a uniform item draw within it; items with no matching table are silently skipped (a content gap, not an error). `rarityOffset` shifts the target rarity down that many ranks, floored at `commun` — how a failed resolution's consolation loot is drawn. docs/TODO.md "Monster-pool loot" replaces this whole draw with one over the target monster's own `lootItemIds`.
+`resolve` assembles the resolution itself rather than delegating to a wrapper: `resolveMission` (the engine above) against the mission's own `tagIds` and difficulty, `rollTalentEvolutionIds` for the talent luck a success earns, `missionLoot.js`'s `drawMissionLoot` for the items (one instead of three on a failure, same pool), and `lib/reputation.js`'s interim `rollReputationReward` for the score — all of it collected into one `ActionResult` and written by `applyActionResult`. `lastAction.score` is the *raised* roll, the number actually compared against `lastAction.threshold`, with the raw `roll` and the `talentBonus` that raised it kept alongside. Nothing is narrated — the generator was removed by "Narration removal" (docs/TODO.md) — so a mission's result pop-up shows only "Succès"/"Échec". The resolved mission (`id`, `name`, `difficulty`, `locationId`, `locationName`) is recorded on both `lastAction.mission` and the `actionsLog` entry, and the resolved entry is removed from `character.missionJournal`. The mission journal and the quest chain's progress are the only things this handler writes outside the applier.
+
+`missionLoot.js`'s `drawMissionLoot` draws over the **target monster's own resolved `lootItemIds`** (docs/TODO.md "Monster-pool loot") — the pool the parent chain contributes to, resolved by `lib/monsters.js` in each handler's `prepare()`. Three parameters shape a draw: the outcome sets the count (**3 on a success, 1 on a failure** — a failure now pays undegraded loot at a smaller haul rather than a full-size degraded one, and the old `rarityOffset` lever is gone), `rarityCeilingIndex` sets a **ceiling** at `max(mission difficulty, monster difficulty)` on the shared 8-tier scale (a ceiling, not an exact match: a `mythique` hunt against a common-loot monster still draws commons), and the draw itself is **uniform, with replacement** over what passes it. Content gaps degrade rather than fail: a pool with nothing under the ceiling falls back to the unfiltered pool, a monster with no loot (or one the bestiary no longer holds) yields `[]`, and nothing here throws. `difficultyToRarity` survives as the positional difficulty→rarity mapping the talent roll still reads.
 
 ### Composite quests: chained `worldData/questChains/items`
 
@@ -353,7 +358,7 @@ The grant channel is still the `triggeredSubjectIds` field, whose name the trigg
 
 ### `partirExplorer.js`: multiple encounters in one action
 
-A second, sibling Aventure-branch handler (`docs/TODO.md` "Aventure exploration mechanics") — not a replacement for `mission.js`, registered under its own `partirExplorer` handlerId. `prepare` resolves the character's region to its area (`region.areaId` → `worldData/areas/items` → `area.type`) and builds the run's draw pool with `monstersForAreaType`, then draws one `worldData/adventureZones/items` entry at random from the region's `adventureZoneIds` for flavour only (an empty list is a content gap, not a failure - the action still runs with `location: null`), and fetches the same catalogs `mission.js` already fetches.
+A second, sibling Aventure-branch handler (`docs/TODO.md` "Aventure exploration mechanics") — not a replacement for `mission.js`, registered under its own `partirExplorer` handlerId. `prepare` resolves the character's region to its area (`region.areaId` → `worldData/areas/items` → `area.type`) and builds the run's draw pool with `monstersForAreaType`, then draws one `worldData/adventureZones/items` entry at random from the region's `adventureZoneIds` for flavour only (an empty list is a content gap, not a failure - the action still runs with `location: null`), and fetches the same catalogs `mission.js` already fetches. Loot tables are *not* among them any more: since docs/TODO.md "Monster-pool loot" each round draws from its own monster's resolved `lootItemIds`, so what a run brings back is the sum of what it met.
 
 `resolve` runs `actionType.encounterCount` independent rounds. Each draws a monster from that pool and a difficulty (weighted per round from `actionType.questDifficultyWeights`, defaulting to the engine's own `DIFFICULTY_WEIGHTS`, 25/45/20/6/3/1), resolves it through `resolveMission` against the *monster's* resolved `tagIds`, and builds its own `ActionResult` — applied immediately, so the character each round sees is the one the round before it left behind and a mid-run talent gain genuinely raises the next round's roll. The loop stops immediately when a round's wound kills the character, leaving fewer than `encounterCount` rounds recorded; an area no monster covers resolves zero rounds rather than failing. `lastAction` flattens `loot`/`talentEvolutions` across every round and adds a `rounds: [{ difficulty, monsterId, monsterName, score, threshold, success, wound, reputationGained }]` array plus a summed `totalReputationGained`; `ActionOutcome.jsx`'s "Rencontres" fieldset renders that array (the existing single-score "Résolution" fieldset stays gated on `lastAction.score != null`, so it never fires for this handler). A `fatigue` counter on `characters/{id}` increments by 1 per round actually resolved; nothing reads or recovers it yet.
 

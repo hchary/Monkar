@@ -18,6 +18,10 @@
 // and reads its rarity from its difficulty (missionLoot.js's difficultyToRarity). No outcome is
 // narrated anywhere any more (docs/TODO.md "Narration removal"), so the result pop-up shows only
 // "Succès"/"Échec".
+//
+// The target monster *is* fetched here, though (docs/TODO.md "Monster-pool loot"): loot is drawn
+// from its own resolved lootItemIds, and its resolved difficulty raises the rarity ceiling. A
+// journal entry whose monster has since left the bestiary still resolves - it just pays nothing.
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
@@ -26,6 +30,7 @@ const { rollTalentEvolutionIds } = require("../lib/talentEvolution");
 const { rollReputationReward } = require("../lib/reputation");
 const { createActionResult, applyActionResult } = require("../lib/actionResult");
 const { drawMissionLoot, difficultyToRarity } = require("../missionLoot");
+const { indexMonstersById, resolveMonster } = require("../lib/monsters");
 const { findChainAdvance } = require("../lib/questChains");
 
 async function prepare({ db, character, payload }) {
@@ -57,22 +62,30 @@ async function prepare({ db, character, payload }) {
     if (locationSnap.exists) locationName = locationSnap.data().name || null;
   }
 
-  const [lootTablesSnap, objectsSnap, talentsSnap, chainsSnap] = await Promise.all([
-    db.collection("worldData").doc("lootTables").collection("items").get(),
+  const [monstersSnap, objectsSnap, talentsSnap, chainsSnap] = await Promise.all([
+    db.collection("worldData").doc("monsters").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
     db.collection("worldData").doc("talents").collection("items").get(),
     db.collection("worldData").doc("questChains").collection("items").get(),
   ]);
-  const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const monsters = monstersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const chains = chainsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { mission, locationName, lootTables, objects, talents, chains };
+  // Resolved here rather than in resolve() for the same reason the whole catalog is fetched here:
+  // prepare() owns every read. A monster the journal entry names but the bestiary no longer holds
+  // is a content gap - target stays null and the hunt pays no loot.
+  const monstersById = indexMonstersById(monsters);
+  const targetMonster = monstersById[mission.targetMonsterId]
+    ? resolveMonster(monstersById[mission.targetMonsterId], monstersById)
+    : null;
+
+  return { mission, locationName, targetMonster, objects, talents, chains };
 }
 
 async function resolve({ character, actionTypeId, today, context }) {
-  const { mission, locationName, lootTables, objects, talents, chains } = context;
+  const { mission, locationName, targetMonster, objects, talents, chains } = context;
 
   const tagIds = mission.tagIds || [];
   const circumstance = `lors de la mission « ${mission.name} »`;
@@ -90,14 +103,14 @@ async function resolve({ character, actionTypeId, today, context }) {
       })
     : { trainedIds: [], gainedIds: [] };
 
+  // Rewards on failure: the same pool at the same rarity ceiling, just one item instead of three -
+  // and no reputation, no talent luck (docs/TODO.md "Monster-pool loot").
   const loot = drawMissionLoot({
+    success: outcome.success,
     difficulty: mission.difficulty,
-    tagIds,
-    lootTables,
+    monsterDifficulty: targetMonster?.difficulty || null,
+    lootItemIds: targetMonster?.lootItemIds || [],
     objects,
-    // Rewards on failure: loot drawn the same way, just two rarity ranks below, floored at
-    // "commun" - and no reputation, no talent luck.
-    rarityOffset: outcome.success ? 0 : 2,
   });
 
   const result = createActionResult({

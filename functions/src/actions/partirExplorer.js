@@ -18,7 +18,10 @@
 //
 // A region with no area, an area no monster covers, or a bestiary that is simply empty are content
 // gaps, not errors: the action runs and resolves zero rounds, the same "silently skipped rather
-// than failing" convention the loot draw uses for a missing table.
+// than failing" convention the loot draw uses for a monster with nothing under the rarity ceiling.
+//
+// Loot follows the encountered monster too (docs/TODO.md "Monster-pool loot"): each round draws
+// from that round's own resolved lootItemIds, so what a run brings back is the sum of what it met.
 //
 // `fatigue` keeps accumulating here and keeps being read by nothing - documented, not fixed.
 
@@ -66,14 +69,12 @@ async function prepare({ db, character }) {
     if (locationSnap.exists) location = { id: locationSnap.id, ...locationSnap.data() };
   }
 
-  const [monstersSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
+  const [monstersSnap, objectsSnap, talentsSnap] = await Promise.all([
     db.collection("worldData").doc("monsters").collection("items").get(),
-    db.collection("worldData").doc("lootTables").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
     db.collection("worldData").doc("talents").collection("items").get(),
   ]);
   const monsters = monstersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
@@ -81,11 +82,11 @@ async function prepare({ db, character }) {
   // the parent-chain walk is the expensive part.
   const candidateMonsters = monstersForAreaType(monsters, areaType);
 
-  return { location, areaType, candidateMonsters, lootTables, objects, talents };
+  return { location, areaType, candidateMonsters, objects, talents };
 }
 
 async function resolve({ character, actionType, actionTypeId, today, context }) {
-  const { location, candidateMonsters, lootTables, objects, talents } = context;
+  const { location, candidateMonsters, objects, talents } = context;
 
   const locationName = location?.name || null;
   const difficultyWeights = actionType.questDifficultyWeights || DEFAULT_DIFFICULTY_WEIGHTS;
@@ -122,11 +123,11 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
 
     const result = createActionResult({
       itemsGained: drawMissionLoot({
+        success: outcome.success,
         difficulty,
-        tagIds,
-        lootTables,
+        monsterDifficulty: monster.difficulty || null,
+        lootItemIds: monster.lootItemIds || [],
         objects,
-        rarityOffset: outcome.success ? 0 : 2,
       }),
       talentsGained: gainedIds,
       talentTrained: trainedIds,
