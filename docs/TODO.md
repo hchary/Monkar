@@ -2,6 +2,8 @@
 
 Design notes for features that aren't implemented yet. Not a task tracker for in-progress work — see the session's task list for that. Add new entries here when a feature is decided but not yet built. The `## Roadmap` section right below is the priority-ordered index into everything below it — start there; the detailed `##` entries further down stay the reference/spec content they've always been.
 
+This roadmap was restarted on 2026-08-24 from [rework-plan.md](../rework-plan.md), the plan for porting the Python model's rules onto this project. The previous roadmap and all its entries — including the reference documentation for everything already shipped — are archived in [docs/archives/TODO-2026-08-24-pre-python-rework.md](archives/TODO-2026-08-24-pre-python-rework.md); read it for how any existing system currently works. The three planning documents this roadmap derives from live at the repo root: [python-model-logic-diff.md](../python-model-logic-diff.md) (the analysis), [simplification-plan.md](../simplification-plan.md) (web → Python) and [rework-plan.md](../rework-plan.md) (Python → web, the one that drives this file). Each entry below summarises the plan's decisions; the plan itself is the long form, including the 17 resolved open calls (§1.3) and the risks (§9).
+
 ## Roadmap
 
 Priority-ordered, dependency-aware queue of everything below that isn't cleanly `Status: **implemented**`. `/next-todo` reads this table to pick the next item.
@@ -10,2274 +12,419 @@ Columns: `Status` is `spec` (needs a design/decision pass, not code), `todo` (sp
 
 | # | Item | Status | Blocked by | Entry |
 |---|------|--------|------------|-------|
-| 1 | Mission and quest resolution — score & wound algorithm (spec) | done | — | [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) |
-| 2 | Mission resolution result pop-up | done | 1 | [Mission resolution result pop-up](#mission-resolution-result-pop-up) |
-| 3 | Aventure mission launch — UX polish | done | — | [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish) |
-| 4 | Interval (12h action cycle) | done | — | [Interval (12h action cycle)](#interval-12h-action-cycle) |
-| 5 | Rumor and mission system — spec | done | — | [Rumor and mission system](#rumor-and-mission-system) |
-| 6 | Rumor and mission system — implementation | done | 5 | [Rumor and mission system](#rumor-and-mission-system) |
-| 7 | Quest triggers and end-of-action pop-up pages — spec | done | — | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
-| 8 | Quest triggers and end-of-action pop-up pages — implementation | done | 4, 7 | [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) |
-| 9 | Trainers — spec | done | — | [Trainers](#trainers) |
-| 10 | Training-driven talent quality-up ("s'entraîner") | done | 9 | [Expanded talent system](#expanded-talent-system) |
-| 11 | Profession initial assignment via quest/trainer | done | 9 | [Profession (métier) creation](#profession-métier-creation) |
-| 12 | Trainer type creation page — description field | done | — | [Trainer type creation page](#trainer-type-creation-page) |
-| 13 | Tag system unification (tagIds vs free-text tags) | done | — | [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) |
-| 14 | Location tags | done | — | [Location tags](#location-tags) |
-| 15 | Aventure exploration mechanics — spec | done | 5 | [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed) |
-| 16 | Aventure exploration mechanics — implementation | done | 15 | [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation) |
-| 17 | Intermède actions — spec | done | 5 | [Intermède actions (spec needed)](#intermède-actions-spec-needed) |
-| 18 | Intermède actions — implementation | done | 17 | [Intermède actions (implementation)](#intermède-actions-implementation) |
-| 19 | Composite quests — spec | done | 7 | [Composite quests (spec needed)](#composite-quests-spec-needed) |
-| 20 | Composite quests — implementation | done | 19 | [Composite quests (implementation)](#composite-quests-implementation) |
-| 21 | Known recipes grant mechanism — spec | done | 9 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
-| 22 | Mission subject and action catalog — spec | done | — | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
-| 23 | Mission subject and action catalog — implementation | done | 22 | [Mission subject and action catalog (spec needed)](#mission-subject-and-action-catalog-spec-needed) |
-| 24 | Mission loot and rarity mapping — spec | done | 22 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
-| 25 | Mission loot and rarity mapping — implementation | done | 23, 24 | [Mission loot and rarity mapping (spec needed)](#mission-loot-and-rarity-mapping-spec-needed) |
-| 26 | Regional mission generation and journal — spec | done | 22, 24 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
-| 27 | Regional mission generation and journal — implementation | done | 23, 25, 26 | [Regional mission generation and journal (spec needed)](#regional-mission-generation-and-journal-spec-needed) |
-| 28 | Retiring quests and quest objectives for the subject-action system — spec | done | 22, 24, 26 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
-| 29 | Retiring quests and quest objectives for the subject-action system — implementation | done | 27, 28 | [Retiring quests and quest objectives for the subject-action system (spec needed)](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) |
-| 30 | Se renseigner intermède action — spec | done | 26, 28 | [Se renseigner intermède action](#se-renseigner-intermède-action) |
-| 31 | Se renseigner intermède action — implementation | done | 27, 30 | [Se renseigner intermède action](#se-renseigner-intermède-action) |
-| 32 | Métier action-kind polish (subtypes, reputation/gold/location content) — action `tagIds` done | todo | — | [Action kinds and Métier actions](#action-kinds-and-métier-actions) |
-| 33 | Misc small polish (profession evolution consumer, quest loot draw creator tooling, talent-relations cycle prevention — `favoredQuestIds` effect dropped, no longer applicable) | todo | — | [Quest loot draw](#quest-loot-draw), [Talent relations](#talent-relations), [Profession (métier) creation](#profession-métier-creation) |
-| 34 | Rumor region-to-region propagation sweep | todo | 8 | [Rumor and mission system](#rumor-and-mission-system) |
-| 35 | Known recipes grant mechanism — implementation | todo | 21 | [Known recipes tab (Xerotex)](#known-recipes-tab-xerotex) |
+| 1 | Retire narration (generator, catalogs, creator pages, poc) | todo | — | [Narration removal](#narration-removal) |
+| 2 | Area and Monster contracts (Zod schemas, shared + functions) | todo | — | [Area and Monster contracts](#area-and-monster-contracts) |
+| 3 | Monster creator page (CRUD, inheritance preview) | todo | 2 | [Monster creator page](#monster-creator-page) |
+| 4 | Area creator page + `region.areaId` | todo | 2 | [Area creator page and region.areaId](#area-creator-page-and-regionareaid) |
+| 5 | Content migration scripts (areas, monsters, reputation, triggers) | todo | 3, 4 | [Content migration scripts](#content-migration-scripts) |
+| 6 | Resolution engine rebuild (thresholds, bands, tier drop) | todo | 1 | [Resolution engine rebuild](#resolution-engine-rebuild) |
+| 7 | `ActionResult` + `applyActionResult`, all eight handlers | todo | 6 | [ActionResult and the single applier](#actionresult-and-the-single-applier) |
+| 8 | Mission generation from the bestiary | todo | 5, 6 | [Mission generation from the bestiary](#mission-generation-from-the-bestiary) |
+| 9 | Monster-pool loot with difficulty rarity ceiling | todo | 8 | [Monster-pool loot](#monster-pool-loot) |
+| 10 | Per-region reputation (+ zero-sum invariant tests) | todo | 7 | [Per-region reputation](#per-region-reputation) |
+| 11 | Talent training roll + monster talent reward | todo | 7, 8 | [Talent training roll and monster talent reward](#talent-training-roll-and-monster-talent-reward) |
+| 12 | Quest chains on monsters + chain completion rewards | todo | 8, 10 | [Quest chains on monsters](#quest-chains-on-monsters) |
+| 13 | Travel action ("Voyager") | todo | 10 | [Travel action (Voyager)](#travel-action-voyager) |
+| 14 | Result pop-up rework (`Succès/Échec : {mission.name}`, signed reputation) | todo | 7 | [Result pop-up rework](#result-pop-up-rework) |
+| 15 | Healing / wound recovery — spec | spec | 6 | [Healing and wound recovery](#healing-and-wound-recovery) |
+| 16 | Métier rework: jobs, per-trainer ceilings, proficiency as rarity ceiling | todo | 7 | [Métier rework](#métier-rework) |
+| 17 | Merchants and the buy side of the economy — spec | spec | 16 | [Merchants and the buy side of the economy](#merchants-and-the-buy-side-of-the-economy) |
+| 18 | Region adjacency gating for travel | todo | 13 | [Region adjacency gating](#region-adjacency-gating) |
 
-**Why this order**: Mission and quest resolution (#1) is first — it's a design document handed down separately from the rest of this list, fundamentally reworking how the already-shipped [Rumor and mission system](#rumor-and-mission-system) and [Quest loot draw](#quest-loot-draw) determine success, wounds, reputation, and loot, and it touches the quest objective schema, so its open integration questions are worth resolving before other work builds further on top of the current tier-based resolution. Its result pop-up (#2) follows directly, since it only has UI to build once #1's outcome shape is settled. Aventure mission launch polish (#3) is independent, small, and already mostly done, but stays this early so it doesn't fall to the bottom of a long list. Interval (#4) is next because three later entries (#5, #7, and transitively #15/#17) are written assuming its "per Interval" cadence exists, even though nothing hard-blocks writing those specs without it. Rumor/mission (#5) and Quest triggers (#7) come next because they're the two specs the most other entries lean on (#6, #15, #17 read on Rumor/mission; #19 reads on Quest triggers) — resolving them early avoids the later specs guessing at answers that get contradicted. Trainers (#9) is an independent track that unblocks two separate entries (#10, #11) plus loosely #21, so it runs in parallel rather than waiting. #12-14 are small, fully unblocked, and safe to pick up any time priority allows.
+**Why this order**: the rows follow the rework plan's four waves, and the wave boundaries were chosen so the game is playable at the end of each one.
 
-**#22-31 — mission/quest simplification chantier**: inserted ahead of the pre-existing #22-25 polish tier (now #32-35, renumbered — see below) per explicit priority direction, since this reworks the core Aventure loop those polish items merely touch. Each spec row (#22, #24, #26, #28, #30 — all already `done`) is immediately followed by its own `— implementation` row, mirroring the #5/6, #7/8 convention elsewhere in this table; those implementation rows are `todo` and drive what `/next-todo` actually picks up next, since the specs themselves are settled. Strict dependency chain, now carried through to the implementation rows too: the Subject/Action catalog (#22 spec / #23 impl) is the foundation everything else assembles a mission name from; loot/rarity mapping (#24 spec / #25 impl) only makes sense once that catalog exists to draw tags from, so its implementation also waits on #23; regional generation and the mission journal (#26 spec / #27 impl) needs both #22-23 (what to draw) and #24-25 (how it pays out) settled and *built*; retiring the hand-authored quest catalog (#28 spec / #29 impl) is deliberately last among the four core-mechanic entries because its implementation only makes sense once the replacement is actually running (#27), not merely spec'd; "Se renseigner" (#30 spec / #31 impl) trails all of them since its mission-generation half is a direct consumer of the regional generation routine's implementation (#27) — its rumor-harvesting half depends on nothing further, since #28 already confirmed the flavor-text rumor mechanic stays as-is.
+- **Wave 0 — rows 1-2.** Narration removal (#1) and the new contracts (#2) are both unblocked and change nothing else's behaviour, so they go first: #1 deletes the code #6 would otherwise have to keep calling, and #2 writes the schemas every content and rules row reads. Doing #2 before any creator page exists is deliberate — per `CLAUDE.md` the schema file is the contract, written first, then wired in.
+- **Wave 1 — rows 3-5.** The content layer. Monster (#3) leads Area (#4) because it's the directive-2 deliverable and the bigger page; both need #2's schemas. Migration scripts (#5) come once both pages exist, so an author can fix up what the scripts can only guess at (`areaType` and `lootItemIds` have no source in the old data). **Budget an authoring pass between #5 and #8**: a region whose area type no monster covers generates an empty journal.
+- **Wave 2 — rows 6-14.** The rules layer. The engine (#6) is the foundation and only waits on #1 clearing the narration calls out of `missionResolution.js`. `ActionResult` (#7) sits directly on it and is itself the blocker for most of the rest, because reputation (#10), talent effects (#11) and the pop-up (#14) are all just effect channels through the one applier. Generation (#8) needs both the content (#5) and the engine (#6); loot (#9) draws from the monster generation picked, so it trails. Quest chains (#12) need generation to key on monsters (#8) and reputation to be per-region (#10) before chain rewards can name a region. Travel (#13) is late in the wave because it's what makes per-region reputation (#10) an actual choice rather than a rename. The pop-up (#14) closes the wave — it's the visible half of directive 5 and only needs #7's outcome shape.
+- **Wave 3 — rows 15-18.** Balance and economy. Healing (#15) is a *named* row and not a someday note because #6 raises injury frequency roughly sixfold with no drain on the ladder — see the risk note in that entry. The Métier rework (#16) carries the deferred gold/trainer/harvest calls (plan decisions 1 and 15), merchants (#17) follow it, and adjacency gating (#18) is last because it can only tighten a travel action that already ships in #13.
 
-#32-33 (previously #22-23) are intentionally after the mission chantier now: real but low-stakes polish with no downstream dependents. #34 (previously #24) trails everything: it only became buildable once #8 shipped the scheduled function it hooks into, and nothing else depends on it — though its own relevance may need revisiting once #28/#29 land and settle the rumor-flavor-text mechanic's fate in practice. #35 (previously #25) stays last, comparable in scope to #32-33's polish tier, not urgent enough to warrant further reordering churn.
+Not carried over from the archived roadmap: its four still-open rows (#32-35 there — Métier action-kind polish, misc small polish, rumor region-to-region propagation, known-recipes grant implementation). The rumor one is moot (the system was retired in `d05821c`); the other three are real but low-stakes, and are recorded in the archive's header rather than diluting this queue. Re-add them if they're still wanted.
 
-## Expanded talent system
+## Narration removal
 
-Status: **implemented** (data model, catalog, grant flow, and UI). Both quality-up progression paths are now implemented: the lucky quest roll (see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)) and the training-driven "s'entraîner" path (see [Trainers](#trainers)).
+Directive 4 of the rework: the procedural narrative generator and everything authored for it are removed, and mission text stops being generated at all. Missions get their identity from the monster catalog instead (see [Mission generation from the bestiary](#mission-generation-from-the-bestiary)), so the five-slot title assembly and the grammar engine have no consumer left.
 
-`character.talents` moved from a flat array of strings to an array of richer objects, granted via `tier.talentGain` in `performAction`. Talents support:
+- **Deleted outright**: `functions/src/textGeneration.js` + its test, `functions/src/missionNaming.js` + its test, the whole `narrative-poc/` directory, `src/components/creator/TextGenerationManager.jsx`, `src/components/creator/NarrativeSubjectList.jsx`, and the `narrativeSubject` / `verbPhrase` schema files in both `shared/schema/` and `functions/src/schema/`. Deleting a retired collection's schema file follows the precedent set when `worldData/quests/items` was retired.
+- **Moved, not deleted**: `docs/ISSUE-01-GRAMMAR-ENGINE.md`, `docs/NARRATIVE-GENERATION.md`, `docs/TEST-SCENARIO-NARRATIVE.md` go to `docs/retired/` so the design record survives.
+- **`functions/src/missionResolution.js`** loses its narration half (`buildNarrativeContext`, `narrateQuestSuccess`, `narrateQuestFailure`, `preferQuestPhrasesPerSlot`, `pickNarratedEvolution`, and `resolveQuestOutcome`'s `narrate` / `defaultSuccessText` / `defaultSuccessClause` / `defaultFailureText` / `defaultFailureClause` parameters). The file is replaced wholesale by [Resolution engine rebuild](#resolution-engine-rebuild) anyway, so here it is enough to stop calling the generator and let `narrativeText` be `""` everywhere.
+- **Loot provenance is dropped.** `drawQuestLoot` / `drawMissionLoot` currently embed `` `${description} [Obtenue lorsque ${accomplishmentMessage}]` `` into every drawn item; with no generator there is no clause to embed, so the item keeps its catalog description. `instances/{id}.description` stays a field — existing documents keep their sentences, it is just written unmodified from now on.
+- **Front end**: `src/components/actions/ActionOutcome.jsx` drops `<p>{lastAction.narrativeText}</p>`. `src/pages/CreatorDashboard.jsx` loses the `Narration` group; its `Tag` tab is *not* narration-specific (tags drive talent matching and loot everywhere) and moves into a new `Système` group.
+- **Schema audit**: `shared/schema/adventureZone.ts`, `talent.ts` and `tag.ts` each carry one `narrativeSubjects` reference in a `.describe()` string or a link field. Per `CLAUDE.md` a dead *field* is documented as legacy rather than deleted, but a stale sentence inside a `.describe()` is simply corrected. `shared/schema/character.ts` needs nothing — `lastAction` is `z.unknown()`.
+- **`functions/scripts/migrateTagsToTagIds.js`** references the retired collections. Leave the historical script untouched (it has already run) and note the retirement in a header comment.
+- **New script** `functions/scripts/dropNarrativeCollections.js` deletes `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items`, following the `seedWorldData.js` / `migrateTagsToTagIds.js` convention: generated, reviewed and run by hand, never invoked from app code.
 
-- **Quality**: a value from 1 to 5 (e.g. "Résistance au feu 3").
-- **Trainable flag**: a talent can be marked trainable (shown with an asterisk in the name, e.g. "Résistance au feu*"). Only trainable talents improve through training (see [Trainers](#trainers)); others only improve via a lucky roll on a quest that specifically showcases that talent (see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)).
-- **Rarity**: each talent has a rarity tier, shown as a colored border around a rectangle (background stays the same color as the rest of the UI — only the border changes):
-  - Commun → white
-  - Peu commun → green
-  - Rare → blue
-  - Très rare → purple
-  - Légendaire → orange
-  - Mythique → red
-  - Divin → black
-  - Unique → multicolor (gradient border)
-- **Hover interaction**: highlight the talent rectangle on hover, with a tooltip made of three bracketed segments — name+quality, effect, then the date and circumstance of the *most recent* change (initial grant, or last quality-up — the circumstance is overwritten each time the talent evolves, it's not a history log). Example at grant:
-  `[Résistance au feu 1][Augmente vos chances de succès lors de quêtes vous confrontant aux flammes][Obtenu le 12/03 en bravant le souffle ardent du terrible Syrphax]`
-  Example after a later quality-up (the whole third segment is replaced, not appended to):
-  `[Résistance au feu 2][Augmente vos chances de succès lors de quêtes vous confrontant aux flammes][Obtenu le 19/03 en travaillant 7 jours et 7 nuits dans les forges de la déesse des volcans]`
-  All bracketed text is in-game content, written in French.
-- **Rarity auto-upgrade from quality**: rarity isn't purely fixed at grant time — reaching a quality threshold bumps it up if it's currently lower (never downgrades it): quality 3 → at least "rare", quality 4 → at least "très rare", quality 5 → at least "légendaire". A talent can still be granted at a higher rarity than its quality would imply (e.g. a "mythique" talent starting at quality 1) — these thresholds only guarantee a floor, they don't cap it. Applied in `performAction` at grant time (and must be re-applied by whatever future code path increases quality).
+Tests deleted with the code: `textGeneration.test.js`, `missionNaming.test.js`.
 
-**Talent catalog** (decided): trainable/rarity/effect are authored once in a new `worldData/talents/items/{id}` collection (creator CRUD: `TalentsManager.jsx`). `tier.talentGain` in `worldData/actionTypes/items/{id}` (no creator UI — authored directly in the Firestore console) references a `talentId` plus a starting `quality` and a French `circumstance` string (the narrative reason for the grant — becomes the tooltip's third bracket, prefixed with the auto-generated grant date). `performAction` resolves the catalog entry into a full denormalized object copied onto `character.talents` (same convention as `character.background`), so renaming a catalog entry later doesn't rewrite already-granted talents.
+Not implemented yet. (Rework plan §3.)
 
-`character.talents` shape:
+## Area and Monster contracts
+
+The Zod schemas the whole content layer reads, written before any page or handler consumes them, per `CLAUDE.md`: isomorphic shape in `shared/schema/`, a `functions/src/schema/` file re-exporting it with the collection-level header, `DEFAULTS` derived via `.pick(...).parse({})`.
+
+**New: `shared/schema/area.ts`** → `worldData/areas/items/{areaId}`
+
 ```
-talents: [{
-  id: string,             -- worldData/talents/items id this was granted from
-  name: string,           -- e.g. "Résistance au feu", French, copied at grant time
-  quality: number,        -- 1-5
-  trainable: boolean,
-  rarity: "commun" | "peu_commun" | "rare" | "tres_rare" | "legendaire" | "mythique" | "divin" | "unique",
-  effect: string,         -- French, shown in the tooltip's 2nd bracket
-  lastChangeDate: string,        -- date of the most recent grant or quality-up
-  lastChangeCircumstance: string, -- French, narrative reason for that change; overwritten on each change, not accumulated
-}]
+name         string    French display name ("Marais de Ravenholm").
+type         string    One of AREA_TYPES. The key mission generation matches on.
+tagIds       string[]  worldData/tags/items — the area's own flavour tags.
+lootTableIds string[]  worldData/lootTables/items — the harvest pool for jobs run here
+                       (see Métier rework).
 ```
 
-`tier.talentGain` shape (success tiers only):
+`AREA_TYPES` is a new shared constant in `shared/lib/areaTypes.ts`, mirroring the Python model's `AreaType` with its typo corrected: `ville | marais | grotte | plaine | montagne | desert | ruines_anciennes | volcan`. Stored keys are unaccented and snake_cased, matching every other stored enum in this repo; the French display labels live in the same file.
+
+**New: `shared/schema/monster.ts`** → `worldData/monsters/items/{monsterId}`
+
 ```
-talentGain: {
-  talentId: string,       -- worldData/talents/items id
-  quality: number,        -- 1-5, starting quality granted
-  circumstance: string,   -- French, e.g. "en bravant le souffle ardent du terrible Syrphax"
-}
-```
-
-The training-driven quality-up path is implemented in `functions/src/actions/sEntrainer.js` (the "S'entraîner" action handler, registered under the shared `sEntrainer` handlerId), reusing `bumpTalentQuality` — extracted from `functions/src/lib/talentEvolution.js` so both the quest-luck path and the training path share the exact same "+1 quality, re-apply `rarityFloor`" logic. See [Trainers](#trainers) for the full mechanic (reachability gate, gold cost, talent picker).
-
-The quest-luck quality-up path (tag + rarity based, no per-tier signal needed) is also implemented — see [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success). Both paths bump quality by a flat **+1** per trigger.
-
-Known gap: granting the same talent via `tier.talentGain` more than once (e.g. via two different tiers) still appends a duplicate entry to `character.talents` rather than merging/bumping quality. The quest-luck evolution path itself doesn't have this gap (it updates the existing entry in place, or skips unlocking an id the character already owns).
-
-## Talent evolution and unlock on quest success
-
-Status: **implemented**.
-
-A successful quest ("Partir en quête") has a chance to evolve an owned talent or unlock a new one, for every talent sharing at least one tag with the quest or with a quest objective drawn (once per resolution, the same random-pick mechanism used for loot) for that occurrence:
-
-- **Eligible talents**: the union of `character.talents` (evolution candidates) and every `worldData/talents/items` catalog entry the character doesn't own yet (unlock candidates), filtered down to those sharing a `tagIds` entry with `quest.tagIds` or the drawn objective's `tagIds`.
-- **Rank**: a talent's "rank" is simply its own `rarity`, read as a 1-indexed position in the shared 8-tier scale (commun=1 .. unique=8) — the same field already used everywhere else, no new field introduced.
-- **Rank gate**: evolution requires the objective's rarity to be **greater than or equal to** the talent's current rank; unlocking a not-yet-owned talent requires it to be **strictly greater** — a talent can never be unlocked by an objective merely as rare as it.
-- **Chance formula**: `5% + 10% × quest difficulty level − 5% × talent rank level`, both levels 1-indexed on their own scale (difficulty: facile=1 .. mythique=6, positionally aligned with rarity per [Quest difficulty](#quest-difficulty)), clamped to [0%, 100%]. Example: a "difficile" (level 3) quest evolves a "commun" (level 1) talent at 30%. Each eligible talent is rolled independently.
-- **On success**:
-  - Evolution: quality +1, capped at 5 (the flat **+1** per trigger already decided in [Expanded talent system](#expanded-talent-system)), then `rarityFloor` is re-applied so rarity only ever rises with it, never drops.
-  - Unlock: the talent is granted at quality 1, rarity = its catalog `rarity` (through the same `rarityFloor`, for consistency).
-  - Both stamp `lastChangeDate`/`lastChangeCircumstance` (`"lors de la quête « {quest.name} »"`), exactly like any other talent change.
-- Only rolled when the quest tier succeeds; nothing happens on a failure, and a quest with no objectives (or none drawn) is skipped entirely.
-- Applied immediately in `resolve()` — like `tier.talentGain` — not deferred to `acknowledgeAction` the way loot is, since there's no equivalent "claim" step for a talent change.
-
-Implemented in `functions/src/lib/talentEvolution.js` (`rollTalentEvolutions`/`evolutionChance`), called from `functions/src/actions/partirEnQuete.js`'s `resolve()`, which also now fetches the full talent catalog in `prepare()`.
-
-**Interaction**: results appear in the end-of-quest pop-up (`ActionOutcome.jsx`), in a `fieldset` below "Butin obtenu" ("Amélioration de talent"), one chip per talent styled like the existing talent tab (`talent-card rarity-{rarity}`), prefixed "Nouveau : " for an unlock.
-
-**Dependencies**: the 8-tier rarity scale and `rarityFloor` ([Expanded talent system](#expanded-talent-system)), the quest difficulty scale ([Quest difficulty](#quest-difficulty)), and quest/objective `tagIds` (same tag-union pattern as [Quest loot draw](#quest-loot-draw)). Independent from the ancestor/descendant talent graph — see [Talent relations](#talent-relations) below, whose own unlock mechanic remains a separate, still-undesigned feature.
-
-## Talent relations
-
-Status: **implemented** (relation storage and creator UI only). The actual unlock mechanic that consumes these relations is **not** implemented yet — see "Still open" below.
-
-Each talent catalog entry (`worldData/talents/items/{id}`) now carries two id lists describing its position in a talent graph: `ancestorIds` (talents that will, eventually, unlock this one) and `descendantIds` (talents this one will, eventually, unlock). The two lists are always kept as mirror images of each other — adding talent A as an ancestor of talent B also adds B as a descendant of A, and the same symmetry applies to removal and to deleting a talent entirely (its id is pruned from every other talent's `ancestorIds`/`descendantIds`). `TalentsManager.jsx` maintains this invariant with a Firestore batch write on every create/edit/delete rather than requiring the creator to edit both sides by hand.
-
-`worldData/talents/items/{id}` shape, new fields:
-```
-ancestorIds: [string]     -- other worldData/talents/items ids that unlock this talent (eventually)
-descendantIds: [string]   -- other worldData/talents/items ids this talent unlocks (eventually)
+name           string             French base name ("dragon", "dragon ancien").
+difficulty     string             A DIFFICULTIES tier. NOT a gate on generation — it raises the
+                                  loot rarity ceiling (see Monster-pool loot).
+areaType       string|null        One of AREA_TYPES. Null = inherited from the parent chain.
+parentId       string|null        worldData/monsters/items — prototypal inheritance.
+tagIds         string[]           Talent-matching tags. CONCATENATED with the parent chain's.
+lootItemIds    string[]           worldData/objects/items — the concrete loot pool. CONCATENATED
+                                  with the parent chain's. Replaces loot-table selection for
+                                  missions; lootTables survive for harvest only.
+talentRewardId string|null        worldData/talents/items — granted at quality 1 on a successful
+                                  hunt if not already owned. First non-null wins along the chain.
+trigger        {conditions}|null  Moved verbatim from missionSubject.trigger.
 ```
 
-**Interaction**: the talent edit form gains two `MultiSelectModalField` pickers ("Talents ancêtres" / "Talents descendants"), reusing the existing `matchesTalent` filter (name, effect, or rarity) and listing every other talent (the talent being edited is excluded from its own options). The read-only list view shows both relations by name under each talent, alongside its existing tags/favored quests/trainer info.
+**Edited contracts:**
 
-**Still open (deliberately deferred)**:
-- The actual unlock mechanic: a character currently owning a talent's ancestors doesn't grant or reveal that talent anywhere — these links are pure data for now.
-- Cycle prevention: nothing stops a creator from linking talents into a cycle (A ancestor of B, B ancestor of A) or from an ancestor/descendant list pointing back at itself indirectly. Not a problem while the graph has no gameplay consumer, but should be revisited once the unlock mechanic is designed.
+- `shared/schema/region.ts` gains `areaId: string | null` — the `worldData/areas/items` entry this region sits in. `climateIds` / `reliefIds` stay (display, and origin matching); they simply stop driving mission generation.
+- `shared/schema/character.ts`: `reputation: number` becomes **legacy** (documented, not deleted), superseded by `reputations: z.record(z.string(), z.number()).default({})`, keyed by region id. `missionJournal[]`'s `subjectId` / `actionId` become legacy, replaced by `targetMonsterId: string` — `name`, `difficulty`, `tagIds`, `locationId`, `regionId`, `generatedAt` are unchanged, except that `tagIds` is now the monster's resolved tag list rather than the tier ∪ variation union. `triggeredSubjectIds` becomes legacy, replaced by `triggeredMonsterIds: string[]` (same `arrayUnion` write, same notification pipeline).
+- `shared/schema/questChain.ts`: `steps[].subjectId` → `steps[].monsterId`, plus chain-level rewards — `rewardItemIds: string[]`, `rewardTalentIds: string[]` (granted at quality 1), `rewardReputation: number`, `rewardRegionId: string|null` (null = wherever the character stands). See [Quest chains on monsters](#quest-chains-on-monsters).
 
-**Implementation scope** (roadmap #33 — ancestor/descendant cycle prevention):
-- Read: `src/components/creator/TalentsManager.jsx` (the batch-write create/edit/delete handlers maintaining the `ancestorIds`/`descendantIds` mirror invariant, where a cycle check would be inserted).
-- Update: `src/components/creator/TalentsManager.jsx`.
-- Do not read or open any other file without asking the user first.
+**Retired schemas** (files deleted here, collections dropped by [Content migration scripts](#content-migration-scripts)): `missionSubject.ts`, `missionAction.ts`.
 
-## Trainers
+Stored enum *values* do not change anywhere in this rework. The Python model renames three difficulty labels (`moyen → normal`, `epique → extrême`, `mythique → impossible`); only the French labels in `src/lib/difficulties.js` change, the stored keys stay, which avoids a migration across `missionJournal[].difficulty`, `questChain.steps[].difficulty`, `monster.difficulty` and every `difficulty-text-{value}` CSS class. The 8-tier `RARITY_ORDER` also stays in full, even though the Python model drops `divin` and `unique` — nothing in the mission pipeline could ever reach them anyway, and dropping them would invalidate authored objects and `salePrice`'s two top rows for no mechanical gain.
 
-Status: **implemented**.
+Not implemented yet. (Rework plan §3.4, §6.)
 
-A trainer is **location-tied**: each `worldData/trainerTypes/items/{id}` references a single quest location (`locationId`, `worldData/adventureZones/items` — the same "Lieu(x) de quête" catalog quests already draw from, see [Quest creation and editing](#quest-creation-and-editing)). A character can train with that trainer type whenever their current region's `adventureZoneIds` includes that location — the same region-contains-location reachability quests already use, no separate mechanism introduced. NPC- and dedicated-location-catalog options were considered and rejected in favor of reusing the existing location primitive.
+## Monster creator page
 
-Training itself is performed via a **"S'entraîner" action** (`worldData/actionTypes/items/{id}.kindId: "entrainement"`, `TRAINING_ACTION_KIND_ID` in `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`, nested under `intermede`) — a normal action type (per the [Modular action framework](#modular-action-framework)), registered under the shared `sEntrainer` handlerId (`functions/src/actions/sEntrainer.js`, one handler for every S'entraîner action, same "one handler, several action documents" convention as [Action de récolte](#action-de-récolte)/[Action d'artisanat](#action-dartisanat)). Availability is gated by the trainer reachability above, injected as an implicit `trainerReachable` condition by `actionCatalog.js`'s `resolveConditions` (same convention as the Métier branch's implicit `hasProfession` gate) — not a bespoke UI flow.
+Directive 2 of the rework: monsters get a CRUD editing page on the creator side. `src/components/creator/MonstersManager.jsx`, modelled directly on `MissionSubjectsManager.jsx` — same `onSnapshot` list + `details`/`summary` form panel + `MultiSelectModalField` shape, same class names (`creator-section`, `creator-list`, `collapsible-group`, `condition-row`), no new styling (directive 3).
 
-Correction to an earlier assumption in this entry: training does **not** reuse a "weighted-tier success roll" — that mechanism was fully retired codebase-wide before this was built (see "Abandoning the paliers system" in `docs/ISSUE-02-ACTION-FRAMEWORK.md`; [Action de récolte](#action-de-récolte)/[Action d'artisanat](#action-dartisanat) confirm neither of the two most recently built non-quest handlers rolls anything). Training instead follows Artisanat's precedent: **precondition-gated, always succeeds** once reachability, ownership of a matching trainable talent, and sufficient gold are all confirmed — no roll, no failure tier. On success, the trained talent's quality is bumped by +1 (the flat **+1** per trigger already decided in [Expanded talent system](#expanded-talent-system)), with `rarityFloor` re-applied — via `bumpTalentQuality`, extracted from `functions/src/lib/talentEvolution.js` so this and [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success) share the exact same mechanism rather than a second RNG system.
+| Control | Field | Widget |
+|---|---|---|
+| Nom | `name` | text, required |
+| Difficulté | `difficulty` | `<select>` over `DIFFICULTIES` |
+| Type de zone | `areaType` | `<select>` over `AREA_TYPES`, with an "hériter du parent" empty option |
+| Parent | `parentId` | `SoloSelectModalField` over monsters, **excluding self and every descendant** (client-side cycle prevention) |
+| Tags | `tagIds` | `MultiSelectModalField` over tags, `matchesTag` filter, `createLink` to the Tag section |
+| Butin | `lootItemIds` | `MultiSelectModalField` over objects, `createLink` to the Objets section |
+| Talent enseigné | `talentRewardId` | `SoloSelectModalField` over talents, nullable |
 
-The remaining open questions are resolved as:
+Plus one thing no existing manager has and this one needs: a **read-only "hérité du parent" panel** showing the resolved tags, loot and talent reward contributed by the parent chain, so an author can see what a monster actually carries without opening its ancestors. It duplicates `resolveMonster`'s logic client-side — the project already accepts client/server twins for `actionConditions`, `actionKinds`, `loot`, `salePrice` and `trainingCost`, because `functions/` (CommonJS) shares no build with the Vite app.
 
-- **Cost**: consumes the character's daily action slot, plus a **gold cost that scales with the trained talent's current quality** — training a talent that's already further along costs more. Implemented as `trainingCost(talent) = 50 × talent.quality` (`functions/src/lib/trainingCost.js` ⇄ `src/lib/trainingCost.js`); rarity isn't a separate factor since it's never authored independently of quality for an owned talent (`rarityFloor` re-derives it on every bump), so quality alone already carries the scaling this line asks for.
-- **Eligibility**: training only bumps a **trainable talent the character already owns** — it can never unlock a new one. Unlocking a not-yet-owned talent stays exclusive to the quest-luck path ([Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)).
-- **Which talent gets trained**: when a character owns several trainable talents matching the trainer's type, **the player picks explicitly** — `TalentPicker.jsx`, an eligible-talent selector (owned, `trainable: true`, catalog `trainerTypeId` matching this action's own `trainerTypeId`, not already at quality 5) shown in `ActionBrowser.jsx` before starting the action (same non-Métier payload-picker pattern as `MissionPicker.jsx`), never a random or auto-picked choice. Re-validated server-side in `sEntrainer.js`'s `prepare()`/`resolve()`, never trusted from the client.
+`CreatorDashboard.jsx`: the `Missions` group's two tabs (`Actions de mission`, `Sujets de mission`) are replaced by a single `Monstres` tab. **Run the migration script before deleting those tabs, not after** — anyone mid-authoring in them loses their working set otherwise.
 
-**Data model implications**:
-```
-worldData/trainerTypes/items/{id}
-  locationId: string   -- worldData/adventureZones/items id, where a character must be able to
-                        --   reach (via their region's adventureZoneIds) to train with this
-                        --   trainer type
+Not implemented yet. (Rework plan §4.3.)
 
-worldData/actionTypes/items/{id}
-  trainerTypeId: string | null   -- worldData/trainerTypes/items id this action trains at; only
-                                  --   meaningful under the Entraînement kind branch
+## Area creator page and region.areaId
 
-character.lastAction.talentEvolutions: [{ talentId, name, kind: "evolution", quality, rarity }]
-character.lastAction.goldSpent: number
-```
+`src/components/creator/AreasManager.jsx`, a small manager on the same pattern as the [Monster creator page](#monster-creator-page): name, a `type` select over `AREA_TYPES`, tags, and harvest loot tables. It joins the `Carte` group in `CreatorDashboard.jsx` as a `Zones` tab, and `RegionsManager.jsx` gains an `Area` selector writing `region.areaId`.
 
-Implemented in `functions/src/actions/sEntrainer.js`, `functions/src/lib/actionContext.js` (`buildReachableTrainerTypeIds`), `functions/src/lib/actionConditions.js` ⇄ `src/lib/actionConditions.js` (`trainerReachable` predicate), and `src/components/actions/TalentPicker.jsx`. The result pop-up needed no new code: `ActionOutcome.jsx`'s existing "Amélioration de talent" fieldset already renders `lastAction.talentEvolutions` in the shape this handler writes.
+Areas exist because mission generation matches monsters on an area *type*, and because the Métier rework wants a per-area harvest pool. **Reduced-scope fallback if the catalog proves not worth its own collection**: put `areaType` directly on `Region` and drop the `areas` collection. That costs the shared area tags and the per-area harvest pool, so the full version is the recommendation — but the fallback is a one-field change and nothing else in this roadmap is affected by it.
 
-## Trainer type creation page
+Not implemented yet. (Rework plan §4.3.)
 
-Status: **implemented**.
+## Content migration scripts
 
-Talents that are trainable now reference a required trainer type (`trainerTypeId`, a single-select on the talent form in `TalentsManager.jsx`, shown when "Entraînable" is checked). The trainer type catalog stores `name`, `description`, and `locationId` in `worldData/trainerTypes/items/{id}`; `TrainerTypesManager.jsx` (registered as the "Types d'entraîneur" tab in `CreatorDashboard.jsx`) has a `locationId` single-select against `worldData/adventureZones/items`, same pattern as `QuestsManager.jsx`'s own `locationId` field, plus a plain `description` textarea (free-text French, e.g. "Maître d'armes", "Sage ermite") shown under the trainer type's name in the list, same textarea pattern as `ProfessionsManager.tsx`'s own `description` field.
+The scripts that carry existing content onto the new contracts. All live in `functions/scripts/`, generated for review and run by hand, following the `seedWorldData.js` / `migrateTagsToTagIds.js` convention — never invoked from app code.
 
-**Data model implications**:
-```
-worldData/trainerTypes/items/{id}
-  description: string   -- free-text French description of what kind of trainer this
-                         --   represents; NEW field, defaults to ""
-```
+| Script | Does |
+|---|---|
+| `seedAreasFromRegions.js` | Creates one `areas` document per distinct region climate/relief combination and sets `region.areaId` |
+| `migrateSubjectsToMonsters.js` | Best-effort: one `monsters` document per `missionSubject`, carrying `name`, `tagIds` (union across tiers and variations) and `trigger`. `areaType` and `lootItemIds` have no source in the old data and need hand-authoring afterwards — the script *flags* them in its output rather than guessing |
+| `migrateReputationToPerRegion.js` | `reputation` → `reputations[character.region.id]`, leaving the scalar in place as legacy |
+| `migrateTriggeredSubjectsToMonsters.js` | `triggeredSubjectIds` → `triggeredMonsterIds`, using the id map `migrateSubjectsToMonsters.js` writes |
 
-## Quest creation and editing
+Retired collections, dropped once the above have run: `worldData/missionSubjects/items`, `worldData/missionActions/items`. (`worldData/narrativeSubjects/items` and `worldData/verbPhrases/items` are dropped earlier, by [Narration removal](#narration-removal).)
 
-Status: **retired**, by [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed). `worldData/quests/items`, `QuestsManager.jsx`, and `QuestObjectivesManager.jsx` are deleted; the "Quêtes"/"Objectifs de quête" creator tabs are gone. `worldData/missionSubjects/items` (`MissionSubjectsManager.jsx`) and `worldData/missionActions/items` (`MissionActionsManager.jsx`) are the sole Aventure-branch content catalog now — see [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed) and [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed). Kept below for historical reference only; nothing in this section reflects live code any more.
+`questChains` documents are **re-authored by hand** (`subjectId` → `monsterId`) rather than migrated — the same call the previous migration made when chains authored against `quests` were left stale.
 
-Status (historical, pre-retirement): **implemented**. `worldData/quests/items` via `QuestsManager.jsx`, registered as the "Quêtes" tab in `CreatorDashboard.jsx`. Loot on quest completion is a separate feature, see [Quest loot draw](#quest-loot-draw).
+**Content re-authoring is the real cost of this wave, not the code.** Until a monster has loot its missions pay nothing; until it has an `areaType` it is never drawn; a region whose area type no monster covers generates an empty journal. Budget an authoring pass before [Mission generation from the bestiary](#mission-generation-from-the-bestiary) ships, and consider a creator-side warning listing area types with no monsters and monsters with no loot.
 
-A quest is characterized by:
+Not implemented yet. (Rework plan §6.)
 
-- **Quest objectives**: multi-select of existing "Objectifs de quête" (`QuestObjectivesManager.jsx`) — quest-themed `worldData/narrativeSubjects/items` tagged `"objectif de quête"` (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). A quest can have several.
-- **Possible difficulty levels**: multi-select from a dedicated 6-tier difficulty scale — facile, moyen, difficile, très difficile, épique, mythique — semantically about how hard the quest is, not how rare it was to author (see [Quest difficulty](#quest-difficulty) below). Own enum, exported as `DIFFICULTIES` from `QuestsManager.jsx`, decoupled from the 8-tier rarity enum shared by talents (see [Expanded talent system](#expanded-talent-system)).
-- **Success phrases**: multi-select of existing verb phrases (`worldData/verbPhrases/items` via `VerbPhrasesManager.jsx` in `TextGenerationManager.jsx`) whose `resultat` is `"victoire"`, with a link over to the verb phrase creation UI.
-- **Failure phrases**: same, filtered to `resultat: "echec"`.
-- **Possible regions**: multi-select of existing regions (`worldData/regions/items` via `RegionsManager.jsx`).
-- **Quest location**: single-select. This reuses what used to be called "Zones d'aventure", now displayed as "Lieu(x) de quête" (`QuestLocationsManager.jsx`, renamed from `AdventureZonesManager.jsx`). The underlying Firestore collection id (`worldData/adventureZones/items`) deliberately kept its original name to avoid a data migration — only the display text and component name changed. This same catalog is also what a region's `adventureZoneIds` multi-select (`RegionsManager.jsx`) draws from.
-- It's already referenced by `TalentsManager.jsx`'s `favoredQuestIds` multi-select (a talent can be tagged as favoring certain quests), but that link is purely informational today — nothing consumes it to influence quest selection or rewards. How it should eventually affect gameplay (e.g. weighting which quest gets offered, or which quest can trigger that talent's quality-up) is still undecided.
+## Resolution engine rebuild
 
-Quest *drawing* is now wired into the "Partir en quête" action (`functions/src/actions/partirEnQuete.js`) — see [docs/ARCHITECTURE.md](ARCHITECTURE.md) for the full mechanism: a difficulty is rolled first (default weights facile 55/moyen 30/difficile 10/tres_difficile 4/epique 1, redrawn until a matching quest exists), then a random quest of that difficulty is picked from the character's region.
+One file, `functions/src/lib/missionResolution.js`, **replaces** `functions/src/lib/questResolution.js` (145 lines) and the non-narration half of `functions/src/missionResolution.js` (270 lines). The wrapper layer that added nothing but renames disappears with it, and the "quest"/"objective" vocabulary goes with it — one name, *mission*, everywhere. Pure math, no Firestore, unit-testable against a seeded `Math.random`, which is the property `questResolution.js` already has and keeps.
 
-**Quest list page**: quests are shown in a filtered list, filterable by quest objectives, difficulty level, possible regions, and quest location. A reset button clears all filters. Selected filters are injected as default values into the matching fields of the "New quest" creation form below (resynced live whenever the filters change, as long as no existing quest is being edited).
+```js
+// Indexed by DIFFICULTY_ORDER position 0..5.
+const SUCCESS_THRESHOLD = [10, 40, 70, 90, 95, 100];
 
-**Quest creation**: the creation section is a collapsible panel (`<details>`), closed by default, opened automatically when editing an existing quest. In that form, the potentially large catalogs (objectives, success/failure phrases, regions) are picked via a searchable `<dialog>` popup — `MultiSelectModalField.jsx`, a shared component (not specific to quests) — rather than an inline checkbox list; a text filter narrows the popup's options, and picked items show as chips once closed. Difficulty levels stay an inline checkbox list (`MultiSelectField`, still local to `QuestsManager.jsx`) since that catalog is small and fixed (6 tiers).
+const INJURY_THRESHOLDS = [
+  { light: 5,  severe: 1,  permanent: 0  },
+  { light: 10, severe: 5,  permanent: 1  },
+  { light: 30, severe: 10, permanent: 5  },
+  { light: 70, severe: 30, permanent: 10 },
+  { light: 90, severe: 70, permanent: 30 },
+  { light: 99, severe: 90, permanent: 70 },
+];
 
-`MultiSelectModalField` takes a `matchesFilter(option, query)` prop (defaulting to a plain name match) so each catalog can define what its popup search actually matches against, instead of hardcoding name-only search in the shared component. Each catalog's manager exports its own: `matchesQuestObjective` (name or tag) in `QuestObjectivesManager.jsx`, `matchesVerbPhrase` (template text, cible, or tag) in `TextGenerationManager.jsx`, `matchesRegion` (name or description) in `RegionsManager.jsx`, `matchesQuest` (name) in `QuestsManager.jsx`, and `matchesTalent` (name, effect, or rarity) in `TalentsManager.jsx` — the last two aren't wired into any `MultiSelectModalField` usage yet (e.g. `TalentsManager.jsx`'s `favoredQuestIds` still uses a plain inline checkbox list), but are ready for whenever those fields switch to the modal picker too.
-
-**Data model implications**:
-```
-worldData/quests/items/{id}
-  name: string                -- French, e.g. "Chasse aux bandits"
-  objectiveIds: string[]      -- worldData/narrativeSubjects/items ids tagged "objectif de quête"
-  difficulties: string[]      -- subset of the quest difficulty enum, see Quest difficulty below
-  successPhraseIds: string[]  -- worldData/verbPhrases/items ids, resultat: "victoire"
-  failurePhraseIds: string[]  -- worldData/verbPhrases/items ids, resultat: "echec"
-  regionIds: string[]         -- worldData/regions/items ids
-  locationId: string          -- worldData/adventureZones/items id
+// 25 / 45 / 20 / 6 / 3 / 1 percent — the Python model's DIFFICULTIES_WEIGHTS.
+const DIFFICULTY_WEIGHTS = [25, 45, 20, 6, 3, 1];
 ```
 
-**Superseded, no longer open**: `favoredQuestIds` never gained a gameplay effect before `worldData/quests/items` itself retired — [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) dropped the field outright (from `talent.ts`/`shared/schema/talent.ts` and `TalentsManager.jsx`) rather than repointing it at Subjects, since it never had a real consumer to migrate. Roadmap row #33's mention of this as a polish item is stale; there is nothing left to implement here.
+- **`checkAgainstTalents(characterTalents, tagIds, difficultyIndex)`** → `{ relevantSum, perfectCount }`. A talent is relevant if it shares a tag with `tagIds` **and** `quality >= difficultyIndex` — a usefulness gate with no current web equivalent. `relevantSum` is the sum of those talents' qualities; `perfectCount` counts `quality === 5`.
+- **`updateDifficulty(difficultyIndex, perfectCount)`** — while `perfectLeft > difficultyIndex && next >= 1`, spend the **original** difficulty per step and drop one tier. Consequence to keep and to test: a *single* level-5 talent never drops a tier, at any difficulty.
+- **`injuryFromRoll(roll, effectiveDifficultyIndex)`** → `{ light, severe, permanent }`, exclusive bands, at most one flag set, permanent compared with **`<=`** — `permanent = roll <= t.permanent`, then `severe = !permanent && roll <= t.severe`, then `light`. The `<` in the source model is a bug: it leaves one roll per difficulty producing no wound at all (at difficulty 5 it is the *only* unwounded roll), so this shifts permanent-wound probability up by one point at every tier versus the diff's table — that table measures the bug, not the rule.
+- **`resolveMission({ character, tagIds, difficulty })`** → `{ roll, relevantSum, updatedRoll, difficultyIndex, effectiveDifficultyIndex, threshold, success, injury, wound }`. `roll` is `0..99` (a domain change from the web's `1..100`), `updatedRoll = roll + relevantSum`, `success = updatedRoll >= threshold`, and `wound` is the injury triple collapsed to `"light" | "severe" | "permanent" | null`.
 
-Loot used to be drawn on quest resolution — see [Quest loot draw](#quest-loot-draw), now itself superseded by the mission system's own loot mapping ([Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed)).
+**Deleted with the old engine**: `SUCCESS_TABLE`, `WOUND_TABLE`, `WOUND_FLOORS`, `REPUTATION_REWARDS` (the 1→300 random scale), `computeSuccessThreshold`, `computeWoundThresholds`, `dropDifficultyTier`, `determineWoundSeverity`, `rollReputationReward`, `talentTagAdjustmentAllowed`. That last one is worth calling out: the objective-level strict condition gate has no counterpart in the new model — a monster's tags always count.
 
-## Quest difficulty
+**Two rules are encoded explicitly rather than left as accidents of the tables**: `mythique` is unwinnable without talents (threshold 100, roll caps at 99) — a named constant and a test, not an emergent property; and a successful mission mathematically never wounds, because every light band sits strictly below its success threshold. `resolveMission` still returns the injury unconditionally, so it stays robust if the two tables are ever retuned apart, but a test asserts the property holds for the current tables.
 
-Status: **implemented**. Replaces the earlier reuse of the talent rarity enum for quests ("Rareté") with a dedicated, semantically-named difficulty scale. The scale itself outlived the hand-authored quest catalog it was named after — [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) relocated `DIFFICULTIES` from the now-deleted `QuestsManager.jsx` to `src/lib/difficulties.js`, and it drives mission difficulty today, not quest difficulty.
+**Wound application is unchanged.** `functions/src/lib/wounds.js` is not touched: its escalation ladder already matches the Python `Health` model (3 light → severe, 3 severe → permanent), and the web's death edge stays (3 permanent wounds survivable, the next severe/permanent kills, `alive: false` stored). The injury triple collapses to the existing severity string at the engine boundary, so the character document keeps its three flat counters — `notWounded` reads them directly, and nesting them under a `health` map is not free. `wounds.test.js` surviving untouched is the check that the ladder really did port unchanged.
 
-A mission's difficulty is drawn from its own 6-tier enum, exported as `DIFFICULTIES` from `src/lib/difficulties.js`: facile, moyen, difficile, très difficile, épique, mythique (positionally equivalent to the talent rarity tiers commun, peu commun, rare, très rare, légendaire, mythique, but a separate enum — no "divin"/"unique" tier). Each tier has its own color, shown as a border/text color rather than the talent system's border-only treatment:
+**Injury frequency is the headline balance risk.** Weighted by the new difficulty distribution, a random mission carries roughly a 20 % chance of some wound and ~4 % of a permanent one, against the web's ~3 % / near-zero. With no healing path the ladder fills about six times faster than today — which is why [Healing and wound recovery](#healing-and-wound-recovery) is a named roadmap row and not a someday note. If the gap between the two is long, cap `permanent` or slow the bands as a stopgap; don't ship the combination unexamined.
 
-- Facile → green
-- Moyen → yellow
-- Difficile → orange
-- Très difficile → light red
-- Épique → gold, with an animated diagonal pixel-striped shine sweeping across the panel
-- Mythique → gold-and-silver gradient border/text
+**New test coverage this row owes**: the threshold/tier-drop pair including "one level-5 talent never drops a tier"; injury bands mutually exclusive and `roll === permanentThreshold` *does* wound; success never wounds for the current tables; `mythique` unwinnable at zero talents and winnable at one point of bonus. Deleted with the old code: `questResolution.test.js`. Rewritten: `missionResolution.test.js`.
 
-**UI**: when the last action drew a mission, the "Action de la veille" panel (`.last-action` in `ActionPanel.jsx`) takes a border colored by `lastAction.mission.difficulty`. In the expanded action detail, the "Succès" toggle text (not "Échec") is colored the same way. Colors live in `src/index.css` as `.last-action.difficulty-{value}` and `.difficulty-text-{value}`.
+Not implemented yet. (Rework plan §4.1.)
 
-**Mission drawing**: `rumeur.js` rolls a difficulty uniformly at random (see [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed) for the full draw), then picks a climate/difficulty-matched Subject and a type-matched Action — see [docs/ARCHITECTURE.md](ARCHITECTURE.md). The `actionType.questDifficultyWeights`-driven weighted draw described here historically belonged to the retired `partirEnQuete.js`; `partirExplorer.js`'s per-round encounter draw still uses that same weighted-draw mechanism today.
+## ActionResult and the single applier
 
-No Firestore migration was needed for this rename — there was no real quest data yet, so the old `rarities` field/values were replaced outright rather than converted.
+The rework's clearest structural win: eight handlers each building their own ad-hoc `updates` object become one closed effect vocabulary and one applier. New file `functions/src/lib/actionResult.js`.
 
-## Object creation
+```js
+createActionResult({
+  itemsGained = [],           // object ids — become `instances` at commit(), not at resolve()
+  itemsLost = [],
+  talentsGained = [],         // talent ids, granted at quality 1
+  talentTrained = [],         // owned talent ids, +1 quality via bumpTalentQuality
+  reputationGained = 0,       // signed
+  reputationRegionId = null,  // null = the character's current region
+  newRegionId = null,
+  injury = null,              // { light, severe, permanent }
+})
 
-Status: **implemented**, except the `Instance` component (see "Still open" below). `worldData/objects/items` via `ObjectsManager.jsx`, registered as the "Objets" tab in `CreatorDashboard.jsx`, under the "Personnages" group.
-
-An object is characterized by:
-
-- **Name**.
-- **Tags**: multi-select against `worldData/tags/items`, same mechanism already used by quests and quest objectives.
-- **Rarity**: reuses the 8-tier rarity enum shared with talents (see [Expanded talent system](#expanded-talent-system)), rather than introducing a separate scale like quest difficulty did.
-- **Type**: single-select from a fixed, own enum exported as `OBJECT_TYPES` from `ObjectsManager.jsx` — armes, armures, consommables, composants, ingrédient, grimoires, parchemin, objet magique, titres de propriété, vêtement. No creator UI to add new types for now.
-- **Description**: a plain string.
-
-Objet is deliberately a general, catalog-level component — weapon, armor, component, grimoire, magic item, currency, property deed, etc. are all expected to eventually be represented as objects, distinguished by their dedicated `type` field (see above) plus any number of tags.
-
-**Object list page**: filtered list (rarity, type, tags, free-text search over name/description, with a reset button) plus a collapsible "Nouvel objet" creation form below — same list-then-create layout as [Quest creation and editing](#quest-creation-and-editing).
-
-**Data model implications**:
-```
-worldData/objects/items/{id}
-  name: string
-  description: string
-  rarity: string        -- one of the 8-tier rarity enum shared with talents
-  type: string           -- one of the fixed OBJECT_TYPES enum (arme, armure, consommable, composant,
-                          --   ingredient, grimoire, parchemin, objet_magique, titre_propriete, vetement)
-  tagIds: string[]       -- worldData/tags/items ids
+applyActionResult(character, result, { today, circumstance })
+  → { updates, died }
 ```
 
-**Still open (deliberately deferred)**:
-- **Instance**: implemented as a display-only component (`Instance.jsx`, `InventoryTab.jsx`) — an Instance is an Object owned by a character, with an acquisition date, an owner (`characterId`), and a condition (neuf, usé, endommagé, cassé). Shown under the object's name in the character page's "Inventaire" tab, filterable by type, tag, and rarity, in a scrollable (non-growing) list. No creation UI yet — instance documents are only created by the [Quest loot draw](#quest-loot-draw) Cloud Function for now; there's still no manual/creator way to add one directly.
+Deliberate deviations from the Python model's nine fields:
 
-**Data model implications (Instance)**:
+- **`idleTime` is not ported.** Duration stays authored on the action type and stamped by `stampLifecycle` before the handler runs. The Python model relocates the clock into the outcome because it has no lifecycle envelope; the web has one, and nothing consumes `idleTime` on either side.
+- **`talentsLost` is not ported.** Nothing on the web can take a talent away and nothing in the source model fills the field.
+- **`reputationRegionId` is added.** The source `ActionResult` cannot name a region, which is why a quest spanning several regions credits wherever the character happens to stand.
+- **`itemsGained` is deferred, not applied.** `applyActionResult` writes it to `lastAction.loot`; the existing per-handler `commit()` turns it into `instances` once the player acknowledges. The acknowledgement step is the web's anti-duplication guarantee and is not negotiable.
+
+`applyActionResult` reads `injury` and routes it through `applyWound` — closing the harm chain the source model leaves broken at exactly this link.
+
+The eight handlers (`mission`, `recherche`, `partirExplorer`, `recolte`, `artisanat`, `sEntrainer`, `apprentissage`, `faireDuCommerce`) each stop hand-rolling `updates` and return an `ActionResult` instead; `functions/src/lib/actionEffects.js` gains the merge into the lifecycle envelope. Everything else about the pipeline is explicitly **out of scope** and stays as it is: the Interval lock, `prepare`/`resolve`/`commit`, the transaction boundary, the `actionsLog` dual write, and server-authoritative rolls. `ActionResult` arrives as a *return value contract*, not as a replacement for the pipeline.
+
+`partirExplorer` is kept and rewired in this pass: each round draws a monster from the current region's area instead of synthesising an objective, and resolves through `resolveMission`. It is the only action where wounds accumulate *within* one action, so it is the most exposed to the engine's injury-frequency rise — [Healing and wound recovery](#healing-and-wound-recovery) should be balanced against this handler specifically. Its `fatigue` keeps accumulating and keeps being unread; documented, not fixed here.
+
+**Test**: every field applied exactly once, `injury` reaches `applyWound`, `reputationRegionId` respected.
+
+Not implemented yet. (Rework plan §4.5, §4.10.)
+
+## Mission generation from the bestiary
+
+`functions/src/actions/recherche.js` is rewritten to draw missions from the monster catalog instead of the subject/action catalogs. Per draw:
+
 ```
-instances/{id}
-  objectId: string        -- worldData/objects/items id
-  characterId: string     -- characters/{id} id, the owner
-  ownerUid: string         -- characters/{id}'s ownerUid, denormalized so firestore.rules
-                            --   can check read access without a second lookup (same
-                            --   convention as actionsLog)
-  acquisitionDate: string -- "YYYY-MM-DD"
-  condition: string        -- one of: neuf, use, endommage, casse
-  description: string      -- optional, overrides the object's catalog description when
-                            --   set (e.g. the quest loot draw appends
-                            --   "[Obtenue lorsque {accomplishment message}]")
-```
-
-## Loot table creation
-
-Status: **implemented**. `worldData/lootTables/items` via `TablesDeTirageManager.jsx`, registered as the "Tables de tirage" tab in `CreatorDashboard.jsx`, under the "Personnages" group.
-
-A table de butin (loot table) is a named, tagged pool of `worldData/objects/items` a quest (or any future consumer) can draw from. It is characterized by:
-
-- **Name**.
-- **Tags**: multi-select against `worldData/tags/items`, same mechanism already used by quests, quest objectives, and objects.
-- **Rarity**: reuses the 8-tier rarity enum shared with talents and objects — a single value per table (not per entry).
-- **Objects**: multi-select against `worldData/objects/items`, via `MultiSelectModalField.jsx`.
-- **Pondération (weighting)**: `Uniforme` (default) or `Manuelle`. In `Manuelle` mode, each selected object gets a per-item weight (1-100) entered as a percentage; the save button is disabled until every selected object has a weight in that range and the weights sum to exactly 100. Switching an object off the table also drops its stored weight.
-
-**Loot table list page**: filtered list (rarity, tags, free-text search over name, with a reset button) plus a collapsible "Nouvelle table de tirage" form below — same list-then-create layout as [Object creation](#object-creation), except list actions ("Modifier"/"Tirer") only appear on hover instead of always being visible, to keep the row uncluttered; deleting a table is done from the edit form instead of the list.
-
-**Drawing**: clicking "Tirer" on a table in the list rolls `drawLootTableItemId(table)` (`src/lib/lootTables.js`, mirrored server-side in `functions/src/lib/loot.js`) — a uniform random pick over the table's `itemIds`, or a weighted pick using `itemWeights` when `weightMode` is `manuelle` (falling back to uniform if the weights happen to sum to 0) — and shows the result in a popup. The drawn object's name links to `/creator?section=Objets&objectId={id}`, which `ObjectsManager.jsx` reads to auto-open that object's edit form. The draw function is a standalone, side-effect-free export specifically so other parts of the app (e.g. a future quest resolution flow) can reuse the same mechanic instead of reimplementing it.
-
-**Data model implications**:
-```
-worldData/lootTables/items/{id}
-  name: string
-  rarity: string           -- one of the 8-tier rarity enum shared with talents
-  tagIds: string[]          -- worldData/tags/items ids
-  itemIds: string[]         -- worldData/objects/items ids
-  weightMode: string        -- "uniforme" (default) or "manuelle"
-  itemWeights: object       -- { [itemId]: number }, percentages summing to 100 — only meaningful when weightMode is "manuelle"
+difficulty = weightedDraw(DIFFICULTY_WEIGHTS)                // 25/45/20/6/3/1
+candidates = monsters where resolvedAreaType === region.area.type
+target     = pickRandom(candidates)                          // empty pool → skip this draw
+name       = `Chasse ${target.name}`
+tagIds     = resolveMonster(target).tagIds                   // parent chain concatenated
 ```
 
-Quest integration is implemented — see [Quest loot draw](#quest-loot-draw).
+- **An empty candidate pool is a content gap: skipped, never fatal** — the convention `drawQuestLoot` already set, and the fix for the source model's `IndexError` on the area types no monster covers.
+- **Region-locking is kept**: the journal entry keeps `regionId` and `mission.js` keeps its check. The source model lost the ability by deleting a parameter, which is a regression, not a design change.
+- **`locationId` is kept**, still drawn from `region.adventureZoneIds`.
+- **The forced chain slot is kept**, now keyed on `monsterId` instead of `subjectId`.
+- `missionRollCount` stays where it is today.
+- **Difficulty and target are drawn independently.** `monster.difficulty` does not gate which monsters can be drawn at which difficulty; it is used only as a floor on the loot rarity ceiling (see [Monster-pool loot](#monster-pool-loot)), which stops it being a dead field without constraining generation.
 
-## Quest loot draw
+**Naming.** The source model's title is `[{difficulty} Chasse {monster.name}]`; the bracket-and-difficulty form is a debug placeholder and reads badly in the new pop-up line (`Succès : [Facile Chasse dragon]`). The name is **`Chasse {monster.name}`** — difficulty is already carried as its own field and already rendered with the `difficulty-text-*` accent class in both the journal and the pop-up. Richer names come back through the catalog itself: `parentId` makes "dragon ancien" a child of "dragon" inheriting its tags and loot, which is where the retired five-slot assembly's expressiveness relocates. No French article contraction is attempted ("Chasse dragon", not "Chasse au dragon").
 
-Status: **retired**, by [Retiring quests and quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed) — `functions/src/actions/partirEnQuete.js` is deleted. The matching mechanism this section describes (rarity + tag overlap, one loot table per item) survives as `drawQuestLoot` in `functions/src/missionResolution.js`, now the *default* loot drawer for any resolution that doesn't override it (`partirExplorer.js`'s rounds); missions specifically draw through `functions/src/missionLoot.js`'s `drawMissionLoot` instead — see [Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed). The `claimQuestLoot` callable this section also describes was itself already superseded pre-retirement by the generic `acknowledgeAction` + per-handler `commit()` pattern (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). Kept below for historical reference only.
+**New: `functions/src/lib/monsters.js`** — `resolveMonster(monster, byId)` walks `parentId` and returns `{ tagIds, lootItemIds, areaType, difficulty, talentRewardId, chain }`. `tagIds` and `lootItemIds` concatenate down the chain (deduplicated); `areaType`, `difficulty` and `talentRewardId` take the first non-null, child first. Cycle guard, depth cap 8. Inheritance is resolved **at read time in the Cloud Function**, not flattened at write time — flattening would force the creator to re-flatten every descendant on each parent edit. Called at `prepare()` time from `recherche.js` and `mission.js`, both of which already fetch whole catalogs.
 
-Status (historical, pre-retirement): **implemented**. A completed quest grants the character 1-3 random Instances (see "Still open" under [Object creation](#object-creation)), rolled server-side by `functions/src/actions/partirEnQuete.js` as part of the same `performAction` resolution as everything else (tier, gold, talent, etc.) — only committed to Firestore once the player closes the result pop-up (see "Interaction" below).
+**Test**: concatenation down the chain, first-non-null scalars, cycle guard, depth cap. Rewritten test files: `recherche.test.js`, `mission.test.js`.
 
-- **Rarity source**: Quest Objectives (`QuestObjectivesManager.jsx`, `worldData/narrativeSubjects/items` tagged "objectif de quête") now carry their own `rarity` field (the 8-tier enum shared with talents/objects/loot tables). A quest usually has several possible objectives; the objective used for rarity matching is re-rolled independently for each loot item, not fixed once for the whole quest.
-- **Loot count**: driven by the quest's resolved difficulty (`quest.difficulty`, already rolled for quest selection — see [Quest difficulty](#quest-difficulty)), via `LOOT_COUNT_BY_DIFFICULTY` in `functions/src/lib/loot.js`: facile/moyen → 1, difficile/très difficile → 2, épique/mythique → 3.
-- **Per-item draw** (`drawQuestLoot` in `partirEnQuete.js`, one pass per item): pick a random objective from the quest's objectives → filter `worldData/lootTables/items` to those whose `rarity` matches that objective's rarity AND whose `tagIds` overlaps the union of the quest's and that objective's `tagIds` → pick a random matching table → `drawLootTableItemId` (`functions/src/lib/loot.js`, a server-side copy of `src/lib/lootTables.js`'s draw) within it. An item is silently skipped (not retried) if no objective, no matching table, or no object is found — a content gap, not an error, so it never fails the quest itself.
-- **Instance description**: each drafted loot item's description is computed at draw time as `` `${object.description} [Obtenue lorsque ${accomplishmentMessage}]` ``, where `accomplishmentMessage` is the same `narrativeText` already generated for the quest's success message. Stored per-item so it survives the object's catalog description changing later.
+Not implemented yet. (Rework plan §4.2.)
 
-**Mechanic — roll vs. claim**: `resolve()` always writes the drafted loot (empty array on failure) to `lastAction.loot`, plus `lastAction.lootClaimed: false`, in the same transaction as the rest of quest resolution — so the outcome is fixed as soon as the action resolves, like everything else in `lastAction`. A separate callable, `claimQuestLoot` (`functions/src/index.js`), is what actually creates the `instances/{id}` documents; it runs when the player clicks "Fermer" on the result pop-up (see below), is idempotent (checks `lastAction.lootClaimed` first), and always flips `lootClaimed` to `true` even on a failed quest (nothing to create, just acknowledges the result) so the pop-up doesn't reopen on the next visit.
+## Monster-pool loot
 
-**Interaction — quest result pop-up**: `ActionPanel.jsx` auto-opens a `<dialog>` (via `showModal()`, not closable by Escape/backdrop click) as soon as a quest's `lastAction` is revealed (same 24h delay as the rest of "Action de la veille") and not yet claimed. It shows the quest name, "Succès"/"Échec", the narrative message, and — on success with a non-empty `loot` array — a "Butin obtenu" `<fieldset>` listing the drafted items as `.instance-card.rarity-{rarity}` chips (same colored-border treatment as the inventory tab), sorted with the rarest item first (topmost) down to the most common (bottommost). The only way to close it is the "Fermer" button, which calls `claimQuestLoot`; the dialog then stays closed for good once `lastAction.lootClaimed` flips to `true` (reactive via the existing character `onSnapshot`). The already-existing expanded "Action de la veille" detail also gained a permanent "Butin : ..." line so the loot is still visible after the pop-up is gone.
+`functions/src/missionLoot.js` is rewritten to draw from the target monster's own pool rather than by matching loot tables:
 
-**Data model implications**:
 ```
-worldData/narrativeSubjects/items/{id}  -- only the addition; see Quest creation and editing
-  rarity: string    -- one of the 8-tier rarity enum shared with talents/objects/loot tables
-                     --   (only meaningful for entries tagged "objectif de quête")
-
-character.lastAction.loot: [{
-  objectId: string, name: string, rarity: string, type: string, tagIds: string[],
-  tableId: string, tableName: string, description: string,
-}]
-character.lastAction.lootClaimed: boolean   -- flips to true once claimQuestLoot runs
+count      = success ? 3 : 1                                   // the outcome moves the count
+rarityMax  = max(difficultyIndex, monsterDifficultyIndex)      // the rarity ceiling
+pool       = resolvedLootItemIds → objects, filtered rarity <= rarityMax
+if pool is empty → fall back to the unfiltered resolved pool   // content gap, never fatal
+if still empty  → return []
+draw `count` items uniformly, with replacement
 ```
 
-firestore.rules gained an `instances/{id}` rule (read: creator or the owning player via a denormalized `ownerUid`; write: false, Cloud Functions only) — it was missing entirely before this feature, so the "Inventaire" tab's `instances` query had no rule to authorize it.
+Deliberate consequences:
 
-**Still open, now stale**: this section's own "creator tooling for unreachable loot combinations" idea (roadmap #33) named `QuestObjectivesManager.jsx` as one of the two catalogs to cross-reference; that manager is deleted. If this polish item is picked up later, it should cross-reference `MissionSubjectsManager.jsx` (or `TextGenerationManager.jsx`'s narrativeSubjects, for `partirExplorer.js`'s synthetic per-round objectives) and `TablesDeTirageManager.jsx` instead, mirroring `functions/src/missionLoot.js`'s `drawMissionLoot` matching rule rather than the deleted `drawQuestLoot`.
+- **`worldData/lootTables/items` loses its mission consumer.** It survives for harvest, so `TablesDeTirageManager.jsx`, the schema and the collection all stay — but `weightMode` / `itemWeights` no longer apply to missions, whose draws are now uniform. If the [Métier rework](#métier-rework) also moves harvest onto area pools, that whole collection goes dead at once; worth deciding then rather than discovering it.
+- **Rarity is a ceiling, not an exact match.** A `mythique` mission against a common-loot monster still draws commons. The old exact match guaranteed the tier; the ceiling only permits it.
+- **Failure pays undegraded loot at a smaller count**, where the web previously degraded rarity on a full-size haul. `rarityOffset` is removed rather than left dangling — keeping both levers would be coherent, but this takes one model's, not half of each.
+- **Ownership stays per-`instance`.** The source model's `Dict[Item, int]` quantity map is not ported: `faireDuCommerce` sells *an instance*, and `condition` / `acquisitionDate` have nowhere to live in a quantity map. `character.inventory` stays reserved and unused.
+- `functions/src/lib/loot.js`'s `LOOT_COUNT_BY_DIFFICULTY` (1/1/2/2/3/3) is deleted — count follows the outcome now, not the difficulty.
 
-## Modular action framework
+**Test** (`missionLoot.test.js`, rewritten): count follows outcome, the rarity ceiling applies, an empty pool degrades to unfiltered and then to `[]`, and nothing ever throws.
 
-Status: **analysed, not implemented** — the analysis, architecture proposal, and phased
-implementation plan asked for by this entry are done and live in
-[docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md). No production code written yet.
+Not implemented yet. (Rework plan §4.4.)
 
-"Partir en quête" is currently the only action, and it is hardcoded end to end: a handler module
-keyed by its own id in `performAction`, a flat unconditional button list in `ActionPanel.jsx`, and
-a quest-specific result pop-up wired to a quest-specific `claimQuestLoot` callable. The goal is a
-framework where adding an action is mostly content authoring: display conditions per character,
-effects, a place in the UI, an end-of-action pop-up, and the ability for other game elements
-(talents, instances) to modify it.
+## Per-region reputation
 
-Target rules the framework has to satisfy:
+`character.reputation: number` becomes `character.reputations: { [regionId]: number }`. Reputation stops being a career score and becomes a relationship with a place.
 
-- One action per day, per character; an action completes 24 h after it starts.
-- Completion opens a result pop-up — immediately if the player is connected, otherwise at their
-  next connection.
-- Availability is decided per action by its own conditions (talent owned, profession, reputation
-  level, …).
-- Actions are grouped into four categories: Aventure, Intermède, Métier, Social. The example
-  actions named for each (Repos, Marchander, Forger, Pêcher, …) are illustrations only —
-  implementing them is explicitly out of scope.
-- UI: the right-hand frame shows category tabs first, then that category's actions; an action's
-  tab has a "Commencer" button; pressing it replaces the frame with a 24 h countdown colored by
-  the quest's difficulty color, framed in the same style as the rest of the UI.
+- **Rewards**: success gives `1 + difficultyIndex`; failure gives `-(4 - difficultyIndex)`, unclamped — so `épique` costs nothing and `mythique` pays +1 even on a failure.
+- **Credited to** `result.reputationRegionId ?? character.region.id`.
+- **Seeding**: `createCharacter` writes `{ [regionId]: origin.reputationStart }`. Arriving in an unvisited region seeds that entry at `1`, and gaining reputation against a named region defaults a missing entry to `0` rather than raising.
+- **The `minReputation` condition** (`functions/src/lib/actionConditions.js` and its `src/lib/` twin) reads the *current region's* entry. Say so in the predicate's documentation, since the meaning of "reputation" changes under it.
+- **Migration**: `migrateReputationToPerRegion.js` (see [Content migration scripts](#content-migration-scripts)) writes `{ [character.region.id]: character.reputation }` and leaves the scalar in place as legacy.
+- **Front end**: `CharacterBanner.jsx` shows the current region's score; the character sheet gains a small per-region list. No new styling — reuse `.instance-list` / `.quest-info`.
 
-The analysis found one blocking prerequisite: the once-per-day lock (UTC calendar date,
-`lastActionDate`) and the 24 h reveal (`lastActionAt + 24 h`, computed client-side) are two
-different clocks today, so an action started at 23:00 UTC unlocks an hour later while its own
-countdown still has 23 h to run. Both rules unify onto a single `lastAction.completesAt` instant
-before the countdown UI can be built — see the linked document for the full finding list.
+**The zero-sum invariant, stated and tested.** The success and failure formulas were chosen independently and happen to net to +0.0125 per mission across the generation weights for a talentless character. Nothing in the code says so today, so it wouldn't survive either formula being retuned. Two tests encode it:
 
-**Data model implications**: see [docs/ISSUE-02-ACTION-FRAMEWORK.md](ISSUE-02-ACTION-FRAMEWORK.md)
-§3.2 and §3.6 for the full shapes. Summary — all additive, every field read-time-defaulted, no
-migration or backfill required:
+1. The generation-weighted expectation for a talentless character stays within ±0.05 of zero.
+2. The same expectation for a character holding one tag-matching level-5 talent is **strictly positive at every tier**, and rises with difficulty.
+
+Test 2 is the answer to "nothing pushes a character up the ladder": the base curve is flat *by design*, and **talents are what make the higher tiers pay**. That makes the non-monotonic talentless curve a feature of the floor rather than a bug in the slope.
+
+Not implemented yet. (Rework plan §4.6.)
+
+## Talent training roll and monster talent reward
+
+`functions/src/lib/talentEvolution.js` is rewritten. `evolutionChance` and `rollTalentEvolutions` are deleted — the rarity-curve unlock goes with them. `bumpTalentQuality` is **kept unchanged**: it already caps quality at 5 and re-applies `rarityFloor`, so talent rarity keeps rising with quality and the pop-up's rarity sort and `rarity-*` CSS classes keep working. `sEntrainer.js` already calls it and is unaffected.
+
+Talent acquisition splits into two paths by role, replacing the three competing designs the analysis found:
+
+**Training (successful missions only)** — levels a talent the character already owns:
+
 ```
-worldData/actionTypes/items/{id}
-  categoryId, description, order, enabled, handlerId, durationHours,   -- NEW
-  availability: { conditions, unmetBehaviour, unmetMessage },           -- NEW
-  result: { accentSource, showLoot }                                    -- NEW
-  -- label, tiers, questDifficultyWeights unchanged
-
-worldData/talents/items/{id}.actionModifiers: [ ... ]   -- NEW
-worldData/objects/items/{id}.actionModifiers: [ ... ]   -- NEW
-
-characters/{id}.lastAction
-  label, categoryId, startedAt, completesAt, accent,    -- NEW
-  acknowledged: boolean                                  -- NEW, replaces lootClaimed
-  -- lastActionDate kept but demoted to a logging/display field, no longer the lock
+if roll(2) !== 1 → nothing                                  // flat 50 %, once per resolution
+candidates = owned talents sharing a tag with mission.tagIds
+             && quality <= min(difficultyIndex + 1, 4)
+if candidates is empty → nothing
+pick exactly one uniformly → bumpTalentQuality
 ```
 
-**Still open**: a handler currently runs its `resolve()` exactly once per action occurrence — there
-is no notion of an action deciding, itself, how many resolution "rounds" it performs (e.g. drawing
-several independent encounters within a single action). No design exists yet for this; the first
-concrete case that needs it is "Partir explorer"'s T encounter draws — see
-[Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed).
+**Granting (successful missions only)** — `monster.talentRewardId`, resolved along the parent chain, granted at quality 1 if the character doesn't already own it. The source model declares this and never calls it; here it is wired.
 
-## Procedural narrative generation
+`Talent.unlockChild` and the web's rarity-curve unlock are both dropped.
 
-Status: **implemented**. The feasibility study asked for by this entry is done
-(`narrative-poc/report.md`), and the multi-slot tag-scored grammar it recommended has shipped in
-`functions/src/textGeneration.js`, wired into quest resolution in
-`functions/src/actions/partirEnQuete.js`. See:
+Two properties are worth testing because they are emergent rather than written down anywhere:
 
-- [docs/NARRATIVE-GENERATION.md](NARRATIVE-GENERATION.md) — how it works and how to author for it
-- [narrative-poc/DEMO.md](../narrative-poc/DEMO.md) — a page of real generated output
-- [narrative-poc/report.md](../narrative-poc/report.md) § 4 — quality review of the solution, the
-  seven gaps found in the plan while building it, and what is deliberately still open
-- [docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) — the original implementation plan,
-  kept for the record; parts of it were written against the retired `tiers` data model
-- [docs/TEST-SCENARIO-NARRATIVE.md](TEST-SCENARIO-NARRATIVE.md) — manual post-deploy test scenario
+- The **training window** (`quality <= min(d+1, 4)`) and the **usefulness gate** (`quality >= d`, from the resolution engine) are written independently, and their intersection is the whole rule: 0-1 at facile, … , 4 only at épique, **and empty at mythique**. The top tier can teach nothing. Assert it, so it's a decision rather than an accident.
+- The level-5 cap is enforced twice — in the candidate filter *and* in `bumpTalentQuality` — so a future second training path can't push a talent past 5, which would silently make the character *weaker*, since `perfectCount` tests `=== 5` exactly.
 
-Today most player-facing text is hand-authored: quest objectives, verb phrases, and per-tier
-`narrativeText`. The goal is to generate coherent narration from the tags, names and
-descriptions already attached to locations, quests, objectives, characters, talents, powers and
-objects — e.g. a character with a fire spell, fighting an undead army during a village-protection
-quest that ranks up their Pyromancie talent, getting a success message that mentions all three.
+Deleted test file: `talentEvolution.test.js` (rewritten against the new paths).
 
-The analysis answered the three questions it posed:
+Not implemented yet. (Rework plan §4.7.)
 
-- **Is it possible?** Yes for *selecting and assembling* the right pre-authored sentence
-  fragments per context, including correct French agreement — this is what
-  `functions/src/textGeneration.js` already does today for one sentence, generalized to a
-  multi-sentence paragraph. No for *inventing* prose as vivid as the motivating example for tag
-  combinations nobody wrote content for; template output degrades to correct-but-plainer text
-  there, and coverage cost grows multiplicatively with the number of tag dimensions.
-- **Without an LLM?** Yes, and that's the recommended default: a multi-slot, tag-scored template
-  grammar (opening / climax / talent-growth slots, each with its own tagged pool), with the
-  coverage gap above accepted as a designed-in limitation. Zero added infrastructure, no
-  latency, no data leaving Firebase. The other non-LLM avenue tried in the POC — a statistical
-  n-gram/Markov model trained on the game's own sentences — does not fit: the corpus will never
-  be large enough, and it has no way to condition on tags at all.
-- **If not, what's close?** A hosted LLM call from the Cloud Function is the only option that
-  covers arbitrary tag combinations at the example's quality bar, at the cost of latency, an
-  external dependency and non-determinism; small self-hosted models trade a small predictable
-  cost for a large unpredictable one and are weaker at French prose. Recommended shape if the
-  gap ever matters in practice: hybrid — template grammar for ordinary outcomes, LLM reserved
-  for rare high-stakes tiers (epic/legendary, talent rank-ups), never as the default path.
+## Quest chains on monsters
 
-Two pieces of pre-existing data-model debt surfaced while analysing this and are tracked
-separately below, neither blocking: [Location tags](#location-tags) (locations have no tags to
-match against at all) and
-[Tag system unification (tagIds vs free-text tags)](#tag-system-unification-tagids-vs-free-text-tags)
-(the generator matches free-text `tags`, while talents/quests store `tagIds`).
+`functions/src/lib/questChains.js` keys on `monsterId` instead of `subjectId`, and `character.triggeredSubjectIds` becomes `triggeredMonsterIds`. `questChainProgress` is unchanged: it stays an id-keyed map, because Firestore needs an id key.
 
-**Data model implications**: two additive optional fields on `worldData/verbPhrases/items`, plus new
-read paths for talent/quest `tagIds`. No migration or backfill: a document without `slot` reads as
-action content and behaves exactly as before.
-```
-worldData/verbPhrases/items/{id}
-  slot: "opening" | "climax" | "talentGrowth"        -- optional, defaults to "climax"
-  talentChange: "evolution" | "unlock" | "les_deux"  -- optional, "talentGrowth" only, defaults to "les_deux"
-```
-The one behavior change to existing content: tag matching went from "shares at least one tag" to "all
-tags satisfied", so a multi-tagged phrase is harder to draw than it was. See
-[narrative-poc/report.md](../narrative-poc/report.md) § 2.1 for why the looser rule had to go.
+- **New: completing the last step fires the chain's rewards** through an `ActionResult` — `rewardItemIds`, `rewardTalentIds`, `rewardReputation` and `rewardRegionId`. The web has no counterpart for this today; `rewardRegionId` is what stops a chain spanning several regions from crediting whichever one the character happens to be standing in.
+- `ActionResultDialog.jsx`'s page 2 fetches `worldData/monsters/items` instead of `missionSubjects`, and its localStorage key becomes `shownTriggeredMonsters:{characterId}`.
+- The scheduled sweep (`sweepQuestTriggers`, `functions/src/lib/questTriggers.js`) is kept and reads `monster.trigger` — triggers moved from `missionSubject.trigger` to `monster.trigger` with the contracts.
+- Chain documents are re-authored by hand rather than migrated (see [Content migration scripts](#content-migration-scripts)).
 
-## Location tags
+Rewritten tests: `questChains.test.js`, `questTriggers.test.js`.
 
-Status: **implemented** (field and creator UI only — see "Still open" below).
+Not implemented yet. (Rework plan §4.9.)
 
-`worldData/adventureZones/items` (displayed as "Lieux de quête" in the creator UI,
-`QuestLocationsManager.jsx`) now carries a `tagIds: string[]` field, referencing
-`worldData/tags/items` via the same `MultiSelectModalField.jsx` picker mechanism already used by
-quests, objects, loot tables, and talents (see [docs/ARCHITECTURE.md](ARCHITECTURE.md)). This
-closes one of the two things explicitly deferred as a non-goal in
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) (the multi-slot narrative grammar
-engine spec), which wants a way to select an "opening"/stakes-setting narrative fragment
-flavored by where the quest takes place (e.g. a forest, a coastal village, ruins) — the same way
-it already plans to flavor fragments by the character's talent tags and the quest's own tags.
+## Travel action (Voyager)
 
-`QuestLocationsManager.jsx`'s create/edit form gained the `tagIds` multi-select (alphabetically
-sorted, same as the other `tagIds` pickers), and its list rows show the resolved tag names, same
-pattern as `ObjectsManager.jsx`. `TagsManager.jsx`'s cascade-delete cleanup now also strips a
-deleted tag's id from `adventureZones.tagIds`, alongside the collections it already covered.
+A new handler `functions/src/actions/voyager.js` and a new action document under the `intermede` kind — so travel draws from the Intermède budget rather than burning the main Interval.
 
-**Data model implications**:
-```
-worldData/adventureZones/items/{id}
-  tagIds: string[]   -- worldData/tags/items ids, same mechanism as quests/objects/loot
-                      --   tables/talents; NEW field, defaults to []
+- Payload: `regionId`. Returns `createActionResult({ newRegionId })`.
+- `applyActionResult` writes `character.region` and seeds `reputations[newRegionId] ??= 1`.
+- **Any region is reachable** at this stage. Gating on the already-authored, currently-unread `region.neighbors` is [Region adjacency gating](#region-adjacency-gating); shipping it now would break travel wherever `neighbors` is unauthored.
+- **Region-locked missions in the journal stay locked to where they were generated**, so travelling strands unclaimed missions. That is the intended trade-off, and it is what makes per-region reputation and area-keyed generation an actual choice.
+- `ActionBrowser.jsx` needs a region picker for it, modelled on `CommercePicker.jsx` / `ProfessionPicker.jsx`.
+
+**Playtest risk worth naming**: travel is an Intermède action, so a character can travel *and* still act — but a region-locked journal is worthless after a move until the next "Se renseigner", which *is* a main-Interval action. Playtest that exact sequence. It may want travel to refresh the journal, which would be a deviation from both models and should be a deliberate one, not a patch.
+
+Not implemented yet. (Rework plan §4.8.)
+
+## Result pop-up rework
+
+Directive 5 of the rework, plus the outcome-display changes the new effect vocabulary forces.
+
+`src/components/actions/results/DefaultResult.jsx` — when `lastAction.mission` is present, the outcome line becomes:
+
+```jsx
+<p className={`outcome ${outcomeClass}`.trim()}>
+  {lastAction.success ? "Succès" : "Échec"} : {lastAction.mission.name}
+</p>
 ```
 
-**Still open (deliberately deferred)**: nothing consumes these `tagIds` yet. The original plan was
-to resolve them to tag names via the "tag vocabulary bridge" pattern in
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md), but that bridge was actually retired
-codebase-wide by [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) —
-`functions/src/textGeneration.js` now reads `tagIds` straight through instead of resolving through
-a name bridge. Wiring location `tagIds` into the "opening" slot's context tag set (alongside quest
-and talent tags) is future work with no scheduled owner; the field ships alone for now, per the
-note this entry always carried that it isn't a prerequisite for the grammar engine's opening slot,
-which already works without it.
+Non-mission actions keep the bare `Succès` / `Échec`. `ActionOutcome.jsx` drops its separate `Mission : {name}` line, which would otherwise repeat the name two lines down; the location, if any, moves onto the `Résolution` fieldset.
 
-## Tag system unification (tagIds vs free-text tags)
+**One deviation flagged rather than silently taken**: the directive spells it `Echec`; every other string in this codebase spells it `Échec` (`ActionOutcome.jsx`, `DefaultResult.jsx`). This implements `Échec` for consistency — it's a one-character change if the unaccented form is actually wanted.
 
-Status: **implemented**. `worldData/narrativeSubjects/items` and `worldData/verbPhrases/items`
-now carry `tagIds: string[]` referencing the shared `worldData/tags/items` catalog, the same
-mechanism every other tagged collection (objects, loot tables, quests, talents) already used. The
-free-text `tags: string[]` field is gone from both schemas; `functions/src/textGeneration.js`'s
-`tagsOf` reads `tagIds` directly, and the "tag vocabulary bridge" that used to resolve quest/talent
-`tagIds` to tag *names* before matching (`resolveTagNames`/`tagsByIdName` in `partirEnQuete.js` and
-`mission.js`) is gone — `buildNarrativeContext` now passes `tagIds` straight through.
+`ActionOutcome.jsx` also needs, in the same pass:
 
-**The reserved sentinel**: the free-text `"objectif de quête"` value that used to mark a
-narrativeSubject as a selectable quest objective is now a real `worldData/tags/items` entry, at
-the fixed document id `"objectif-de-quete"` (`OBJECTIVE_TAG_ID`, exported from
-`QuestObjectivesManager.jsx`, hand-mirrored as a literal in `functions/src/actions/rumeur.js` per
-the project's usual functions/src ⇄ src convention). `QuestObjectivesManager.jsx` force-injects
-that id into `tagIds` on every save and hides it from its own tags picker (never a user-toggled
-choice); `rumeur.js` and `QuestsManager.jsx` filter on it the same way `.tags.includes(...)` used
-to.
+- reputation rendered **signed** (`+2` / `−3`), since failure now moves it — the current `reputationGained > 0` guard hides every loss;
+- the region the reputation landed in, now that it is per-region;
+- `Talent entraîné` alongside the existing `Amélioration de talent` list, since training and granting are now two distinct effects (the old `rollTalentEvolutions` returned both through one list).
 
-**Cascade-delete cleanup**: `TagsManager.jsx`'s delete handler now also strips a deleted tag's id
-from `verbPhrases.tagIds`, alongside the collections it already covered.
+Other front-end follow-ups in the same pass: `MissionPicker.jsx` reads `targetMonsterId` (the difficulty accent is unchanged), `CharacterBanner.jsx` / `CharacterTabs.jsx` show per-region reputation, and `src/lib/actionConditions.js`'s `minReputation` twin stays in step with the server copy.
 
-**Data migration for existing content**: `functions/scripts/migrateTagsToTagIds.js` (same one-off
-admin-script convention as `migrateActionDurationTo12h.js`) resolves every free-text tag name still
-sitting in `narrativeSubjects.tags`/`verbPhrases.tags` to a `worldData/tags/items` id (creating the
-catalog entry if none matches by name yet), merges the result into `tagIds`, and deletes the old
-`tags` field. It also ensures the reserved `"objectif-de-quete"` tag doc exists. **Not run against
-production yet** — mutating live Firestore data needs a separate go-ahead; run with
-`node functions/scripts/migrateTagsToTagIds.js` after `gcloud auth application-default login`.
+**Styling is not touched** (directive 3): `src/index.css` is untouched, and every new or reworked component reuses the existing class vocabulary — `creator-section`, `creator-list`, `collapsible-group`, `condition-row`, `action-loot-box`, `instance-list`, `instance-card`, `quest-info`, `outcome`, `difficulty-text-{value}`, `rarity-{value}`. The `difficulty-text-*` and `rarity-*` classes are keyed on the *stored* enum values, which is one more reason those keys don't change.
 
-**Data model implications**:
-```
-worldData/narrativeSubjects/items/{id}
-  tagIds: string[]   -- worldData/tags/items ids; now the functional tag field, read by
-                      --   textGeneration.js and by partirEnQuete.js's loot draw / talent
-                      --   evolution gating when the subject acts as a quest objective
-  -- tags: string[]  -- REMOVED (was free-text, functionally used for matching)
+Not implemented yet. (Rework plan §5.)
 
-worldData/verbPhrases/items/{id}
-  tagIds: string[]   -- worldData/tags/items ids, optional (omitted when empty)
-  -- tags: string[]  -- REMOVED (was free-text, functionally used for matching)
-```
+## Healing and wound recovery
 
-Once the migration script has run against production, the "tag vocabulary bridge" section of
-[docs/ISSUE-01-GRAMMAR-ENGINE.md](ISSUE-01-GRAMMAR-ENGINE.md) is stale and could be trimmed as a
-follow-up — not done in this pass since it's documentation-only and low priority.
+**Spec row — needs a design pass, not code.** The [Resolution engine rebuild](#resolution-engine-rebuild) raises injury frequency from roughly 3 % of missions to roughly 20 % (and permanent wounds from near-zero to ~4 %), against a wound ladder that has **no drain at all**: light wounds escalate to severe, severe to permanent, permanent accumulates until the fourth kills. Nothing anywhere removes a wound. At the new rates the ladder fills about six times faster than today, so a character's lifespan becomes a function of how long they play rather than how well.
 
-## Profession (métier) creation
+Open questions this spec has to answer:
 
-Status: **implemented** (catalog, creator UI, and character link — see "Character link" below).
-`worldData/professions/items` via `ProfessionsManager.jsx`, registered as the "Métiers" tab in
-`CreatorDashboard.jsx`, under the "Personnages" group alongside Talents and Objets.
+- What removes a wound — an action (rest, a healer NPC), time (wounds decay per Interval), gold, an item, or a combination?
+- Does healing walk the ladder back down (severe → light) or clear a counter outright?
+- Are permanent wounds actually permanent, or is "permanent" only permanent without expensive intervention?
+- Where does it live in the action taxonomy — Intermède (cheap, parallel to acting) or main Interval (a real day spent not adventuring)?
+- Balance target: what steady-state wound load should an average character carry? `partirExplorer` is the specific handler to balance against, since it is the only action where wounds accumulate *within* a single action.
 
-A profession is characterized by:
+If this row can't ship soon after the engine, apply a stopgap rather than shipping the combination unexamined: cap `permanent`, or slow the injury bands.
 
-- **Name**.
-- **Description**.
-- **Talents**: multi-select against `worldData/talents/items`, same `MultiSelectModalField` +
-  `matchesTalent` mechanism already used by `TalentsManager.jsx`'s own ancestor/descendant
-  pickers.
-- **Reputation condition**: a minimum reputation value required, mirroring the semantics of the
-  existing `minReputation` predicate in `src/lib/actionConditions.js` (a single numeric threshold
-  against `character.reputation`), rather than inventing a new condition shape.
-- **Trainers**: multi-select against `worldData/trainerTypes/items` — the only "entraîneur"
-  catalog that exists today (see [Trainer type creation page](#trainer-type-creation-page)),
-  via `TrainerTypesManager.jsx`.
-- **Evolution**: single-select referencing another `worldData/professions/items` entry (the
-  profession this one evolves into) — self-referencing like talents' ancestor/descendant links,
-  but single-valued here rather than a list.
-- **Actions associées**: multi-select against `worldData/actionTypes/items`, same
-  `MultiSelectModalField` + `matchesActionType` mechanism already exported by `ActionsManager.jsx`
-  (option labels come from each action type's `label` field, not `name`). Restricted to actions of
-  kind Métier, and kept in step with the action's own `professionIds` — see
-  [Action kinds and Métier actions](#action-kinds-and-métier-actions).
+Not implemented yet. (Rework plan §4.1, §9.)
 
-**Interaction**: new "Métiers" tab in the creator dashboard, under the "Personnages" group.
+## Métier rework
 
-**Data model implications**:
-```
-worldData/professions/items/{id}
-  name: string              -- French, e.g. "Forgeron"
-  description: string
-  talentIds: string[]       -- worldData/talents/items ids
-  minReputation: number     -- minimum character.reputation required, same semantics as
-                             --   actionConditions.js's minReputation condition
-  trainerTypeIds: string[]  -- worldData/trainerTypes/items ids
-  evolutionId: string       -- worldData/professions/items id this profession evolves into, or ""
-  actionIds: string[]       -- worldData/actionTypes/items ids
-```
+The deferred economy and job calls, gathered into one wave-3 row. None of this is broken today — `gold`, `salePrice`, `trainingCost` and `faireDuCommerce` all work and are untouched by the earlier waves — so this is about extending the Métier side onto the new engine, not repairing it.
 
-**Initial assignment (roadmap #11)**: **implemented**, via two paths, deliberately not three —
-a quest-driven grant was considered and dropped from scope, leaving:
+- **Jobs**: harvest and craft actions run against the new area catalog. `area.lootTableIds` is the per-area harvest pool the [Area creator page](#area-creator-page-and-regionareaid) authors, which is otherwise written and unread.
+- **Proficiency as a rarity ceiling**: harvest yields cap at a rarity determined by the character's proficiency, mirroring how mission loot now caps at a difficulty-derived ceiling.
+- **Per-trainer ceilings**: which ceiling wins when a trainer's cap and the talent system's cap disagree. Deferred here deliberately — the talent cap is enforced twice already (candidate filter and `bumpTalentQuality`), so this row can only tighten, never reopen, the level-5 hole.
+- **Gold economy and training cost** revisited once the above are in place.
 
-- **Origin** (pre-existing): at character creation, `createCharacter` (`functions/src/index.ts`)
-  resolves the drawn origin's linked profession and sets `professionId`/`professionLevel: 1`/
-  `knownProfessions` together with the legacy `profession` string, all in one write.
-- **Trainer** (new): a character practising no profession at all (`professionId` unset) can learn
-  one at a trainer. A new action kind, `apprentissage` (nested under `entrainement` in
-  `functions/src/lib/actionKinds.js` ⇄ `src/lib/actionKinds.js`, `PROFESSION_LEARNING_ACTION_KIND_ID`)
-  reuses Entraînement's existing `trainerTypeId` field and `trainerReachable` gate — filed there
-  rather than as a Métier subtype, since it's mediated by a trainer location, not gated by an
-  already-held profession — and additionally injects an implicit `professionless` condition
-  (`actionCatalog.js`'s `resolveConditions`, same "nobody authors this row" convention as
-  `hasProfession`/`trainerReachable`). Registered under the shared `apprentissage` handlerId
-  (`functions/src/actions/apprentissage.js`, one handler for every such action, same "one handler,
-  several action documents" convention as [Trainers](#trainers)' `sEntrainer`). The player picks
-  from the professions actually taught at that action's own trainer type (`profession.trainerTypeIds`
-  matching the action's `trainerTypeId`) via `ProfessionPicker.jsx`, re-validated server-side in
-  `prepare()`/`resolve()`, never trusted from the client. Grants at level 1 via
-  `src/lib/professions.js`'s `withProfessionChange` (the same helper `switchKnownProfession`
-  reuses), and — per the reconciliation note under "Character link" below — also sets the legacy
-  `character.profession` string, kept in step with what the origin path already does. No gold cost:
-  unlike training a talent's quality (which scales against the talent's current quality), there is
-  no equivalent progress variable to scale an initiation fee against.
+Note for when this lands: if harvest also moves onto area pools, `worldData/lootTables/items` loses its last consumer — the collection, its schema, `TablesDeTirageManager.jsx` and `weightMode`/`itemWeights` all go dead at once. Decide that here rather than discovering it later.
 
-**Still open (deliberately deferred)**:
-- No consumer reads `minReputation` or `evolutionId` yet — reputation-gated profession change and
-  the evolution trigger are not implemented.
-- A quest-driven initial-assignment path (granting a profession as a quest reward, mirroring
-  `tier.talentGain`) was explicitly not built in this pass — only origin and trainer exist. Revisit
-  as its own entry if a quest-driven grant turns out to be wanted later.
+Not implemented yet. (Rework plan §1.3 decisions 1 and 15, §4.4.)
 
-**Implementation scope**:
-- **Evolution consumer (roadmap #33, misc polish)**: read `src/lib/professions.js`, `functions/src/schema/profession.ts` / `shared/schema/profession.ts` (the unread `evolutionId` field), and `src/components/ProfessionTab.jsx` (where a reached-evolution notice would surface). Update whichever of those ends up hosting the evolution trigger.
-- Do not read or open any other file for this entry without asking the user first.
+## Merchants and the buy side of the economy
 
-### Character link
+**Spec row — needs a design pass, not code.** The web has a sell side (`faireDuCommerce` sells an instance at `salePrice`) and no buy side. The Python model has a `Merchant` class, but it is entirely unwired — `buy` raises and `buildInventory` is a TODO — so there is nothing to port, only to design. That is why this is a spec row and why it sits behind the [Métier rework](#métier-rework), which settles the gold economy it would spend.
 
-Status: **implemented**, including trainer-driven initial assignment (see "Initial assignment"
-above). A quest-driven initial-assignment path remains deliberately unbuilt, see "Still open" above.
+Questions to answer: what stocks a merchant (a fixed catalog, a per-area pool, drawn from the `lootTables` harvest survives on?), whether stock is per-region and persistent or regenerated, how buy prices relate to `salePrice`, whether merchants gate on reputation (now per-region — a natural fit), and where buying sits in the action taxonomy.
 
-A character has at most one active profession plus a mastery level (`professionLevel`, an integer
-1-5, starting at 1 whenever a profession is (re)assigned), and a history of every profession it has
-ever held (`knownProfessions`), each with its own remembered level.
+Ownership constraint carried over from [Monster-pool loot](#monster-pool-loot): purchases create `instances`, not quantity-map entries. `character.inventory` stays reserved and unused.
 
-Displayed in the character sheet's "Métier" tab (renamed from "Bénédictions", which it replaces —
-`CharacterTabs.jsx`), via `ProfessionTab.jsx`: profession name and level, description, and associated
-actions (resolved from `actionIds` against `worldData/actionTypes/items`). A profession carries no
-income of its own — income is reserved for future actions, not tied to a profession. A "Métiers
-connus" control opens a popup listing
-`knownProfessions`; picking one swaps it in as the active profession, first upserting the previously
-active profession's current level back into `knownProfessions` so no progress is lost
-(`src/lib/professions.js`'s `withProfessionChange`).
+Not implemented yet. (Rework plan §1.3 decision 1.)
 
-**Data model implications**:
-```
-characters/{id}
-  professionId: string | null       -- worldData/professions/items id, the active profession
-  professionLevel: number | null    -- 1-5 mastery level, only meaningful when professionId is set
-  knownProfessions: { professionId: string, level: number }[]
-                                     -- every profession ever held, with its last known level
-```
+## Region adjacency gating
 
-`character.profession` (the legacy free-text string copied from the rolled background) is kept in
-step with `professionId` by every path that sets the latter — origin at character creation, and now
-the trainer-driven `apprentissage` handler too — so the `profession` action condition in
-`actionConditions.js`, which still keys off that string, keeps working for characters assigned
-either way. `switchKnownProfession` (a later switch between professions already known) does not
-touch it, so it can still drift from `professionId` after a switch — left as is, since nothing reads
-`character.profession` as anything other than the origin-time trade today. The newer `hasProfession`
-condition, which gates Métier actions, reads `professionId` directly; both predicates coexist.
+`region.neighbors` is authored today and read by nothing. This row makes it real: [Travel action (Voyager)](#travel-action-voyager) ships with any region reachable from anywhere, and this restricts it to adjacent regions.
 
-## Action kinds and Métier actions
+- Gate the region picker in `ActionBrowser.jsx` and re-check server-side in `voyager.js` — the picker is a convenience, the handler is the authority.
+- **Blocked on content, not code**: shipping this while any region has an unauthored or asymmetric `neighbors` list strands characters. Audit the full region graph first — every region reachable, no one-way edges unless one-way edges are intended.
+- Decide at that point whether travel to a non-adjacent region becomes a multi-Interval trip or is simply impossible.
 
-Status: **implemented**.
-
-An action type is now an instance of a *kind* — the "class" it inherits from — rather than a free
-document filed under a category. `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`
-(mirrored pair, same convention as `actionConditions`/`actionCatalog`/`actionLifecycle`) holds the
-tree:
-
-- Four roots, one per category: **Aventure**, **Intermède**, **Métier**, **Social**. "Partir en
-  quête" is an action of kind Aventure.
-- A kind's **category is its root ancestor**, so `categoryId` stops being authored and becomes
-  derived. The four categories and the four root kinds are the same four values, which is what
-  makes that work; `ACTION_CATEGORIES` is now derived from the roots instead of restated.
-- `parentId` exists for the subtypes the Métier branch will grow (Artisanat, Récolte, Transport,
-  Recherche…). Each will inherit Métier's profession gate by being under it, with no new code.
-- Every kind is selectable by an action: "abstract" describes the modelling, not a rule the code
-  enforces, so there is no flag for it.
-
-A **Métier action** is an action whose kind inherits from `metier`. It carries `professionIds`,
-and is available only to a character *practising* one of those professions:
-
-- The gate is **not an authored condition row**. `resolveConditions` (`actionCatalog.js`) injects
-  `{ type: "hasProfession", professionIds }` for anything under Métier, so "which métiers may run
-  this" is edited in exactly one field and cannot be forgotten or contradicted in the condition
-  editor. `hasProfession` is therefore absent from `CONDITION_TYPES`.
-- It matches `character.professionId` — the *active* profession. A profession the character used
-  to hold (`knownProfessions`) does not open the action.
-- It fails closed like every other malformed condition: a Métier action with no profession
-  selected is available to nobody, and both creator screens say so inline.
-- Enforced server-side by the same mirrored evaluator the client uses for display
-  (`runActionPipeline` step 3), so the client's answer stays UX and the server's stays authority.
-
-**The link is stored on both ends and synchronized both ways** (`src/lib/professionActions.js`):
-saving an action writes its `professionIds` *and* `arrayUnion`/`arrayRemove`s itself into each
-profession's `actionIds`, in one `writeBatch`; saving a profession does the mirror image. Deleting
-either end drops the reference from the other, so no dangling id survives the delete. Both ends are
-written because both are read without a join — the availability gate reads the action's side, the
-character sheet's Métier tab reads the profession's. There is no Cloud Function in front of
-`worldData` (it is creator-write per `firestore.rules`), so this runs in the creator's browser; a
-concurrent delete fails the whole batch rather than half-committing.
-
-**Action tags** (roadmap #32, one of the bundled items — **implemented**): `worldData/actionTypes/items/{id}`
-now carries a `tagIds: string[]` field, referencing `worldData/tags/items` via the same
-`MultiSelectModalField.jsx` picker mechanism already used by quests, objects, loot tables, talents,
-locations, and recettes. Generic and unconditional — unlike `lootTagIds`/`recipeCategoryIds`, it
-isn't scoped to a single kind branch, so every action type carries it regardless of kind.
-`ActionsManager.jsx`'s create/edit form gained the picker right after the description field, and its
-list rows show the resolved tag names, same pattern as `ObjectsManager.jsx`/`QuestLocationsManager.jsx`.
-`TagsManager.jsx`'s cascade-delete cleanup now also strips a deleted tag's id from `actionTypes.tagIds`,
-alongside the collections it already covered. No consumer reads it yet — this entry only closes the
-"the field doesn't exist" gap, per the note it always carried that a consumer (filtering in the action
-browser? matching against the procedural narrative generator's tag vocabulary, per
-[Procedural narrative generation](#procedural-narrative-generation)?) is still undecided.
-
-**Data model implications**:
-```
-worldData/actionTypes/items/{id}
-  kindId: string           -- NEW, src/lib/actionKinds.js value; defaults at read time to the
-                           --   document's old categoryId, so no migration is needed
-  categoryId: string       -- no longer written; derived from kindId's root ancestor. Existing
-                           --   documents keep theirs and it still reads correctly.
-  professionIds: string[]  -- NEW, worldData/professions/items ids; only meaningful for kinds
-                           --   inheriting from "metier", cleared when the kind moves elsewhere
-  tagIds: string[]         -- NEW, worldData/tags/items ids; generic, unconditional, defaults to [];
-                           --   no consumer yet
-```
-
-**Still open (deliberately deferred)**:
-- No concrete Métier subtype exists yet beyond Récolte and Artisanat (Transport, Recherche...).
-  Adding one is an entry in `ACTION_KINDS` plus, if it needs bespoke mechanics, a handler in
-  `ACTION_HANDLERS` - see [Action de récolte](#action-de-récolte) and
-  [Action d'artisanat](#action-dartisanat) for how those two did it. Candidate content for future
-  Métier actions/subtypes: forger, couper du bois, cultiver, monter la garde, cuisiner, faire de la
-  musique, construire, miner - illustrations only, same status as the example actions listed in
-  [Modular action framework](#modular-action-framework)'s own analysis.
-- A kind cannot declare which handlers or which extra form fields belong to it; the handler select
-  still offers every registered handler regardless of kind. Worth revisiting when the next
-  subtype needs its own fields.
-- A Métier action's `resolve()` can already return `updates` touching `reputation`, `gold`, or
-  `region` - the pipeline applies whatever a handler returns, nothing new to build there (see
-  [Modular action framework](#modular-action-framework)). No handler exercises this today: Récolte
-  and Artisanat only ever touch `instances`. Since the retired paliers system stopped rolling
-  gold/reputation/wound changes entirely (`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7), which action
-  grants how much of what is undecided content, not a missing architecture piece.
-**Implementation scope** (roadmap #32 — bundles several independent small polish items; the action
-`tagIds` field is now done, see above — the remaining two are still open):
-- Read: `src/lib/actionKinds.js` / `functions/src/lib/actionKinds.js` (`ACTION_KINDS` tree, to extend with a new Métier subtype), `functions/src/actions/recolte.js` and `functions/src/actions/artisanat.js` (precedent for how a Métier subtype adds its own handler + fields), `functions/src/lib/actionCatalog.js` (`resolveConditions`, where the `hasProfession` gate is injected), and `functions/src/schema/actionType.ts` / `shared/schema/actionType.ts`.
-- Update: whichever of the above the specific polish item touches. This row still bundles two independent items (a new Métier subtype, gold/reputation/region content on an existing handler) — confirm with the user which one to pick up first rather than doing both in one pass.
-- Do not read or open any other file without asking the user first.
-
-## Action de récolte
-
-Status: **implemented**.
-
-A **Récolte action** (`worldData/actionTypes/items/{id}.kindId: "recolte"`, `HARVEST_ACTION_KIND_ID`
-in `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`) is a Métier subtype - it inherits
-the profession gate for free by being filed under Métier in the kind tree, exactly as the
-[Action kinds and Métier actions](#action-kinds-and-métier-actions) entry anticipated. It is
-characterized by everything a Métier action already carries (name, description, associated
-professions, handler, tiers, conditions, …) plus two fields meaningful only for this kind:
-
-- **Tags de butin** (`lootTagIds: string[]`, `worldData/tags/items` ids): a *different* tag
-  vocabulary from action tags (not implemented yet - see
-  [Tag system unification](#tag-system-unification-tagids-vs-free-text-tags) for the only tag
-  concept that exists today). Used only to pick which loot table this harvest draws from.
-- **Rareté** (`rarity`, the 8-tier enum shared with talents/objects/loot tables): combined with
-  `lootTagIds`, narrows `worldData/lootTables/items` down to the candidate pool for this action.
-
-**Mechanic** (`functions/src/actions/recolte.js`, registered under the shared `"recolte"`
-handlerId - one handler for every Récolte action, keyed by `handlerId` like every other handler,
-not by a per-action document id): on a successful tier (rolled exactly like any other action's
-`tiers`), a random loot table is picked among those whose `tagIds` overlaps the action's
-`lootTagIds` and whose `rarity` matches the action's `rarity`; `harvestFromLootTable`
-(`functions/src/lib/harvest.js`) then draws `baseQuantity` items from it, one uniform draw at a
-time (repeats are just repeated ids, same convention as everywhere else loot is drawn).
-`baseQuantity` is the sum of the character's mastery level across every profession the action is
-associated with (`professionIds`) - but **only for professions the character actually knows**
-(its active `professionId`/`professionLevel`, or an entry in `knownProfessions`); a profession
-listed on the action that the character never held contributes 0, it doesn't block the harvest.
-No matching table, or a `baseQuantity` of 0, yields no loot rather than an error - a content gap,
-not a failure, same convention as quest loot's per-item skip.
-
-Loot is deferred exactly like quest loot: `resolve()` freezes the drawn items onto
-`lastAction.loot` (reusing the same entry shape - `objectId`, `name`, `rarity`, `type`, `tagIds`,
-`tableId`, `tableName`, `description` - so `ActionOutcome.jsx`'s "Butin obtenu" box needs no
-Récolte-specific branch), and `commit()` turns each entry into its own `instances/{id}` document
-once the player acknowledges the result (`acknowledgeAction`) - a harvest of quantity 5 from a
-one-item table produces 5 separate Instance documents, not one stacked count (the client already
-groups identical inventory items with a count badge, see
-[Object creation](#object-creation)'s "Instance" note).
-
-**Interaction**: no new UI. The creator's "Nouvelle action" form shows "Tags de butin"/"Rareté"
-whenever the selected type inherits from Récolte, right where "Métiers associés" already appears
-for any Métier action (`ActionsManager.jsx`); a character sees and starts a Récolte action exactly
-like any other Métier action, through the existing `ActionBrowser`/`hasProfession` gate - no
-mechanic 2 work was needed beyond that gate already being generic.
-
-**Data model implications**:
-```
-worldData/actionTypes/items/{id}  -- only meaningful when kindId inherits from "recolte"
-  lootTagIds: string[]   -- worldData/tags/items ids, distinct from any future action-tags field
-  rarity: string          -- one of the 8-tier rarity enum shared with talents/objects/loot tables
-```
-
-`functions/src/lib/actionPipeline.js`'s `runActionPipeline` now also passes `actionTypeId` into
-`handler.prepare`/`handler.resolve` (previously only available to `genericResolve`) - needed
-because, unlike `partirEnQuete.js`, `recolte.js` has no single hardcoded action document id to
-stamp onto `lastAction.actionTypeId`.
-
-## Action d'artisanat
-
-Status: **implemented**.
-
-An **Artisanat action** (`worldData/actionTypes/items/{id}.kindId: "artisanat"`,
-`CRAFTING_ACTION_KIND_ID` in `src/lib/actionKinds.js` ⇄ `functions/src/lib/actionKinds.js`) is a
-Métier subtype, exactly like Récolte - it inherits the profession gate for free by being filed
-under Métier in the kind tree. It carries one field meaningful only for this kind:
-
-- **Catégories de recettes** (`recipeCategoryIds: string[]`, `worldData/tags/items` ids - the same
-  catalog a recette's own `categoryIds` draws from): a recette qualifies for this action when its
-  `categoryIds` overlaps this list.
-
-**Mechanic** (`functions/src/actions/artisanat.js`, registered under the shared `"artisanat"`
-handlerId): unlike Récolte or a quest, there's no rolled tier - crafting always succeeds once its
-ingredients are confirmed present. `prepare()` validates the client-picked `recetteId` (present on
-`character.knownRecipes`, and matching the action's `recipeCategoryIds`) and throws a friendly
-precondition error otherwise, without consuming the daily lock. `resolve()` then re-checks
-ingredient quantities against `instances` (`hasIngredients`, `functions/src/lib/crafting.js`) as
-the authority and, if met, **consumes them immediately** (`tx.delete`, in the same transaction that
-starts the action) - a player sees the ingredients leave their inventory the moment they click
-"Commencer", not 24h later. The recette's results (`craftResults`, same module) are frozen onto
-`lastAction.craftResults` and only turned into `instances/{id}` documents in `commit()`, once the
-player acknowledges the result pop-up - the one difference from the crafting mechanic's original
-single-shot sketch (`functions/src/actions/artisanat.js`'s previous `craft()`, which consumed and
-produced in one immediate call rather than splitting across the action's lifecycle).
-
-**Interaction**: no generic `ActionBrowser` entry - an Artisanat action instead surfaces as its own
-sub-tab inside the character sheet's "Métier" tab (`ProfessionTab.jsx`; a sub-tab bar - "Description"
-plus one tab per enabled Artisanat action tied to the active profession - only appears once such an
-action exists). `CraftingTab.jsx` lists the character's `knownRecipes` restricted to the action's
-`recipeCategoryIds`, alphabetically sorted and filterable by a free-text search (reusing
-`RecettesManager.jsx`'s exported `matchesRecette`/`objectEntryLabel`), scrollable vertically.
-Hovering a recette shows its ingredients/results via the shared `[data-tooltip]` CSS convention;
-clicking selects it, showing the same detail below with a "Commencer" button, disabled with no
-recette selected, while submitting, or while another action is already running. Starting it calls
-`performAction({ actionTypeId, recetteId })` - the same callable every action goes through, just
-carrying one extra field. The result pop-up (`ActionResultDialog.jsx`) special-cases
-`lastAction.handlerId === "artisanat"`: no Succès/Échec line (crafting can't fail once it starts),
-header reads "`{action label}: {recette name}`", results are listed under "Résultat", and the
-acknowledge button reads "Terminer" instead of "Fermer" - everywhere else in the dialog this is
-generic and shared with every other action.
-
-**Data model implications**:
-```
-worldData/actionTypes/items/{id}  -- only meaningful when kindId inherits from "artisanat"
-  recipeCategoryIds: string[]   -- worldData/tags/items ids, same catalog as a recette's categoryIds
-
-characters/{id}
-  lastAction: {
-    recetteId: string        -- artisanat only, worldData/recettes/items id
-    recetteName: string      -- denormalized at resolve time
-    craftResults: [{ objectId, name, rarity, description }]   -- one entry per unit produced,
-                                                                --   same convention as récolte's loot
-  }
-```
-
-`functions/src/lib/actionPipeline.js`'s `runActionPipeline` now also accepts a `payload` object,
-passed through to `handler.prepare`/`handler.resolve` alongside a `characterRef` (previously only
-available to `commit`) - needed because, unlike every other handler so far, `resolve()` here must
-itself query and delete `instances` documents, which requires the character's id before `commit()`
-ever runs.
-
-**Still open (deliberately deferred)**: nothing grants `knownRecipes` yet (see
-[Known recipes tab (Xerotex)](#known-recipes-tab-xerotex)), so until some other mechanic populates
-it, `CraftingTab.jsx` has nothing to list for any character.
-
-## Known recipes tab (Xerotex)
-
-Status: **implemented** (display only). The grant mechanism is now spec'd — see "Grant mechanism"
-below — but not yet built.
-
-The Xerotex page gains a "Recettes" tab listing the recipes a character knows, filterable and
-sortable by rarity, category, tags, ingredients, and results — the same filter/sort logic already
-used by the creator's Recettes page (`RecettesManager.jsx`), exported from that file and reused
-rather than duplicated (`matchesRecette`, `tagNames`, `objectEntryLabel`, `SORT_FIELDS`,
-`compareRecettes`).
-
-- **Mechanic 1**: the "Recettes" tab is reachable from the Xerotex page's tab bar.
-- **Mechanic 2**: the tab shows the character's known recipes (name, rarity, categories, tags,
-  ingredients, results), filterable by rarity/category/tag and free-text name search, sortable by
-  any of those fields plus ingredient/result count.
-- **Interaction**: `XerotexRecipesTab.jsx` (new, sibling to `InventoryTab.jsx`), rendered from
-  `Xerotex.jsx` alongside its existing tabs. Read-only — no edit/delete, unlike the creator's list.
-  An empty `knownRecipes` shows the same `EmptyState` pattern used by every other stub tab.
-
-**Data model implications**:
-```
-characters/{characterId}
-  knownRecipes: string[]   -- worldData/recettes/items ids the character knows
-```
-
-**Grant mechanism (roadmap #21) — resolved decisions**: two paths, deliberately not three — a
-discovery-based grant (finding a recipe while foraging/crafting) was considered and dropped from
-scope, the same call already made for profession's own initial-assignment design (see "Initial
-assignment" under [Profession (métier) creation](#profession-métier-creation)):
-
-- **Origin**: `worldData/origins/items/{id}` gains `startingRecetteIds: string[]`, granted at
-  character creation alongside `talentIds`/`startingItemIds` — `createCharacter` resolves each id
-  against `worldData/recettes/items` and writes the union straight onto `character.knownRecipes`,
-  plus a `{ id, name }` snapshot onto `character.origin.recettes` (same convention as
-  `origin.talents`/`origin.items`). An id pointing at a deleted recette is silently skipped, same
-  as `talentIds`.
-- **Trainer**: a new action kind, `transmission` (nested under `entrainement`,
-  `RECIPE_LEARNING_ACTION_KIND_ID` in `functions/src/lib/actionKinds.js` ⇄ `src/lib/actionKinds.js`,
-  sibling to `apprentissage`), reuses Entraînement's `trainerTypeId` field and `trainerReachable`
-  gate — same "mediated by a physical trainer" precedent as [Trainers](#trainers)' `sEntrainer` and
-  Profession's own trainer path. `worldData/recettes/items/{id}` gains an optional
-  `trainerTypeId: string` (default `""`; no "trainable" boolean gate needed the way talents have
-  one — an empty id simply never appears at any trainer, the same net effect as an untrainable
-  talent's absent `trainerTypeId`). The player picks from recettes actually taught at that action's
-  own trainer type (`recette.trainerTypeId` matching the action's `trainerTypeId`) via a new
-  `RecettePicker.jsx`, same non-Métier payload-picker pattern as `TalentPicker.jsx`/
-  `ProfessionPicker.jsx`, re-validated server-side in the new `transmission` handler's
-  `prepare()`/`resolve()`, never trusted from the client. Always succeeds once reachability, the
-  picked recette's `trainerTypeId` match, and not-already-known are confirmed — same
-  precondition-gated convention as `sEntrainer.js`/`apprentissage.js`, no roll. No gold cost, same
-  reasoning as `apprentissage.js`: unlike a talent's quality, a known/not-known recette has no
-  progress variable to scale a fee against.
-
-**Data model implications (grant mechanism)**:
-```
-worldData/origins/items/{id}
-  startingRecetteIds: string[]   -- worldData/recettes/items ids granted at creation; NEW field,
-                                  --   defaults to []
-
-worldData/recettes/items/{id}
-  trainerTypeId: string   -- worldData/trainerTypes/items id this recette is taught at via the
-                           --   transmission action kind, or "" for none; NEW field, defaults to ""
-
-characters/{id}
-  knownRecipes: string[]   -- worldData/recettes/items ids the character knows; documented here for
-                            --   the first time - already read by functions/src/actions/artisanat.js
-                            --   but missing from shared/schema/character.ts until now
-  origin.recettes: { id: string, name: string }[]   -- snapshot of startingRecetteIds granted at
-                                                      --   creation, same convention as
-                                                      --   origin.talents/origin.items
-```
-
-**Implementation scope** (roadmap #35, now unblocked):
-- Read: `functions/src/index.ts` (`createCharacter`'s talent/item-granting loop, the pattern
-  `startingRecetteIds` extends), `functions/src/actions/apprentissage.js` and
-  `functions/src/actions/sEntrainer.js` (the two existing trainer-mediated handlers the new
-  `transmission` handler mirrors), `functions/src/lib/actionKinds.js` / `src/lib/actionKinds.js`
-  (where the new kind is added), `shared/schema/origin.ts`, `shared/schema/recette.ts`, and
-  `shared/schema/character.ts` (`knownRecipes` needs adding, not just documenting).
-- Create: `functions/src/actions/transmission.js`, `src/components/actions/RecettePicker.jsx`.
-- Update: `shared/schema/origin.ts` (`startingRecetteIds`), `shared/schema/recette.ts`
-  (`trainerTypeId`), `shared/schema/character.ts` (`knownRecipes`), `functions/src/index.ts`
-  (origin-grant loop), `functions/src/lib/actionKinds.js` ⇄ `src/lib/actionKinds.js`, and the
-  creator UI for both new fields (`OriginsManager.jsx`, `RecettesManager.jsx`).
-- Do not read or open any other file without asking the user first.
-
-## Interval (12h action cycle)
-
-Status: **implemented**. Every action used to lock a character for a fixed 24 h (`durationHours`,
-defaulting to 24 — see [Modular action framework](#modular-action-framework), whose
-`completesAt`-based lock already made the duration a single configurable number rather than a
-hardcoded day). The game's base time unit is now a 12 h segment, named "Interval" in-game, so a
-character can act roughly twice as often.
-
-- **Default duration**: `durationHours`'s default dropped from 24 to 12
-  (`DEFAULT_DURATION_HOURS` in `functions/src/lib/actionLifecycle.js` / `src/lib/actionLifecycle.js`,
-  and the schema default in `functions/src/schema/actionType.js`). This is a global default, not
-  just a new baseline for future documents: already-authored action types relying on the old
-  default (absent `durationHours`, or explicitly `24`) were bulk-migrated to `12` via a one-off
-  admin script, `functions/scripts/migrateActionDurationTo12h.js`. A per-action type still
-  authored with its own deliberate value (e.g. 6 h, 48 h) is untouched either way — per-action
-  overrides work exactly as before, only the fallback changed.
-- **Terminology**: the three "day"-worded UI strings tied to the action lock were reworded to
-  "Interval" — `ActionPanel.jsx`'s two headings ("Action du jour" → "Action de l'Interval",
-  "Action de la veille" → "Dernier Interval") and the debug-only `[TEST] Avancer le temps d'un
-  jour` button (→ "…d'un Interval"). No other player-facing copy referenced "jour"/"veille" for
-  the action lock specifically.
-- **Shared clock**: the rumor propagation and quest-trigger checks described below
-  ([Rumor and mission system](#rumor-and-mission-system),
-  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages))
-  are meant to tick on this same Interval boundary rather than introduce a separate cadence —
-  "beginning of an Interval" is the moment both a character's own action can complete and the
-  world-level systems (rumor propagation, quest trigger evaluation) advance. Not built yet; those
-  are separate roadmap entries.
-- **Phase cycle**: a player's Interval is described as three phases — Intermède → Action →
-  Intermède — i.e. a character can spend Intermède actions (see
-  [Intermède actions](#intermède-actions-spec-needed), capped at 3 total) both before and after
-  their one main action for that Interval, not only in a single window before or after it. The
-  Intermède mechanic itself (including how that 3-action cap is tracked) is still undesigned — see
-  that entry's own open questions.
-
-Depended on nothing else being built first — it was a default-value and copy change on top of the
-already-implemented `completesAt` lock. The rumor/quest systems below are written assuming it
-lands, since they're specified in terms of "per Interval".
-
-## Rumor and mission system
-
-Status: **implemented**, except region-to-region propagation (roadmap #34, see "Still open"
-below — the Interval-tick cadence it depends on is now built, shared with
-[Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
-but the propagation logic itself is still not written).
-A rumor is a hand-authored piece of flavor text with a rarity and an optional link to a quest;
-regions and characters each keep their own rumor journal, and a "Rumeur" action lets a character
-harvest their region's better rumors and, separately, roll for local missions generated the same
-way "Partir en quête" generates its narration.
-
-- **Rumor catalog**: `worldData/rumors/items/{id}`, authored through a new `RumorsManager.jsx`
-  ("Rumeurs" tab), same convention as quests/loot tables/narrative subjects — hand-authored, not
-  procedurally generated. A rumor carries French flavor text, a rarity (the existing shared 8-tier
-  scale — commun .. unique — reused as-is, not a separate lighter scale, for the same reason every
-  other loot/talent/quest system already reuses it), and the region(s) it originates in
-  (`originRegionIds`, same shape as a quest's own `regionIds` used to be). It also carried an
-  optional `linkedQuestId` pointing at `worldData/quests/items` — dropped, not repointed at
-  Subjects, once that catalog retired (see [Retiring quests and quest objectives for the
-  subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed)).
-- **Location = region**: resolved by investigation, not by design call. Propagation (below) needs
-  an adjacency graph between locations, and that graph already exists — but only on
-  `worldData/regions/items` (`neighbors: [{regionId, direction}]`, authored and wired up in
-  `RegionsManager.jsx`), not on `worldData/adventureZones/items` (name + description only, no
-  adjacency). So "location" for this whole feature means region, the same entity a character's
-  `region` field already points to. This also settles the same open question raised in
-  [Aventure exploration mechanics (spec needed)](#aventure-exploration-mechanics-spec-needed).
-- **Region rumor journal**: a new subcollection, `worldData/regions/items/{regionId}/rumorSightings/{rumorId}`
-  — one doc per rumor currently present in that region, holding the rumor's *effective* rarity at
-  that location (see decay below) and an `arrivedAt` timestamp. A subcollection rather than an
-  array field on the region document, since sightings accumulate indefinitely and are never pruned
-  (see propagation below) — an array risks the document outgrowing Firestore's per-document limits
-  over a long-running game the way a bounded list like `character.talents` doesn't.
-- **Propagation and decay**: once per Interval (same shared cadence as the still-undecided
-  trigger-check mechanism in
-  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages) —
-  whichever mechanism ends up ticking that also ticks this), every region with a rumor sighting
-  pushes it to each neighbor from `neighbors` (checked symmetrically — a region counts as a
-  neighbor of its own listed neighbors even though the edge is authored on one side only, matching
-  how `RegionsManager.jsx` already treats the list as undirected for display). Each hop drops the
-  rumor's effective rarity by one tier from what it was at the sending region. A rumor already at
-  "commun" does not propagate further (it would decay below the scale's floor); a rumor's very
-  first hop out of its origin region carries the catalog's authored rarity unchanged. If the
-  receiving region already has a sighting for that rumor id, the arrival is a no-op — the earlier
-  sighting's rarity is never upgraded or downgraded by a later, differently-decayed arrival.
-- **Character rumor journal**: `character.rumorJournal`, an unbounded array of denormalized copies
-  (`{ id, text, rarity, receivedAt }`, same "copy the catalog entry so a later rename doesn't
-  rewrite already-granted history" convention as `character.talents`) — the rumors a
-  character has personally harvested via the Rumeur action, independent of any region's journal and
-  never pruned.
-- **Rumor banner**: a character standing in a region sees that region's `rumorSightings` scroll
-  through a dedicated banner at the bottom of the screen, above the existing visual banner. A
-  sighting is visually called out when its effective rarity is "rare" or above — a flat floor on
-  the existing 8-tier scale, not scaled to whatever the rumor is about.
-- **"Rumeur" action** (`kindId: "intermede"`, new `handlerId: "rumeur"`): performing it does two
-  things in the same resolution:
-  - Harvests up to `rumorHarvestCount` (new `worldData/actionTypes/items` field, only meaningful
-    when `handlerId` is `"rumeur"`, default 1) sightings at or above "rare" from the character's
-    current region into `character.rumorJournal`, skipping rumor ids the character already owns;
-    harvesting fewer than requested when fewer qualify is not an error.
-  - Generates `missionRollCount` (same convention, default 3) missions into
-    `character.missionJournal`, replacing whatever was left there unclaimed (see mission journal
-    below).
-- **Mission generation**: reuses "Partir en quête"'s own generative building blocks instead of a
-  new content pool — a mission is not hand-authored. Each rolled mission draws one random
-  `worldData/narrativeSubjects/items` entry tagged "objectif de quête" (the same pool
-  `QuestObjectivesManager.jsx` populates) and one difficulty, picked uniformly across the 6
-  `DIFFICULTIES` tiers. The mission's `tagIds` are copied from the drawn objective's own `tagIds` —
-  there is no mission-level catalog entry to carry them. `character.missionJournal` entries have
-  the shape:
-  ```
-  { id, objectiveId, difficulty, tagIds, locationId, regionId, generatedAt }
-  ```
-  where `locationId` is drawn from the character's current region's `adventureZoneIds` (or `""`
-  when the region lists none) and `regionId` is that region's id, both fixed at generation time.
-  **Correction, decided in [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed):**
-  this narrativeSubjects-objective-based draw has been replaced by a climate-aware draw against the
-  new Subject/Action catalog; `character.missionJournal` entries now carry `subjectId`/`actionId`/
-  `name` instead of `objectiveId` (`difficulty`/`tagIds`/`locationId`/`regionId`/`generatedAt`
-  unchanged) — see that entry for the current shape and mechanism.
-- **Mission journal expiry**: `character.missionJournal` is not a growing history like the rumor
-  journal — it's a rolling offer. Missions still sitting there unclaimed are simply overwritten the
-  next time the Rumeur action resolves (see above); nothing else prunes them, since there's no
-  global per-Interval tick to hook a separate expiry into yet (same open cadence question as
-  propagation, above).
-- **"Mission" action** (`kindId: "aventure"`, new `handlerId: "mission"`, sibling of
-  `partirEnQuete`'s `handlerId: "partirEnQuete"`): a player picks one entry from
-  `character.missionJournal` and it resolves through the exact same pipeline as
-  `partirEnQuete.js`'s `resolve()` — narration, loot draw, talent evolution roll — reading
-  `objectiveId`/`difficulty`/`tagIds` straight off the journal entry instead of loading a
-  `worldData/quests/items` document. Once resolved, the entry is removed from
-  `character.missionJournal`.
-  **Correction, decided in [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm):**
-  `mission.js` currently evaluates `LOOT_COUNT_BY_DIFFICULTY` and the talent-evolution chance formula
-  at `mission.difficulty` *one tier lower* than the difficulty actually rolled and narrated (clamped
-  at "facile"), a "missions pay out like a quest a notch easier than their stated difficulty"
-  discount (`rewardDifficulty`) — this was a balance mistake and is being removed. A mission's loot
-  count and talent-evolution chance (and, once that entry is implemented, its success threshold,
-  wound thresholds, and reputation reward) all read `mission.difficulty` directly instead, exactly
-  like a quest reads `quest.difficulty`. `rewardDifficulty` and its "one tier lower" computation are
-  dead as of this decision and should be deleted the next time `mission.js` is touched for the
-  algorithm entry's implementation.
-
-**Still open (deliberately deferred)**:
-- Region-to-region propagation itself is not implemented: a rumor's sightings today only ever exist
-  at its authored `originRegionIds` (seeded by `RumorsManager.jsx` on save) — nothing spreads it
-  further. The tick/cadence mechanism it (and mission-journal expiry) would run against is now
-  built — the scheduled `sweepQuestTriggers` Cloud Function
-  ([Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages),
-  `functions/src/index.ts`, ticking every Interval at 00:00/12:00 UTC) — but propagation's actual
-  sweep logic still needs to be written and hooked into it, tracked as roadmap #34 (see
-  "Implementation scope" below). Everything else in this entry (catalog, sightings storage, both
-  journals, both actions, the banner) is built and does not depend on it.
-- `rumorHarvestCount` / `missionRollCount` defaults (1 / 3) and the mission reward's "one tier
-  lower" scaling factor are starting balance values, not playtested — tunable without a further
-  design pass once the feature is live.
-- The Intermède-side "selling a mythic object spreads a rumor of its presence" mechanic (see
-  [Intermède actions (spec needed)](#intermède-actions-spec-needed)) is a separate, still-undesigned
-  trigger that would need to insert directly into a region's `rumorSightings`, once designed.
-
-**Implementation scope** (roadmap #34 — region-to-region propagation sweep):
-- Read: `functions/src/lib/questTriggers.js` (`sweepQuestTriggers`, the sibling sweep already
-  registered on the same schedule — propagation should run alongside it, e.g. a second exported
-  function called from the same `functions/src/index.ts` scheduled handler, or its own scheduled
-  export on the same cron), `src/components/creator/RegionsManager.jsx` (the `neighbors:
-  [{regionId, direction}]` adjacency graph to walk, authored as one-directional but meant to be
-  read symmetrically per this entry's "Propagation and decay" note above), and
-  `shared/schema/regionRumorSighting.ts` (the `worldData/regions/items/{regionId}/rumorSightings`
-  shape to write into, including the one-tier-per-hop rarity decay and the "first sighting for a
-  rumor id wins, never re-decayed" no-op rule already decided above).
-- Update: `functions/src/index.ts` and/or `functions/src/lib/questTriggers.js` (or a new sibling
-  lib file, e.g. `functions/src/lib/rumorPropagation.js`, if keeping the two sweeps' logic
-  separate reads better than folding propagation into the trigger-sweep file).
-- Do not read or open any other file for this entry without asking the user first.
-
-**Data model implications**:
-```
-worldData/rumors/items/{id}                                        -- NEW catalog
-  text: string                       -- French flavor text
-  rarity: string                     -- 8-tier RARITIES
-  originRegionIds: string[]          -- worldData/regions/items ids, same shape a quest's regionIds used to be
-  -- linkedQuestId: DROPPED by "Retiring quests and quest objectives for the subject-action system"
-  --   (docs/TODO.md) - used to point at worldData/quests/items, now-retired; never repointed at
-  --   Subjects since it had no real gameplay consumer beyond flavor text.
-
-worldData/regions/items/{regionId}/rumorSightings/{rumorId}        -- NEW subcollection
-  rarity: string                     -- effective rarity at this region (decayed from origin)
-  arrivedAt: timestamp
-
-worldData/actionTypes/items/{id}
-  rumorHarvestCount: number          -- NEW, default 1, only meaningful when handlerId is "rumeur"
-  missionRollCount: number           -- NEW, default 3, only meaningful when handlerId is "rumeur"
-
-characters/{id}
-  rumorJournal: [{ id, text, rarity, receivedAt }]                                            -- NEW, unbounded
-  missionJournal: [{ id, objectiveId, difficulty, tagIds, locationId, regionId, generatedAt }]  -- NEW, ephemeral
-```
-
-Implemented in `functions/src/actions/rumeur.js` and `functions/src/actions/mission.js` (registered
-as the `rumeur`/`mission` handlers in `functions/src/index.ts`), `shared/schema/rumor.ts` and
-`shared/schema/regionRumorSighting.ts`, the "Rumeurs" creator tab (`RumorsManager.jsx`), the rumor
-banner (`RumorBanner.jsx`, wired into `CharacterProfile.jsx`), the "Rumeurs" character tab
-(`CharacterTabs.jsx`), and the mission picker in `ActionBrowser.jsx`/`MissionPicker.jsx`. See the
-"Still open" note above for what's deliberately not built yet (propagation).
-
-## Quest triggers and end-of-action pop-up pages
-
-Status: **implemented**, except the region-to-region rumor propagation the same scheduled tick
-was always meant to drive (split out as its own follow-up, roadmap #34, once this entry's
-implementation was under way — see [Rumor and mission system](#rumor-and-mission-system)).
-**Repointed at Subjects** by [Retiring quests and quest objectives for the subject-action
-system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed): every
-"quest"/`triggeredQuestIds` reference below describes the mechanism as it was designed and first
-built, before `worldData/quests/items` retired — the live mechanism now triggers
-`worldData/missionSubjects/items` entries into `character.triggeredSubjectIds`, same sweep logic,
-same notification pipeline, see [docs/ARCHITECTURE.md](ARCHITECTURE.md)'s `sweepQuestTriggers`
-section for the current shape. Quests
-are meant to be generated less frequently than
-missions and, unlike missions, are given to a character based on a trigger the quest defines rather
-than picked at will. A player who now satisfies a quest's trigger is notified at the start of their
-next Interval, through a new page added to the existing end-of-action result pop-up
-(`ActionResultDialog.jsx`).
-
-- **Quest documents**: no new generation system. Quests stay the existing hand-authored catalog
-  (`worldData/quests/items` via `QuestsManager.jsx`) — this feature only adds a trigger that gates
-  which characters currently qualify for which already-existing quest, the same way conditions
-  already gate action availability. "Generated less frequently than missions" describes the
-  player-facing effect of a trigger being rare to satisfy, not an actual content-generation cadence.
-- **Quest trigger**: each quest carries a trigger — a set of conditions on the character (owned
-  talent, reputation, profession, region, …) — reusing the existing condition system
-  (`CONDITION_TYPES` in `src/lib/actionConditions.js` / its server mirror) already used to gate
-  action availability and, per
-  [Profession (métier) creation](#profession-métier-creation), reputation thresholds, rather than
-  inventing a second condition format.
-- **Trigger evaluation and cadence**: a new global scheduled Cloud Function (Firebase Cloud
-  Scheduler / pub/sub, not request-triggered), ticking on fixed Interval boundaries (every 12h,
-  e.g. 00:00 and 12:00 UTC) rather than piggybacking on any individual character's own
-  `completesAt` clock. Each tick sweeps every character against every quest they don't yet own and
-  haven't yet triggered (`triggeredQuestIds`); a match grants/reveals that quest to the character.
-  This was the first scheduled, non-request-triggered Cloud Function in the project — every other
-  mechanic so far (loot draw, talent evolution, rumor harvest, mission generation) resolves lazily
-  on a player action instead. The same tick is also meant to drive
-  [Rumor and mission system](#rumor-and-mission-system)'s region-to-region propagation, whose
-  implementation was deferred pending this exact cadence decision; the cadence now exists, but the
-  propagation sweep itself is a separate follow-up (roadmap #34) rather than something this
-  entry's implementation pass bundled in — the two are independent Firestore sweeps that happen to
-  share a cron schedule, not one combined pass.
-- **Notification**: a newly triggered quest doesn't interrupt the player mid-session — it's
-  surfaced the next time they see the end-of-action pop-up, on its own page.
-- **Multi-page pop-up**: `ActionResultDialog.jsx` (today a single-page dialog, per action — see
-  [Modular action framework](#modular-action-framework)) gains numbered, paginated pages:
-  - Page 1: the current action's result (today's entire dialog content, unchanged).
-  - Page 2: newly triggered quests, shown only when there are any for that Interval.
-  - Page 3: received messages — a placeholder for now, since no messaging feature exists yet; the
-    page exists in the pagination but has nothing to show.
-- **Pop-up gating**: "Fermer" closes the dialog from any page — paging to 2/3 is optional browsing,
-  not required to close. Unlike loot/craft results (which commit a deferred side effect on close,
-  per [Quest loot draw](#quest-loot-draw) and [Action d'artisanat](#action-dartisanat)), a newly
-  triggered quest needs no "claim" step: it's simply available (e.g. in a future quest list/journal)
-  from the moment the scheduled tick grants it, whether or not the player ever opens page 2.
-
-**Implemented in**: `functions/src/lib/questTriggers.js` (`subjectsWithTriggers` /
-`evaluateQuestTriggersForCharacter` / `sweepQuestTriggers`, unit-tested in
-`questTriggers.test.js`), registered as the scheduled `sweepQuestTriggers` export in
-`functions/src/index.ts` (`onSchedule({ schedule: "0 0,12 * * *", timeZone: "UTC" }, ...)`),
-`shared/schema/missionSubject.ts`'s `trigger` field and `shared/schema/character.ts`'s
-`triggeredSubjectIds` field (both reused by their `functions/src/schema/*` re-exports; renamed
-from `quest.ts`'s `trigger` and `triggeredQuestIds` by the subject-action retirement), and the
-paginated `src/components/actions/ActionResultDialog.jsx`.
-
-- **"Newly triggered … for that Interval" tracking**: the data model deliberately adds no field
-  for this (`character.triggeredQuestIds` only ever grows, it doesn't distinguish seen from
-  unseen) — so which triggered quests are still "new" is tracked client-side, in
-  `localStorage` under a per-character key (`ActionResultDialog.jsx`'s
-  `loadShownTriggeredQuestIds`/`markTriggeredQuestsShown`). Page 2 shows whatever's in
-  `triggeredQuestIds` that this browser hasn't marked shown yet, and marks it shown when the
-  dialog closes. This is a pragmatic reading of "UI-only, no schema change" below, not a
-  precisely "per Interval" cadence — a player switching browsers/devices sees every
-  not-yet-shown quest at once instead of losing track of which Interval granted what, which is
-  strictly friendlier than the alternative.
-- **No creator UI**: `trigger` is authored directly in the Firestore console, same convention as
-  `tier.talentGain` (see [Expanded talent system](#expanded-talent-system)). `QuestsManager.jsx`'s
-  save handler was switched from a bare `setDoc` to `setDoc(ref, {...}, { merge: true })` so
-  editing a quest through the form no longer silently drops a hand-authored `trigger` (or any
-  other out-of-form field) — the same protection `ActionsManager.jsx` already had for
-  `questDifficultyWeights`.
-- **Incidental fix**: `results/DefaultResult.jsx` (the page 1 result view for every handler
-  without its own `RESULT_COMPONENTS` entry — quests, missions, rumeur) referenced `ActionOutcome`
-  without importing it, a latent `ReferenceError` on every render of that path. Fixed while
-  restructuring the dialog for pagination.
-- **Propagation split out**: the scheduled function this entry adds is also meant to drive
-  [Rumor and mission system](#rumor-and-mission-system)'s region-to-region propagation sweep, but
-  that sweep's own logic (walking `neighbors`, decaying rarity per hop) is independent enough,
-  and touches enough files outside this entry's original scope, that it was tracked separately
-  as roadmap #34 instead of bundled into this pass.
-
-**Implementation scope**: exhausted — see "Implemented in" above. Roadmap #34 (propagation) is a
-separate follow-up with its own scope, listed under
-[Rumor and mission system](#rumor-and-mission-system).
-
-**Still open (deliberately deferred)**:
-- The messages feature that page 3 anticipates doesn't exist anywhere yet — this entry only
-  reserves the page, it doesn't design messaging.
-- Region-to-region rumor propagation itself — see roadmap #34 above and
-  [Rumor and mission system](#rumor-and-mission-system)'s own "Still open" note.
-
-**Data model implications**:
-```
-worldData/quests/items/{id}
-  trigger: { conditions: [...] } | null   -- NEW, same condition row shape as an action's
-                                            --   availability.conditions (shared/schema/actionType.ts's
-                                            --   ActionAvailabilityConditionSchema), evaluated per
-                                            --   character every Interval tick. Null/absent: never
-                                            --   auto-granted. No creator UI - Firestore console only.
-
-characters/{id}
-  triggeredQuestIds: string[]   -- NEW, quest ids already granted by the sweep, so re-evaluation
-                                  --   doesn't re-trigger or re-notify the same quest. Which of these
-                                  --   are still unseen is tracked client-side (localStorage), not here.
-```
-
-Depends on [Interval (12h action cycle)](#interval-12h-action-cycle) for its evaluation cadence, and
-touches the same `ActionResultDialog.jsx` that [Modular action framework](#modular-action-framework)
-generalized. Its scheduled-tick decision also resolves
-[Rumor and mission system](#rumor-and-mission-system)'s propagation cadence question (see roadmap #34
-for that sweep's own implementation).
-
-## Aventure exploration mechanics (spec needed)
-
-Status: **designed, not implemented**. The open questions below are now resolved by reuse of
-machinery [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) and
-[Rumor and mission system](#rumor-and-mission-system) already built, rather than by inventing a
-parallel system — see [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation)
-for the resulting build plan.
-
-Aventure actions are tied to a location, updating a character's state, fatigue, and wounds, and may
-also edit inventory, reputation, gold. For a given Interval, the Aventure tab offers "Partir
-explorer": costs a time T, and the player draws T encounters from the zone (possibly with
-increasing difficulty as T grows).
-
-This extends the Aventure kind, whose implemented instances today are "Partir en quête" and
-"Mission" — both drawing exactly one occurrence and resolving it through
-`resolveQuestOutcome` (`functions/src/actions/partirEnQuete.js`), the shared score-roll engine
-[Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) built: one
-random score (1-100) per resolution, compared against a difficulty-derived success threshold and
-wound-threshold scale, landing loot, reputation, talent evolution, and wounds through
-`applyWound`. "Partir explorer" reuses this engine verbatim, called T times in one action instead
-of once — no second consequence roller is introduced.
-
-**Resolved decisions:**
-- **Location**: region, per [Rumor and mission system](#rumor-and-mission-system)'s "Location =
-  region" resolution. No new dungeon/location sub-catalog: at the start of the action, a single
-  `worldData/adventureZones/items` entry is drawn at random from the character's current region's
-  `adventureZoneIds` — the exact same draw [Rumor and mission system](#rumor-and-mission-system)
-  already performs for a generated mission's own `locationId` — and stays fixed for every encounter
-  drawn within that one action occurrence. Its `tagIds` (see [Location tags](#location-tags)) gate
-  which encounter content can be drawn, giving that field its first consumer; a location with no
-  tags (the common case today, since nothing has authored any yet) leaves the encounter pool
-  unfiltered rather than empty. No reachability condition gates the action itself (unlike
-  [Trainers](#trainers)' `trainerReachable`) — the zone is drawn from the region automatically, the
-  player doesn't travel to a specific one.
-- **Encounter content**: no new catalog. Each encounter is one round of `resolveQuestOutcome`
-  against a synthetic, in-memory pseudo-quest built for that round: `difficulty` rolled
-  independently per round from the action's own `questDifficultyWeights` (same field/mechanism
-  `partirEnQuete.js` already reads, no new one introduced — automatic difficulty *escalation* across
-  rounds is deliberately not built now, see "Still open" below), `tagIds` from the drawn location,
-  `objectiveIds` the full `worldData/narrativeSubjects/items` pool tagged "objectif de quête"
-  (`OBJECTIVE_TAG_ID`) filtered by overlap with the location's `tagIds` when it has any, and no
-  `successPhraseIds`/`failurePhraseIds` of its own — `resolveQuestOutcome`'s existing per-slot
-  fallback (`preferQuestPhrasesPerSlot`) already falls back to the global verb-phrase pool when a
-  "quest" carries none, so this needs no new fallback logic either. This mirrors
-  [Rumor and mission system](#rumor-and-mission-system)'s own precedent of reusing the objective
-  pool for generated content instead of authoring a second one.
-- **Multi-step resolution**: T = `encounterCount`, a new `worldData/actionTypes/items` field (same
-  convention as `rumorHarvestCount`/`missionRollCount`, only meaningful for this handler),
-  author-set rather than player-chosen — keeps the action a plain "Commencer" button, no new picker.
-  The handler calls `resolveQuestOutcome` up to `encounterCount` times, sequentially: each round's
-  `character` argument carries forward the previous round's `nextTalents` and updated wound counters
-  (`woundResult`), so a mid-run talent evolution or escalating wound state genuinely affects the
-  next round's threshold/wound math instead of every round rolling against the character's
-  pre-action snapshot. If a round's wound kills the character (`woundResult.died`), the loop stops
-  immediately — an already-dead character doesn't draw further encounters — leaving fewer than
-  `encounterCount` rounds recorded for that occurrence. This is the generic "several resolution
-  rounds in one action" mechanism [Modular action framework](#modular-action-framework)'s "Still
-  open" note asked for, and it's exactly `resolveQuestOutcome` called in a loop, not a parallel
-  implementation — any future action needing multiple rounds can reuse the same pattern.
-- **Fatigue**: new `character.fatigue` field (integer, default 0, doesn't exist today — sits
-  alongside `woundsLight`/`woundsSevere`/`woundsPermanent` in the schema). Increases by a flat +1
-  per encounter round actually resolved (not scaled by difficulty — wounds already carry that
-  scaling burden), regardless of that round's success/failure. Nothing recovers or reads it yet (no
-  "Repos" action exists — [Modular action framework](#modular-action-framework) names it an
-  out-of-scope illustration only) — it accumulates, unconsumed, same as
-  [Location tags](#location-tags)' `tagIds` shipped before textGeneration read them.
-- **Wounds**: yes — "increases after an adventure" means each encounter round is a full
-  `resolveQuestOutcome` wound roll (`computeWoundThresholds`/`determineWoundSeverity`/`applyWound`),
-  not a new mechanic. A single action can land several wounds, one per round that happens to hit a
-  threshold, same escalation/death rules as a single quest already has via `wounds.js`.
-- **Coexistence with "Partir en quête"**: "Partir explorer" is a second, sibling Aventure-branch
-  action (registered under its own `partirExplorer` handlerId), alongside "Partir en quête" and
-  "Mission" — not a replacement, and it does not subsume quest-drawing as an encounter outcome.
-  Encounters draw plain objectives from the shared pool, never a full `worldData/quests/items`
-  document; quests and missions keep their own distinct, larger-stakes actions untouched by this
-  feature.
-
-**Still open (deliberately deferred)**:
-- **Escalating difficulty across rounds**: the design note's "possibly with increasing difficulty
-  as T grows" isn't built as an automatic mechanic — each round independently rolls from the same
-  `questDifficultyWeights`. A content author can already bias that weighting harder without any new
-  code; a genuine escalation curve (e.g. a per-round tier bump) is future balance work if flat
-  per-round weights turn out to feel wrong in play, same "starting balance, not playtested" status
-  as `rumorHarvestCount`/`missionRollCount`.
-- **Fatigue as a gate**: whether a tired character can still adventure, and how fatigue would ever
-  recover, are unanswered — the field ships write-only, exactly like `triggeredQuestIds` or
-  `Location tags`' `tagIds` shipped before anything consumed them.
-- **Result pop-up**: `ActionOutcome.jsx`'s existing "Résolution" fieldset assumes one score/threshold
-  pair (gated on `lastAction.score != null`); a multi-round action needs its own new section
-  listing each round. Left to the implementation entry below, not designed here.
-
-**Implementation scope**: see [Aventure exploration mechanics (implementation)](#aventure-exploration-mechanics-implementation)
-below — now unblocked by this entry's decisions.
-
-## Aventure exploration mechanics (implementation)
-
-Status: **implemented**. Built exactly to the shape [Aventure exploration mechanics (spec
-needed)](#aventure-exploration-mechanics-spec-needed) above decided.
-
-`functions/src/actions/partirExplorer.js`, registered under a new `partirExplorer` handlerId in
-`ACTION_HANDLERS` (`functions/src/index.ts`), is a second Aventure-branch action alongside "Partir
-en quête" and "Mission" — not a replacement. `prepare()` draws one `worldData/adventureZones/items`
-entry from the character's region's `adventureZoneIds` (a content gap — an empty `adventureZoneIds`
-— leaves `location` null rather than failing the action) and fetches the same catalogs
-`partirEnQuete.js`/`mission.js` already fetch. `resolve()` then calls `partirEnQuete.js`'s exported
-`resolveQuestOutcome` up to `actionType.encounterCount` times in a loop, each round against a
-synthetic pseudo-quest (`difficulty` rolled independently per round from
-`actionType.questDifficultyWeights` — falling back to the same `DEFAULT_QUEST_DIFFICULTY_WEIGHTS`
-`partirEnQuete.js` exports — `tagIds` from the drawn location, and objectives drawn from the
-"objectif de quête" pool, filtered by overlap with the location's own `tagIds` when it has any).
-Each round threads its `nextTalents` and updated wound counters into the next round's `character`
-argument, and the loop stops immediately once a round's wound kills the character
-(`outcome.woundResult.died`), leaving fewer than `encounterCount` rounds recorded. `resolveQuestOutcome`
-was extended to also return the objective it drew, so each round can record its own `objectiveId`
-without a second, redundant draw.
-
-`encounterCount` was added to `worldData/actionTypes/items` (`shared/schema/actionType.ts`), gated
-by `handlerId === "partirExplorer"` the same way `rumorHarvestCount`/`missionRollCount` are gated by
-`handlerId === "rumeur"` — including a plain number input in `ActionsManager.jsx`, added next to the
-existing rumeur fields since it was a cheap addition while already touching that form. `fatigue` was
-added to `characters/{id}` (`shared/schema/character.ts`), `+1` per round actually resolved (not
-`encounterCount`, so an early wound-death doesn't over-count) — nothing reads or recovers it yet, per
-the spec entry's own "Still open" note.
-
-`lastAction` for this handler flattens `loot`/`talentEvolutions` across every round (so
-`ActionOutcome.jsx`'s existing "Butin obtenu"/"Amélioration de talent" fieldsets needed no changes),
-plus a new `rounds: [{ objectiveId, difficulty, score, threshold, success, wound, reputationGained }]`
-array and a summed `totalReputationGained`. `ActionOutcome.jsx` gained a "Rencontres" fieldset
-listing each round (difficulty label and color reused from `QuestsManager.jsx`'s `DIFFICULTIES`,
-wound label reused from the existing "Résolution" fieldset's `WOUND_LABELS`) — genuinely new UI, not
-a reuse of the existing single-score fieldset, which stays gated on `lastAction.score != null` and
-so never renders for this handler. The top-level `lastAction.success` (which colors the "Succès"/
-"Échec" line `DefaultResult.jsx` already renders unchanged) is `true` when at least one round
-succeeded — a judgment call the spec entry left to this one, since no single boolean can capture a
-multi-round outcome exactly.
-
-**Data model implications**:
-```
-worldData/actionTypes/items/{id}
-  encounterCount: number   -- how many rounds partirExplorer resolves per occurrence; only
-                            --   meaningful when handlerId is "partirExplorer", defaults to 1
-
-characters/{id}
-  fatigue: number           -- +1 per encounter round resolved by partirExplorer; defaults to 0,
-                             --   write-only for now (see "Still open" above)
-
-characters/{id}.lastAction (partirExplorer shape)
-  location: { id, name } | null
-  rounds: [{ objectiveId, difficulty, score, threshold, success, wound, reputationGained }]
-  totalReputationGained: number
-  loot / talentEvolutions: flattened across every round, same shape as partirEnQuete.js/mission.js
-```
-
-Tested in `functions/src/actions/partirExplorer.test.js`: multi-round resolution, reputation/loot
-summed and flattened across rounds, the wound-death early stop (fewer than `encounterCount` rounds
-recorded), and the no-location content-gap fallback.
-
-Escalating difficulty across rounds and fatigue-as-a-gate remain deliberately unbuilt, exactly as
-the spec entry's own "Still open" section already flagged.
-
-## Intermède actions (spec needed)
-
-Status: **designed, not implemented**. Intermède actions are bonus actions, repeatable within an
-Interval, with a deliberately reduced scope — send a message, trade, post an announcement. A
-player can perform at most 3 Intermède actions per Interval, shared across both Intermède windows
-(see "Cap tracking" below). Some Intermède actions matter far more than their small scope
-suggests: selling a mythic object, for instance, is meant to spread the rumor of that object's
-presence at the sale location, around the seller.
-
-The `intermede` root kind already exists in `ACTION_KINDS`
-(`src/lib/actionKinds.js` / its server mirror), reserved for exactly this since
-[Action kinds and Métier actions](#action-kinds-and-métier-actions) was built — this entry resolves
-what a concrete Intermède action does and how its per-Interval cap is tracked; the paired
-[Intermède actions (implementation)](#intermède-actions-implementation) entry builds what turned
-out to be buildable.
-
-**Resolved decisions:**
-- **Cap tracking**: a new counter, `character.intermedeActionsThisInterval` (integer, default 0),
-  fully decoupled from the main-action lock (`lastAction.completesAt`) — Intermède actions never
-  touch it. Availability is instead gated by an implicit condition (same "nobody authors this row"
-  convention as `hasProfession`/`trainerReachable`/`professionless`, see
-  [Action kinds and Métier actions](#action-kinds-and-métier-actions) and
-  [Trainers](#trainers)), checked against `< 3` and incremented by 1 on each successful resolution.
-  Reset to 0 by the same Interval-boundary scheduled tick already driving
-  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)'s
-  `sweepQuestTriggers` — the shared cadence the
-  [Interval (12h action cycle)](#interval-12h-action-cycle) entry's "Shared clock" bullet calls for
-  — as a sibling reset pass inside that same scheduled function, not a second cron schedule.
-- **Shared budget across both windows**: one shared budget of 3 total per Interval, not 3 per
-  window — the reading the [Interval (12h action cycle)](#interval-12h-action-cycle) entry's
-  phase-cycle note already implied ("capped at 3 total"), confirmed explicitly here rather than
-  left ambiguous. Since the budget check never reads `lastAction.completesAt`, a character with no
-  main action slot left for the Interval (mid-countdown) but unused Intermède budget still has
-  their Intermède category tabs active — the UI represents this the same way the main Action tab
-  already shows its own lock state (disabling "Commencer" and showing e.g. "X/3 restantes cet
-  Interval" once exhausted), not a separate UI concept.
-- **"faire du commerce"**: scoped to selling only, not buying — buying would need an NPC/shop
-  pricing catalog that doesn't exist and isn't part of this pass. Mechanically: the player sells one
-  owned Instance (see [Object creation](#object-creation)) for gold; the sale removes the Instance
-  and credits `character.gold`. The exact price formula is left to the implementation entry (same
-  "starting balance, decided at build time" precedent as `trainingCost`, see
-  [Trainers](#trainers)), not fixed here.
-- **Mythic-sale rumor side effect — which sales qualify**: the sold object's own rarity (see
-  [Object creation](#object-creation)) must be "mythique" or above (mythique, divin, unique on the
-  shared 8-tier scale) — reusing the exact tier the original design note named ("selling a mythic
-  object") as the floor, rather than inventing a separate threshold. What the side effect writes was
-  already settled by [Rumor and mission system](#rumor-and-mission-system): a direct
-  `worldData/regions/items/{regionId}/rumorSightings/{rumorId}` entry at the seller's current
-  region, skipping the normal hop-by-hop propagation decay.
-
-**Still open (deliberately deferred):**
-- **"envoyer un message"**: confirmed to feed the still-undesigned messaging feature
-  ([Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)'s
-  page 3 reserves a slot for it but doesn't design it). Not buildable until messaging gets its own
-  spec entry — out of this pass's and the paired implementation entry's scope.
-- **"placer une annonce"**: confirmed to feed the mission-announcement idea noted under
-  [Rumor and mission system](#rumor-and-mission-system) — one player's announcement becoming
-  another (or the same) player's discoverable Aventure hook. [Aventure exploration mechanics
-  (implementation)](#aventure-exploration-mechanics-implementation) shipped without any such hook:
-  "Partir explorer" only ever draws encounters from the static "objectif de quête" pool, never from
-  anything player-generated. Building "placer une annonce" needs that discoverable-hook mechanism
-  designed first — no cross-character interaction of this kind exists anywhere in the game yet, and
-  this pass doesn't invent one.
-- **Mythic-sale rumor content**: a sale has no backing `worldData/rumors/items` catalog entry to
-  copy text/rarity from the way a hand-authored rumor does — how the sighting's (and, once
-  harvested, the character journal entry's) flavor text gets generated for a sale-triggered sighting
-  isn't decided here. Left to the implementation entry.
-
-**Implementation scope**: see
-[Intermède actions (implementation)](#intermède-actions-implementation) below — partially
-unblocked by this entry's decisions (cap tracking and "faire du commerce" are buildable now;
-"envoyer un message" and "placer une annonce" stay out of scope until their own prerequisites are
-designed).
-
-## Intermède actions (implementation)
-
-Status: **implemented**, scoped down to what
-[Intermède actions (spec needed)](#intermède-actions-spec-needed) actually resolved: the
-per-Interval cap-tracking mechanism, plus "faire du commerce" (sell only). "envoyer un message" and
-"placer une annonce" stay out of scope — both need prerequisites (the still-undesigned messaging
-feature [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
-reserves a page for, and a not-yet-existing player-announcement discoverable-hook mechanism for
-[Aventure exploration mechanics](#aventure-exploration-mechanics-implementation)) that this pass
-deliberately didn't build.
-
-A blocking architecture gap surfaced while implementing this that the spec entry hadn't
-anticipated: every action type up to now (`runActionPipeline` in
-`functions/src/lib/actionPipeline.js`) unconditionally checks the once-per-Interval
-`isActionRunning` lock and unconditionally overwrites `character.lastAction` via `stampLifecycle`
-— including "S'entraîner"/"Apprentissage", which sit under the `intermede` root kind in
-`actionKinds.js` but consume the *main* lock, not this budget. Resolved by making the bypass
-kind-scoped rather than root-scoped: a new `commerce` kind (`parentId: "intermede"`, sibling to
-`entrainement`), and `actionKinds.js`'s `actionUsesIntermedeBudget(kindId)` — currently just
-`["commerce"]`, the list "envoyer un message"/"placer une annonce" will join once built — which
-`runActionPipeline` checks to skip *both* the lock check and the `stampLifecycle` envelope for
-these kinds specifically, leaving `entrainement`/`apprentissage` unaffected. A second gap: since a
-budget action never writes `lastAction`, it has no result pop-up to show its outcome through —
-resolved by having `performAction` thread the handler's `resolve()` return value back to the
-caller under a `response` key (`{ ok: true, response }`, additive — every other handler leaves it
-undefined), which `CommercePicker.jsx` reads directly instead of watching the character snapshot.
-See [docs/ARCHITECTURE.md](ARCHITECTURE.md)'s "Intermède-budget actions" section for the full
-mechanism.
-
-**Built**:
-- `character.intermedeActionsThisInterval` (default 0, `shared/schema/character.ts`), incremented
-  by the handler on success, reset to 0 as a sibling pass inside `sweepQuestTriggers`
-  (`functions/src/lib/questTriggers.js`) — not a second cron schedule.
-- The implicit `hasIntermedeBudget` condition (`functions/src/lib/actionConditions.js` ⇄
-  `src/lib/actionConditions.js`), injected by `resolveConditions` (`actionCatalog.js`) for any kind
-  `actionUsesIntermedeBudget` recognizes, checked against `< 3`.
-- `faireDuCommerce.js` (`functions/src/actions/faireDuCommerce.js`, registered under the shared
-  `faireDuCommerce` handlerId): the player sells one owned Instance (picked client-side via the new
-  `CommercePicker.jsx`, re-validated server-side, never trusted from the client) for gold, priced
-  by a fixed per-rarity table (`functions/src/lib/salePrice.js` ⇄ `src/lib/salePrice.js`, same
-  mirrored-module convention as `trainingCost.js` — a starting-balance table, not a formula, since
-  an object has no "quality" of its own to scale against like a talent does): commun 10, peu commun
-  25, rare 50, très rare 100, légendaire 250, mythique 600, divin 1500, unique 4000.
-- **Mythic-sale rumor side effect**: selling an object of rarity "mythique" or above authors a new
-  `worldData/rumors/items` entry on the fly (there being no hand-authored rumor to copy from for a
-  sale, unlike `RumorsManager.jsx`'s own flow) with generated French flavor text naming the object
-  and the seller's region, plus the matching
-  `worldData/regions/items/{regionId}/rumorSightings/{rumorId}` entry — same shape
-  `RumorsManager.jsx` itself seeds — at the seller's current region only, skipping the normal
-  hop-by-hop propagation decay.
-- UI: `ActionBrowser.jsx` gained a `budgetActionsOnly` mode (Intermède-budget actions only, no
-  category tabs) so `ActionPanel.jsx` can still offer "Faire du commerce" while the character's
-  main action is counting down, plus an inline "X/3 restantes cet Interval" indicator on the
-  Intermède tab.
-
-**Not built** (see "Still open" under the spec entry): "envoyer un message", "placer une annonce".
-
-## Composite quests (spec needed)
-
-Status: **implemented** — see the paired [Composite quests (implementation)](#composite-quests-implementation) entry below for what shipped. A composite quest is a sequence of quests, where each step
-beyond the first is revealed only once the previous step is completed. Quests already grant
-meaningfully better rewards than missions (gear, talent evolution — see
-[Quest loot draw](#quest-loot-draw) and
-[Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)); a
-composite quest is where that reward gap matters most, as a multi-Interval commitment — resolved
-below by reusing the existing reward engine verbatim rather than adding a second one.
-
-**Resolved decisions:**
-- **Chain authoring**: a new catalog, `worldData/questChains/items/{id}`, each entry an ordered
-  array `questIds: string[]` of existing `worldData/quests/items` ids (step 1 first) — not a
-  `nextQuestId` pointer on the quest document itself. An explicit ordered list gives the chain its
-  own identity to track progress against, and avoids the cycle-safety problem
-  [Talent relations](#talent-relations) already flagged for a pairwise ancestor/descendant-style
-  link; it also matches how every other catalog in this project (loot tables' `itemIds`,
-  professions' `actionIds`, quests' own `objectiveIds`) already references another catalog through
-  an id array on a parent document, rather than a self-referencing pointer. No creator UI in the
-  first pass — authored directly in the Firestore console, same convention as `quest.trigger` and
-  `tier.talentGain`.
-- **Reveal mechanism**: reused, not reinvented. A composite quest's first step is just an ordinary
-  quest, discoverable however quests normally are (the random region/difficulty draw, or its own
-  `trigger` per
-  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)) —
-  a chain only starts mattering once step 1 is *completed*. When `partirEnQuete.js`'s `resolve()`
-  resolves a quest **successfully**, it checks whether that quest's id appears in some chain's
-  `questIds`; if so, and it isn't that chain's last step, the next step's quest id is pushed
-  straight into `character.triggeredQuestIds` (the same `FieldValue.arrayUnion` write
-  `questTriggers.js`'s scheduled sweep already does for a normal trigger match), and
-  `character.questChainProgress[chainId]` is bumped to the new step index. This reuses the entire
-  existing reveal/notification pipeline (end-of-action pop-up page 2, localStorage "shown"
-  tracking) for free, with no new condition type and no new "completed quests" history field —
-  only a small, chain-scoped progress counter is added. A failed step does not advance the chain;
-  the character keeps the same step pending and simply attempts it again.
-- **Drawing steps 2+**: once a chain step beyond the first is pending (granted into
-  `triggeredQuestIds` but not yet reflected in `questChainProgress[chainId]`), it does not compete
-  in `partirEnQuete.js`'s normal random region/difficulty pool. `prepare()` checks for a pending
-  chain step first; if the character has one, that exact quest is used, bypassing the `regionIds`
-  filter entirely (the chain has already earned the right to be offered regardless of where the
-  character currently is), and a difficulty is picked uniformly at random from the step's own
-  `difficulties` array (content authors are expected to author chain steps with a single difficulty
-  each to keep this deterministic, though nothing enforces it). Resolution then falls straight
-  through to the existing `resolveQuestOutcome` engine, unchanged. While a chain step is pending,
-  "Partir en quête" offers only that step — no unrelated quest can be drawn instead, matching the
-  design intent that a chain shouldn't compete with an unrelated quest in the random pool.
-  "Mission" (`mission.js`) is untouched: composite quests only ever apply to the hand-authored
-  `worldData/quests/items` catalog "Partir en quête" draws from, not missions' on-the-fly generated
-  offers.
-- **Multiple pending chains**: if a character somehow has more than one chain's step pending at
-  once, the earliest-granted pending step wins (earliest insertion into `triggeredQuestIds`) — a
-  rare content-authoring edge case, resolved with a simple deterministic tiebreak rather than left
-  ambiguous.
-- **Reward tiering**: unchanged from a normal quest — no new reward math. Difficulty, and
-  therefore loot count, reputation, and talent-evolution chance, are still whatever each step's own
-  `difficulties` says, exactly like
-  [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) already
-  resolves for any quest. A chain's escalating stakes (a modest early step, an epic finale) are
-  purely a content-authoring choice — pick harder quests for later steps — not a mechanic the engine
-  special-cases, the same way [Aventure exploration mechanics](#aventure-exploration-mechanics-spec-needed)
-  resolved its own "how do rounds differ" question by reusing the resolution engine verbatim.
-
-**Data model implications**:
-```
-worldData/questChains/items/{id}   -- NEW collection
-  name: string           -- French, for reference/authoring only; not shown to players yet
-  questIds: string[]     -- worldData/quests/items ids, ordered, step 1 first
-
-characters/{id}
-  questChainProgress: { [chainId: string]: number }   -- NEW, number of steps of that chain
-                                                        --   completed so far (0 = chain not
-                                                        --   started) - an index into the chain's
-                                                        --   questIds this character has cleared
-```
-
-**Implementation scope** (roadmap #20, now unblocked):
-- Read: `functions/src/actions/partirEnQuete.js` (`prepare()`'s region/difficulty draw and
-  `resolve()`'s success handling — both need the chain-step branch described above),
-  `functions/src/lib/questTriggers.js` (the `triggeredQuestIds` arrayUnion convention this reuses),
-  `shared/schema/quest.ts` and `shared/schema/character.ts` (where `questChainProgress` and the new
-  collection's schema land, per this project's schema-file convention).
-- Create: a `worldData/questChains/items` schema file (Zod format, per this project's rule for new
-  components) and the collection itself.
-- Update: `functions/src/actions/partirEnQuete.js`, `shared/schema/character.ts`
-  (`questChainProgress`), and the `functions/src/schema/quest.ts`/`character.ts` re-exports.
-- Do not read or open any other file without asking the user first.
-
-See the paired [Composite quests (implementation)](#composite-quests-implementation) entry below
-for what shipped.
-
-## Composite quests (implementation)
-
-Status: **implemented**, then **ported onto Subject/difficulty pairs** by [Retiring quests and
-quest objectives for the subject-action system](#retiring-quests-and-quest-objectives-for-the-subject-action-system-spec-needed).
-Originally built exactly the shape
-[Composite quests (spec needed)](#composite-quests-spec-needed) above decided: a
-`worldData/questChains/items` catalog (`shared/schema/questChain.ts` ⇄
-`functions/src/schema/questChain.ts`, no creator UI, authored directly in the Firestore console),
-a `character.questChainProgress` counter (`shared/schema/character.ts`), and a chain-step branch in
-`partirEnQuete.js`'s `prepare()`/`resolve()` (`findPendingChainStep`/`findChainAdvance`) — `mission.js`
-was untouched, per the spec's own scoping at the time. Once `partirEnQuete.js` retired, that
-scoping no longer held: `questChains/items/{id}.steps` is now `[{ subjectId, difficulty }]` instead
-of a `questIds: string[]` list, the chain logic moved to `functions/src/lib/questChains.js` (same
-two function names), and it is now `rumeur.js` (generation, forcing a pending step into the mission
-batch) and `mission.js` (advancement, on a matching mission's success) that call it — see
-[docs/ARCHITECTURE.md](ARCHITECTURE.md)'s "Composite quests" section for the current mechanism.
-
-**Implementation scope**: see
-[Composite quests (spec needed)](#composite-quests-spec-needed)'s own "Implementation scope"
-above — the same file list applies here, since the spec pass already scoped exactly what building
-it touches. (Historical: this scope predates the subject-action retirement above, which is what
-actually ported the mechanism onto missions.)
-
-## Mission and quest resolution algorithm
-
-Status: **implemented**. [Rumor and mission system](#rumor-and-mission-system) and
-[Quest loot draw](#quest-loot-draw) currently resolve every quest/mission through
-`partirEnQuete.js`'s existing pipeline: a quest always concludes successfully once drawn (the
-retired paliers system used to roll a weighted tier deciding death/injury/gold/reputation — see
-`docs/ISSUE-02-ACTION-FRAMEWORK.md` §7 "Abandoning the paliers system" — nothing has replaced it
-since), and nothing touches `reputation`, `gold`, or wounds. A separate design document ("Résolution
-missions/quêtes"), handed down outside this repo, specifies a replacement resolution mechanic: draw
-a random score (1-100) and compare it against two independent difficulty-derived scales. This entry
-resolves that document's open questions into a buildable spec.
-
-**Scope** (resolved): applies to **both** "Partir en quête" and "Mission" — they already share one
-`resolve()` pipeline (`buildNarrativeContext`, `narrateQuestSuccess`, `drawQuestLoot`,
-`rollTalentEvolutions`, all defined once in `partirEnQuete.js` and reused by `mission.js`), and there
-is no live tier roll left to "sit alongside" for either of them (paliers is fully retired, per
-above) — the score becomes the sole success/failure gate for both, replacing today's
-always-succeeds behavior outright. A quest/mission's `successPhraseIds` were the only narration path
-exercised until now; failure gets a new, symmetric narration path off `failurePhraseIds` (mirroring
-`narrateQuestSuccess`, e.g. `narrateQuestFailure`, same target-shape/slot-fallback logic, just
-`resultat: "echec"`).
-
-**Missions use their full, undiscounted difficulty everywhere** (resolved, and a correction to
-already-shipped code): [Rumor and mission system](#rumor-and-mission-system)'s "one tier lower,
-clamped at facile" reward discount for a mission's loot count and talent-evolution chance was a
-balance mistake, not a decision to preserve or extend — it is removed. Missions look up the success
-threshold, the wound thresholds, the reputation reward, the loot count, and the talent-evolution
-chance all off `mission.difficulty` exactly as drawn/displayed, the same way a quest uses
-`quest.difficulty`. `mission.js`'s `rewardDifficulty` ("one tier lower than `mission.difficulty`,
-clamped at facile") is dead as of this spec and must be deleted when this entry is implemented —
-every call site that reads it switches to reading `mission.difficulty` directly, same as
-`partirEnQuete.js` already does with `quest.difficulty`.
-
-- **The score roll**: one random integer 1-100 per resolution, compared against the two independent
-  scales below.
-- **A single objective drawn per resolution**: both the threshold adjustment and the wound
-  adjustment below key off one `worldData/narrativeSubjects/items` objective, drawn once per
-  resolution occurrence — the same draw already made for
-  [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success)
-  (`objective: pickRandomLoot(questObjectives)` in `partirEnQuete.js`'s `resolve()`), reused here
-  rather than drawn a second time. This is independent of loot's own per-item objective draw (see
-  [Quest loot draw](#quest-loot-draw)), which keeps re-rolling separately for each item exactly as
-  today.
-- **`difficultyRange` (success threshold)**: a base threshold per the quest/mission's difficulty
-  tier, reusing the existing 6-tier `DIFFICULTIES` scale (see [Quest difficulty](#quest-difficulty)):
-
-  | Difficulté | Seuil de réussite | Niveau de Talent requis |
-  |---|---|---|
-  | Facile | 30 | 1 |
-  | Moyen | 50 | 1 |
-  | Difficile | 80 | 2 |
-  | Très difficile | 90 | 3 |
-  | Épique | 98 | 4 |
-  | Mythique | 100 | 5 |
-
-  The score must equal or beat this threshold to succeed. Adjustment: every character talent sharing
-  a tag with the drawn objective reduces the threshold by 1, plus 1 more per talent level (i.e. its
-  `quality`, 1-5) above the tier's required level (the table's third column). Example: a quality-3
-  "Sens aiguisés" talent (tags "Survie"/"Sens") against a "difficile" objective tagged
-  "Survie"/"Poison" — base 80, -2 (1 for the shared tag, 1 for being one level above the "difficile"
-  row's required level 2) = 78. Gated by the strict objective condition below when the objective
-  carries one.
-- **Strict objective conditions**: a quest objective can optionally carry a condition (new, empty by
-  default), evaluated with the same condition evaluator already used for action availability
-  (`CONDITION_TYPES` in `src/lib/actionConditions.js` and its server mirror — most naturally a
-  `hasTalentTag` row here, no new condition type needed). It gates, all-or-nothing, whether the
-  talent-tag adjustments below apply at all for this resolution: when set, a character only benefits
-  from its talents' tag overlap (for both the threshold and the wound adjustments) if it owns at
-  least one talent matching the condition; when absent/null (the default), every owned talent
-  sharing a tag with the drawn objective counts, exactly as described above.
-- **`woundRange` (wound thresholds)**: base thresholds per difficulty tier, each with its own floor:
-
-  | Niveau de difficulté | Blessure permanente (min 1) | Blessure grave (min 2) | Blessure légère (min 3) | Coût en talents parfaits pour baisser d'un palier |
-  |---|---|---|---|---|
-  | Facile | 1 | 5 | 20 | — |
-  | Moyen | 2 | 10 | 50 | 1 |
-  | Difficile | 5 | 30 | 60 | 2 |
-  | Très difficile | 10 | 50 | 80 | 3 |
-  | Épique | 30 | 80 | 95 | 4 |
-  | Mythique | 50 | 95 | 100 | 5 |
-
-  The same score is also compared against these thresholds: landing exactly on a threshold inflicts
-  the corresponding wound, via the existing `applyWound`/`woundCounts` helpers in
-  `functions/src/lib/wounds.js` — light→severe→permanent escalation and the death rule are already
-  implemented there, but nothing calls them today. If more than one threshold coincides on the same
-  value after adjustment (possible once floors compress the range), the most severe matching wound
-  wins (permanent > severe > light) rather than stacking multiple wounds from one roll.
-
-  **Perfect-talent tier drop** (resolved): the table's last column is a per-step cost ladder, not a
-  flat "N talents = 1 step" rate — stepping from a tier down to the tier directly below it costs the
-  number of quality-5 ("talent parfait") talents shown on the *upper* tier's row (e.g. stepping
-  Mythique→Épique costs 5; Épique→Très difficile costs 4). Dropping multiple steps sums the cost of
-  each step crossed: Mythique→Très difficile (2 steps) costs 5+4=9, matching the original design
-  note's own example. A character's total count of owned quality-5 talents (tag-independent, unlike
-  the adjustment below) is spent greedily from the quest/mission's actual difficulty tier downward —
-  one step at a time, as long as the running total can afford the next step's cost — to find which
-  row of this table is actually used to look up thresholds, floored at "Facile" (never drops below
-  it, and any leftover, unaffordable balance is wasted, not banked).
-
-  After the tier lookup above, every talent sharing a tag with the drawn objective (gated by the
-  strict objective condition, same as the threshold adjustment) reduces each of the three resulting
-  thresholds by 1, down to its own floor (permanent min 1, severe min 2, light min 3).
-- **Rewards on success**: loot (unchanged, see [Quest loot draw](#quest-loot-draw), objective rarity
-  drawn independently per item as today) plus reputation, scaled by the quest/mission's own
-  difficulty — facile 1+1d2, moyen 5+1d4, difficile 10+1d6, très difficile 20+1d10, épique 80+1d20,
-  mythique 200+1d100 (`1d[N]` = a random integer 0..N). [Talent evolution and unlock on quest
-  success](#talent-evolution-and-unlock-on-quest-success) keeps running exactly as it does today
-  (`rollTalentEvolutions`, unchanged chance formula) — it was never gated by the retired tiers roll
-  in the first place, only by "the quest succeeds", so it now reads that flag off this entry's
-  score-based success instead.
-- **Rewards on failure** (new — today a failed quest/mission grants nothing): loot drawn the same
-  way as success loot (`drawQuestLoot`, one random objective per item, independent of the single
-  objective drawn above for thresholds), except matching loot tables against a rarity two ranks
-  below each per-item objective's own rarity instead of an exact match, floored at "commun" — stays
-  entirely on the existing 8-tier rarity scale used by [Quest loot draw](#quest-loot-draw), no new
-  difficulty-to-rarity mapping introduced. No reputation, no talent evolution on failure.
-
-**Resolution order** in `resolve()`: draw the single objective for this occurrence → roll the score
-→ compute the (talent- and condition-adjusted) `difficultyRange` threshold and determine
-success/failure → compute the (perfect-talent- and tag-adjusted) `woundRange` thresholds and apply
-any matching wound immediately via `applyWound`/`woundCounts` (same "no claim step, apply directly
-in `resolve()`" precedent as talent evolution — a wound is a character-stat change, not an
-instance-creating side effect like loot) → on success: reputation reward, existing loot draw,
-`rollTalentEvolutions` → on failure: degraded-rarity loot draw only → narrate (success or failure
-phrases) using whichever outcome was decided.
-
-**Data model implications**:
-```
-worldData/narrativeSubjects/items/{id}    -- only the addition; see Quest creation and editing
-  condition: { conditions: [...] } | null  -- NEW, optional, default null/empty; same shape as an
-                                            --   action's availability conditions (reuse, not a new
-                                            --   format) — restricts which character talents count
-                                            --   toward this objective's threshold/wound adjustments
-
-character.lastAction (quest/mission handlers only, additive)
-  success: boolean            -- unchanged field, but now genuinely varies instead of always true
-  score: number                -- NEW, the 1-100 roll, shown in the result pop-up
-  threshold: number             -- NEW, the (talent-adjusted) success threshold `score` was compared
-                                --   against — added during implementation: the result pop-up needs
-                                --   it to show alongside the score, and it wasn't listed here
-                                --   originally even though the pop-up entry below always called for it
-  wound: string | null         -- NEW, "light" | "severe" | "permanent" | null, this resolution's
-                                --   wound (if any) — the character's post-resolution woundsLight/
-                                --   woundsSevere/woundsPermanent counters are read off the character
-                                --   document itself, not duplicated here
-  reputationGained: number     -- NEW, 0 on failure
-  loot: [...]                  -- unchanged shape (see Quest loot draw), now also populated (at
-                                --   degraded rarity) on failure instead of only on success
-```
-
-Builds on [Rumor and mission system](#rumor-and-mission-system) (mission generation/journal, and the
-now-removed reward discount above), [Quest loot draw](#quest-loot-draw) (loot table draw mechanics),
-[Quest difficulty](#quest-difficulty) (the 6-tier scale reused here), and the
-`applyWound`/`woundCounts` helpers in `functions/src/lib/wounds.js` (now actually called from
-`resolveQuestOutcome`, shared by `functions/src/actions/partirEnQuete.js` and `mission.js`). The
-pure score/threshold/wound math lives in `functions/src/lib/questResolution.js`. A wound severe
-enough to trigger `applyWound`'s death rule flips `character.alive` to `false`, which is what
-actually removes the character from play (`useOwnCharacter`'s query and `runActionPipeline`'s
-character lookup both filter on `alive == true` already) — not a new mechanic, just the first
-caller of a rule that already existed.
-
-## Mission resolution result pop-up
-
-Status: **implemented**. Built alongside
-[Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) above, per that
-entry's own note that building this row was expected to include building the algorithm as a
-prerequisite.
-
-A resolved quest or mission still shows its outcome through the existing generic dialog
-(`ActionResultDialog.jsx` / `ActionOutcome.jsx`, shared with every other action) — narration, a
-"Succès"/"Échec" toggle, and a "Butin obtenu" fieldset (see [Quest loot draw](#quest-loot-draw), now
-also populated at degraded rarity on failure, so it needed no changes of its own). `ActionOutcome.jsx`
-gained a dedicated "Résolution" `fieldset` (a new section, not a generalization of "Butin obtenu" —
-resolving the entry's one open UI-architecture question), shown whenever `lastAction.score != null`
-(inert for every non-quest/mission handler):
-
-- The rolled score and the (talent-adjusted) success threshold it was compared against, always shown.
-- Any wound inflicted (`lastAction.wound`'s severity), alongside the character's current
-  `woundsLight`/`woundsSevere`/`woundsPermanent` counters — read off a new `character` prop threaded
-  through `ActionPanel.jsx` → `ActionResultDialog.jsx` → `DefaultResult.jsx` → `ActionOutcome.jsx`,
-  since those counters live on the character document itself, not on `lastAction`.
-- The reputation gained, shown on success when positive.
-
-Applies to both "Partir en quête" and "Mission", which already shared one result pop-up path.
-
-## Aventure mission launch UX polish
-
-Status: **implemented**. [Rumor and mission system](#rumor-and-mission-system) already
-implemented mission launching: `MissionPicker.jsx` lists a character's `missionJournal` entries and
-starts the "Mission" action (`kindId: "aventure"`, `handlerId: "mission"`) with the picked
-`missionId`, embedded in `ActionBrowser.jsx`'s Aventure category tab alongside "Partir en quête" and
-"Rumeur".
-
-- This already satisfies the substance of "launch missions from the Aventure tab, backed by the
-  character's mission journal" — no separate mechanic left to build.
-- The presentational gap against the source design ("l'onglet Aventure/missions") — missions being
-  one action among others inside the shared Aventure tab, with no visual distinction — is now
-  closed: `MissionPicker.jsx` wraps its mission list in a `<fieldset className="action-loot-box">`
-  with a `<legend>Missions en cours</legend>`, the same titled-subsection convention already used
-  by `ActionOutcome.jsx` for "Butin obtenu" and "Amélioration de talent", giving the mission list
-  its own heading within the Aventure tab's action detail panel.
-
-Not blocking anything else in this list.
-
-## Mission subject and action catalog (spec needed)
-
-Status: **implemented** (catalogs, creator UI, name-assembly helper, and — since
-[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed) —
-the drawing/generation logic that actually calls it).
-Replaces the multi-slot narrative grammar system
-(`worldData/verbPhrases/items`, see
-[Procedural narrative generation](#procedural-narrative-generation)) as the source of a mission's
-*name* with a much simpler two-part model: an **Action** and a **Subject**, concatenated to read as
-a title — "Protéger caravane marchande", "Vaincre dragon noir", "Enquêter sur meurtres macabres".
-This is a new, dedicated catalog pair — distinct from `worldData/actionTypes/items` (the gameplay
-action a character actually performs, e.g. "Partir en mission", "S'entraîner") — narrative
-title-building blocks only.
-
-- **Shared type field**: both a mission-name Action and a Subject carry a `type` string. It starts
-  seeded with four values — ennemis, livraison, trésor, protection — but is plain free text, not a
-  hardcoded frontend enum (unlike, say, `OBJECT_TYPES`): a content author adds a new type simply by
-  giving an Action or Subject an unseen `type` value, no code change needed, the same
-  no-code-touch-to-extend convention already used for tag ids. Generation only ever pairs an Action
-  and a Subject sharing the same `type` value.
-- **Mission-name Action catalog** (new, `worldData/missionActions/items` — named to avoid colliding
-  with "verb phrase" from the grammar system it replaces): a French phrase template ("Protéger",
-  "Vaincre", "Enquêter sur") plus its `type`. The phrase is authored as a complete bare prefix,
-  including any trailing preposition it needs ("Enquêter sur" is one authored string, not "Enquêter"
-  plus a separate preposition field) — the same "author the whole fragment, no placeholder grammar"
-  convention `textGeneration.js` already uses elsewhere. Kept deliberately separate from the
-  gameplay `worldData/actionTypes/items` catalog — nothing about starting a mission ties to which
-  phrase named it. Has its own creator UI, `MissionActionsManager.jsx`, registered as a tab in
-  `CreatorDashboard.jsx` — this catalog is meant to keep growing with content the way quests, objects,
-  and talents do, so it gets the same list-then-create management screen those get, rather than the
-  Firestore-console-only route used for a single narrow field like `tier.talentGain`.
-- **Subject catalog** (new, `worldData/missionSubjects/items`): a base French name ("caravane
-  marchande", "dragon", "meurtres"), its `type`, and:
-  - **Climates**: a multi-select of the climates it may appear in (used later to match a subject to
-    the region it's generated for — see
-    [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)).
-  - **Difficulty tiers**: for each of some subset of the existing 6-tier difficulty scale (see
-    [Quest difficulty](#quest-difficulty)) the subject can appear at, an optional prefix and/or
-    suffix string, plus any extra `tagIds` that tier contributes. Example: "dragon" — prefix "jeune"
-    at difficile, prefix "ancien" at mythique, suffix "adulte" at très difficile, suffix "liche" at
-    épique (contributing e.g. a "mort-vivant" tag).
-  - **Variations**: a separate, difficulty-independent list of prefix/suffix flavor modifiers, each
-    with its own `tagIds` — e.g. suffix "rouge" (tags: feu), suffix "blanc" (tags: glace). One
-    variation is drawn at random per generation, independent of the difficulty draw.
-  Also gets its own creator UI, `MissionSubjectsManager.jsx`, same tab-in-`CreatorDashboard.jsx`
-  convention as the Action catalog above, since its per-entry structure (climates, difficulty tiers,
-  variations) is richer than a single-field console edit would comfortably support.
-- **Name assembly**: at generation time, once a `type`-matched Action and Subject are picked (plus a
-  difficulty and a random variation for the Subject), the final mission name is assembled in a fixed
-  slot order — difficulty-tier prefix, then variation prefix, then the Subject's base name, then
-  variation suffix, then difficulty-tier suffix — with any absent slot simply skipped, then the whole
-  Subject string appended after the Action's phrase. Example: Action "Vaincre" + Subject "dragon"
-  drawn at épique with the "liche" difficulty suffix and the "rouge" variation suffix →
-  "Vaincre dragon rouge liche". As with the rest of `textGeneration.js`, there's no automatic French
-  grammatical agreement check on the assembled result — a content-authoring discipline, not a code
-  guarantee.
-
-**Data model implications**:
-```
-worldData/missionActions/items/{id}   -- NEW catalog
-  phrase: string      -- French, complete phrase including any trailing preposition,
-                       --   e.g. "Protéger", "Vaincre", "Enquêter sur"
-  type: string         -- free text, matched against a Subject's own type; seeded with
-                        --   ennemis | livraison | tresor | protection, open to more
-
-worldData/missionSubjects/items/{id}  -- NEW catalog
-  name: string                        -- French base name, e.g. "dragon"
-  type: string                        -- free text, matched against a mission Action's own type
-  climateIds: string[]                -- climates this subject can be generated for
-  difficultyTiers: [{
-    difficulty: string,               -- one of the 6-tier DIFFICULTIES scale
-    prefix: string | null,
-    suffix: string | null,
-    tagIds: string[],
-  }]
-  variations: [{
-    prefix: string | null,
-    suffix: string | null,
-    tagIds: string[],
-  }]
-```
-
-Implemented in `shared/schema/missionAction.ts` / `shared/schema/missionSubject.ts` (isomorphic
-Zod contracts, re-exported by `functions/src/schema/missionAction.ts` /
-`functions/src/schema/missionSubject.ts`), `src/components/creator/MissionActionsManager.jsx` /
-`MissionSubjectsManager.jsx` (registered as the "Actions de mission" / "Sujets de mission" tabs
-under a new "Missions" group in `CreatorDashboard.jsx`), and the name-assembly helper
-`functions/src/missionNaming.js` (`assembleMissionName`, tested in
-`functions/src/missionNaming.test.js`) — mirrors `textGeneration.js`'s fixed-slot-order,
-skip-if-absent assembly style. `assembleMissionName` is now actually called by mission generation
-(`functions/src/actions/rumeur.js`'s `drawMission`) — see
-[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed).
-The multi-slot verb-phrase grammar ([Procedural narrative generation](#procedural-narrative-generation))
-is unrelated to a mission's *title* and is still used for its end-of-mission *narration* paragraph.
-
-## Mission loot and rarity mapping (spec needed)
-
-Status: **implemented**, including wiring it into an actual mission resolution (see
-[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)).
-Once a mission is generated from a difficulty and a Subject (with its difficulty-tier and variation
-`tagIds`), this entry pins down how that combination selects a `worldData/lootTables/items` entry —
-reusing the exact matching mechanism [Quest loot draw](#quest-loot-draw) already built (rarity match
-+ tag overlap against `worldData/lootTables/items`), not a new one.
-
-- **Difficulty-to-rarity equivalence**: the mission's difficulty tier (the existing 6-tier
-  `DIFFICULTIES` scale) maps onto the existing 8-tier rarity scale the same way
-  `worldData/narrativeSubjects/items` objectives already do it today (see
-  [Quest loot draw](#quest-loot-draw)'s rarity source) — reused, not redefined.
-- **Tag source for matching**: the union of the difficulty-tier `tagIds` and variation `tagIds`
-  drawn for this Subject at generation time (see
-  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed)) — the
-  Subject catalog has no separate base-level `tagIds` of its own, only per-difficulty-tier and
-  per-variation ones.
-- **Resolved once per mission occurrence, not re-rolled per item**: unlike
-  [Quest loot draw](#quest-loot-draw), where each loot item independently re-rolls a random
-  objective (and therefore its own rarity/tag pool), every loot item drawn for one mission
-  occurrence shares the exact same rarity and tag pool. A mission's difficulty, Subject,
-  difficulty-tier, and variation are all already fixed once, at generation time — there is no
-  second candidate to re-roll per item the way a quest's several possible objectives allow. Only
-  the loot table pick and the `drawLootTableItemId` draw within it vary per item.
-- **Loot count**: still driven by `LOOT_COUNT_BY_DIFFICULTY` (see
-  [Quest loot draw](#quest-loot-draw)), unchanged.
-
-Implemented in `functions/src/missionLoot.js` (`difficultyToRarity`, `drawMissionLoot`, tested in
-`functions/src/missionLoot.test.js`). `difficultyToRarity` reuses the same
-`DIFFICULTY_ORDER`/`RARITY_ORDER` positional-equivalence arrays (`functions/src/lib/rolls.js`)
-`talentEvolution.js`'s `evolutionChance` already relies on. `drawMissionLoot` resolves the target
-rarity and tag pool once, then reuses `functions/src/lib/loot.js`'s `pickRandom`,
-`drawLootTableItemId`, and `LOOT_COUNT_BY_DIFFICULTY` per item, same as `partirEnQuete.js`'s
-`drawQuestLoot`; it also gained a `rarityOffset` parameter (mirroring `drawQuestLoot`'s own) for the
-failure-consolation-loot case. Called from `functions/src/actions/mission.js`'s `resolve()`, passed
-into `partirEnQuete.js`'s `resolveQuestOutcome` as its new overridable `drawLoot` parameter — see
-[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed).
-
-## Regional mission generation and journal (spec needed)
-
-Status: **implemented**, except moving the generation *trigger* itself onto "Se renseigner" — see
-the "Generation trigger" bullet and "Still open" below. Replaces
-[Rumor and mission system](#rumor-and-mission-system)'s mission-generation mechanic (previously: one
-random `worldData/narrativeSubjects/items` objective and a uniformly random difficulty) with a
-climate-aware draw against the new Subject/Action catalog, and ties each generated mission to the
-region it was generated in.
-
-- **Region climate**: regions gain a `climateIds: string[]` field (multi-select, mirroring the
-  Subject catalog's own `climateIds` rather than a single value) — a region bordering several
-  biomes can list more than one climate. Distinct from the pre-existing single-value `climatId`
-  field (which only drives the character page's banner illustration, `ClimateBanner.jsx`) — the
-  two are authored independently and not kept in sync.
-- **Generation**: for each mission rolled, draw a difficulty, then a random Subject whose
-  `climateIds` overlaps the region's `climateIds` (same tag-overlap-style matching already used
-  elsewhere in this catalog, e.g. [Quest loot draw](#quest-loot-draw)'s tag matching — not an
-  exact-set match) and whose difficulty-tier list includes the drawn difficulty, then a random
-  Action sharing that Subject's `type`, then a random variation for the Subject (independent of
-  difficulty) — assembling the mission name per
-  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed).
-- **Generation trigger**: still the "Rumeur" action for now, exactly as before — moving it onto
-  "Se renseigner" ([Se renseigner intermède action](#se-renseigner-intermède-action))
-  is that entry's own implementation (roadmap #31), deliberately not resolved here since "Se
-  renseigner" doesn't exist yet. No passive or scheduled source generates missions; the scheduled
-  Interval tick (`sweepQuestTriggers`) stays reserved for quest triggers and rumor propagation, not
-  mission generation.
-- **Roll count and overwrite semantics unchanged**: `missionRollCount` (missions rolled per
-  trigger, still a `worldData/actionTypes/items` field, default 3) and the "unclaimed journal
-  entries are simply overwritten on the next roll" rule (see
-  [Rumor and mission system](#rumor-and-mission-system)) both carry over unchanged — climate-gating
-  only narrows which Subjects are eligible for a given roll, it doesn't change how many missions
-  are rolled or what happens to leftovers. A region whose climate has too few matching Subjects to
-  fill `missionRollCount` is a content-coverage gap (same "silently skipped, not retried" precedent
-  as [Quest loot draw](#quest-loot-draw)), not a mechanic change: a roll that finds no matching
-  Subject, or no Action sharing that Subject's type, is simply skipped, not retried with a
-  different difficulty.
-- **Region-locked**: a generated mission is tied to its origin region (already true of
-  `character.missionJournal` entries' `regionId`/`locationId` before this entry — see
-  [Rumor and mission system](#rumor-and-mission-system)) and can only be completed there; a
-  character who travels to a different region can no longer resolve a mission generated elsewhere.
-  Enforced in `functions/src/actions/mission.js`'s `prepare()`, which previously recorded
-  `regionId` but never checked it against the character's current region at resolution time.
-- **Mission journal UI**: the player's mission journal — the `character.missionJournal` array and
-  its `MissionPicker.jsx` display (see [Rumor and mission system](#rumor-and-mission-system),
-  [Aventure mission launch UX polish](#aventure-mission-launch-ux-polish)) — is reused, not
-  rebuilt, but its listing is now grouped by region (sorted by region name) then sorted by
-  difficulty within each region, rather than the earlier flat list.
-- **"Partir en mission"**: the existing "Mission" action (`kindId: "aventure"`, `handlerId:
-  "mission"`) and its `MissionPicker.jsx` entry point in the Aventure tab already satisfied "select
-  a journal entry and perform it from the Aventure tab" — no new action or entry point was needed,
-  only its generation source and journal display changed.
-- **Loot and threshold/wound math without a narrativeSubjects objective**: a mission no longer
-  carries any `worldData/narrativeSubjects/items` reference at all — its own `tagIds` (the union
-  fixed at generation time) and its difficulty's rarity equivalence
-  ([Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed)'s
-  `difficultyToRarity`) stand in for what an "objectif de quête" objective used to supply to
-  `resolveQuestOutcome`'s threshold/wound/talent-evolution pipeline. `resolveQuestOutcome` gained
-  an overridable `drawLoot` parameter (default: the existing per-item `drawQuestLoot`) so
-  `mission.js` can inject `missionLoot.js`'s `drawMissionLoot` instead, finally wiring that
-  standalone helper into an actual handler. The end-of-mission narration paragraph itself is
-  unaffected — it still draws from the global `narrativeSubjects` pool via `resolveQuestOutcome`'s
-  existing fallback, since that catalog is unrelated to how a mission is *titled*.
-
-**Still open (deliberately deferred)**:
-- The generation trigger stays on "Rumeur", not "Se renseigner" — see the "Generation trigger"
-  bullet above; moving it is roadmap #31's job once that action exists.
-
-**Data model implications**:
-```
-worldData/regions/items/{id}
-  climateIds: string[]   -- NEW, climates this region draws mission Subjects from - distinct from
-                          --   the pre-existing single-value climatId (banner illustration only)
-
-characters/{id}.missionJournal[]   -- objectiveId replaced; difficulty/tagIds/locationId/regionId/
-                                     --   generatedAt unchanged (see Rumor and mission system)
-  subjectId: string      -- worldData/missionSubjects/items id drawn at generation time
-  actionId: string        -- worldData/missionActions/items id drawn at generation time
-  name: string             -- the already-assembled title (functions/src/missionNaming.js), so
-                            --   resolution never needs to re-fetch either catalog entry
-```
-
-Implemented in `functions/src/actions/rumeur.js` (`drawMission`, replacing the old
-narrativeSubjects-based draw), `functions/src/actions/mission.js` (region-lock check in `prepare()`,
-synthetic `{ tagIds, rarity }` objective stand-in and `drawMissionLoot` wiring in `resolve()`),
-`functions/src/actions/partirEnQuete.js` (`resolveQuestOutcome`'s new `drawLoot` override
-parameter), `functions/src/missionLoot.js` (`drawMissionLoot` gained a `rarityOffset` parameter,
-mirroring `drawQuestLoot`'s own, for the failure-consolation-loot case), `shared/schema/region.ts`
-and `src/components/creator/RegionsManager.jsx` (`climateIds`), `shared/schema/character.ts`
-(`missionJournal`'s new shape), and `src/components/actions/MissionPicker.jsx` (region/difficulty
-grouping, `mission.name` used directly instead of a `narrativeSubjects` lookup).
-
-## Retiring quests and quest objectives for the subject-action system (spec needed)
-
-Status: **implemented**. Blocked by
-[Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed),
-[Mission loot and rarity mapping](#mission-loot-and-rarity-mapping-spec-needed), and
-[Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed). The
-description handed down for this chantier is explicit that both "objectif de quête"
-(`worldData/narrativeSubjects/items` tagged "objectif de quête") and "quête"
-(`worldData/quests/items`, the hand-authored catalog) disappear, replaced everywhere by the
-Subject/Action mission system above. Several already-implemented features are built directly on top
-of the catalog being retired here; this entry decides, explicitly, what happens to each rather than
-leave it as an unplanned casualty.
-
-- **Hand-authored quests gone**: `worldData/quests/items`, `QuestsManager.jsx`, and the "Partir en
-  quête" action/handler (`partirEnQuete.js`) are retired. "Partir en mission" (see
-  [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed))
-  becomes the sole Aventure-branch action drawing on this generative content; whether "Partir en
-  quête" is deleted outright or simply stops being offered (`enabled: false`) is an
-  implementation-time call, not a design one.
-- **"Objectif de quête" gone**: `worldData/narrativeSubjects/items` tagged "objectif de quête" and
-  `QuestObjectivesManager.jsx` are superseded by the new Subject catalog everywhere they were
-  previously the rarity/tag source — [Quest loot draw](#quest-loot-draw),
-  [Talent evolution and unlock on quest success](#talent-evolution-and-unlock-on-quest-success), and
-  [Aventure exploration mechanics](#aventure-exploration-mechanics-implementation)'s encounter draw
-  all currently read from this pool and need to be repointed at the Subject catalog instead.
-- **Verb phrases retired for mission outcome narration too**:
-  [Procedural narrative generation](#procedural-narrative-generation)'s multi-slot grammar
-  (`worldData/verbPhrases/items`) already stops being the source of a mission's *name*, per
-  [Mission subject and action catalog](#mission-subject-and-action-catalog-spec-needed). It is not
-  kept on for the mission's *outcome* either (the success/failure paragraph shown in the result
-  pop-up) — that paragraph is retired along with it, and the result pop-up shows only "Succès" or
-  "Échec" for a mission, the same way it already does for other non-narrated actions. Verb phrases
-  and `functions/src/textGeneration.js` remain in place for whatever non-mission content still uses
-  them; this only removes their mission-outcome consumer.
-- **Composite quests retired, ported onto Subjects**:
-  [Composite quests](#composite-quests-implementation) (`worldData/questChains/items`,
-  `character.questChainProgress`) is not dropped — it's rebuilt on top of the new system as a chain
-  of Subject/difficulty pairs instead of a chain of quest ids. `questChains/items/{id}.steps` moves
-  from referencing `questId` per step to a `{ subjectId, difficulty }` pair per step (mirroring
-  [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)'s
-  own mission shape), and progression/completion checks compare against a resolved mission's Subject
-  and difficulty instead of its quest id. The chain-advancement trigger point (on mission completion,
-  same as today's on quest completion) is unchanged.
-- **Quest triggers retired, repointed at a Subject**:
-  [Quest triggers and end-of-action pop-up pages](#quest-triggers-and-end-of-action-pop-up-pages)
-  (`quest.trigger`, `character.triggeredQuestIds`, the scheduled `sweepQuestTriggers` sweep) keeps
-  its condition-gated grant mechanic, but what it grants changes: instead of unlocking a specific
-  hand-authored quest, a trigger grants access to a specific Subject (guaranteeing that Subject is
-  eligible to be drawn the next time the character generates a mission, the same "guaranteed next
-  draw" semantics the old mechanism gave a specific quest). `quest.trigger` moves to
-  `subject.trigger` on the Subject catalog entry, and `character.triggeredQuestIds` is renamed
-  `character.triggeredSubjectIds`, storing Subject ids instead of quest ids; `sweepQuestTriggers`'s
-  sweep logic (condition evaluation, one-time grant) is otherwise unchanged.
-- **Mission and quest resolution algorithm carries over unchanged**:
-  [Mission and quest resolution algorithm](#mission-and-quest-resolution-algorithm) (the score-roll
-  success/wound/reward engine) was already written to be difficulty- and tag-driven, not
-  quest-catalog-specific, and is confirmed to carry over onto the new mission shape as-is — no rework
-  needed here.
-- **`favoredQuestIds` and `linkedQuestId` dropped**: `favoredQuestIds` on talents (see
-  [Quest creation and editing](#quest-creation-and-editing)) and
-  `worldData/rumors/items.linkedQuestId` (see
-  [Rumor and mission system](#rumor-and-mission-system)) both reference `worldData/quests/items` ids
-  directly and would go dangling once that catalog is retired. Neither field had a real gameplay
-  consumer yet (`favoredQuestIds` was purely informational; `linkedQuestId` only ever fed flavor
-  text), so both fields are simply dropped rather than repointed at Subjects — from
-  `TalentsManager.jsx`'s form and `talent.ts`/`shared/schema/talent.ts`, and from the rumor schema
-  and `RumorsManager.jsx`, respectively. This is unrelated to the fate of the rest of the flavor-text
-  rumor mechanic (region rumor sightings/propagation, `RumorBanner.jsx`, etc.), which this chantier's
-  description never asks to remove and which stays as-is.
-
-**Implemented as follows**:
-
-- `functions/src/actions/partirEnQuete.js` and its test file are deleted; the "partirEnQuete"
-  handlerId is removed from `functions/src/index.ts`'s `ACTION_HANDLERS` and from
-  `ActionsManager.jsx`'s `KNOWN_HANDLER_IDS` (a `worldData/actionTypes/items` document still
-  authored with that handlerId needs disabling/deleting by hand in the Firestore console — no
-  content migration ships with this change). The shared score-roll engine it used to house
-  (`resolveQuestOutcome`, `drawQuestLoot`, narration helpers) moved unchanged to
-  `functions/src/missionResolution.js`, now imported by `mission.js` and `partirExplorer.js`.
-- `src/components/creator/QuestsManager.jsx` and `QuestObjectivesManager.jsx` are deleted and
-  unregistered from `CreatorDashboard.jsx`. `worldData/quests/items` and `shared/schema/quest.ts` /
-  `functions/src/schema/quest.ts` are gone; `DIFFICULTIES` (still needed by `MissionPicker.jsx`,
-  `ActionOutcome.jsx`, `MissionSubjectsManager.jsx`) relocated to `src/lib/difficulties.js`.
-  `narrativeSubject.ts`'s `rarity`/`condition` fields are kept as documented dead fields (their only
-  writer, `QuestObjectivesManager.jsx`, is gone).
-- `partirExplorer.js`'s encounter draw no longer reads the "objectif de quête" narrativeSubjects
-  pool: each round now builds a synthetic `{ tagIds, rarity }` objective from the location's tags
-  and the round's own difficulty (`missionLoot.js`'s `difficultyToRarity`), the same pattern
-  `mission.js` already used, and draws loot through `missionLoot.js`'s `drawMissionLoot` too.
-- Composite quests: `worldData/questChains/items/{id}.steps` is now `[{ subjectId, difficulty }]`
-  (`shared/schema/questChain.ts`). `functions/src/lib/questChains.js` holds the ported
-  `findPendingChainStep`/`findChainAdvance`; `rumeur.js`'s mission-generation batch reserves one
-  guaranteed slot for a pending step, `mission.js`'s `resolve()` advances the chain on a matching
-  success.
-- Quest triggers: `missionSubject.trigger` replaces `quest.trigger`
-  (`shared/schema/missionSubject.ts`), `character.triggeredSubjectIds` replaces
-  `triggeredQuestIds` (`shared/schema/character.ts`). `functions/src/lib/questTriggers.js` now loads
-  `worldData/missionSubjects/items`; `ActionResultDialog.jsx` fetches/shows triggered Subjects
-  ("Sujets débloqués" page) instead of quests.
-- `mission.js` no longer fetches `narrativeSubjects`/`verbPhrases` or narrates its outcome —
-  `resolveQuestOutcome` is called with `narrate: false`, so the result pop-up shows only
-  "Succès"/"Échec" for a mission.
-- `favoredQuestIds` (talent.ts, `TalentsManager.jsx`) and `linkedQuestId` (rumor.ts,
-  `RumorsManager.jsx`, and the denormalized copy in `character.ts`'s `rumorJournal` entries) are
-  dropped outright, as decided above.
-
-Not implemented as part of this pass, deliberately unrelated: the flavor-text rumor mechanic
-(region rumor sightings/propagation, `RumorBanner.jsx`) and the "Se renseigner" action itself (see
-[Se renseigner intermède action](#se-renseigner-intermède-action)) both stay untouched.
-
-## Se renseigner intermède action
-
-Status: **implemented**. Replaces the "Rumeur" action (`handlerId: "rumeur"`, see
-[Rumor and mission system](#rumor-and-mission-system)) with "Se renseigner" in-game — same handler
-(kept for continuity, only its content doc's `label`/`kindId` change). Every character always has
-access to it, with no condition: performing it generates three missions at random from the
-possible mission subjects in the character's current region.
-
-- **Renamed and repurposed, both halves carried over**: "Se renseigner" keeps "Rumeur"'s
-  rumor-harvesting half unchanged — up to `rumorHarvestCount` sightings at or above "rare" from the
-  character's current region into `character.rumorJournal`, same skip-already-owned rule — and takes
-  over its mission-generation half, now via the climate/Subject draw in
-  [Regional mission generation and journal](#regional-mission-generation-and-journal-spec-needed)
-  instead of the current objective+uniform-difficulty draw.
-- **No availability condition**: a reputation-scaled cadence gate (a `renseignementAvailable`
-  predicate in `actionConditions.js`, injected whenever an action's `kindId` inherited from the
-  `renseignement` kind, backed by a `missionsRequiredForRenseignement(reputation)` formula and a
-  `character.missionsSinceRenseignement` counter) was implemented and then reverted: the action
-  must always be available like any other Intermède action, so the predicate, its injection in
-  `actionCatalog.js`'s `resolveConditions`, and the `missionsRequiredForRenseignement.js` helper
-  were all removed. `character.missionsSinceRenseignement` is kept in the schema as a dead field
-  (see `shared/schema/character.ts`) so existing documents stay valid, but nothing reads or writes
-  it any more.
-
-**Still open (deliberately deferred)**: the existing `worldData/actionTypes/items` "Rumeur"
-document itself is not migrated by this change — renaming its `label` to "Se renseigner" and
-setting its `kindId` to `renseignement` is a content edit for the creator to make by hand, same
-convention as every other action-type field authored directly in the Firestore console.
+Not implemented yet. (Rework plan §4.8.)
