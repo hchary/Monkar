@@ -1,6 +1,6 @@
 // Canonical contract for `worldData/tags/items/{tagId}`: the shared vocabulary every other
-// component classifies itself with. Referenced by tagIds on quests, narrativeSubjects, objects,
-// lootTables, talents, verbPhrases and recettes, and by recette.categoryIds and
+// component classifies itself with. Referenced by tagIds on quests, missionSubjects, objects,
+// lootTables, talents and recettes, and by recette.categoryIds and
 // actionType.lootTagIds / recipeCategoryIds. Authored through
 // src/components/creator/TagsManager.jsx, which also sweeps every referencing collection on
 // delete so no dangling tag id survives.

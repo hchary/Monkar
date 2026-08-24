@@ -7,10 +7,11 @@ function difficultyLabel(value) {
   return DIFFICULTIES.find((d) => d.value === value)?.label || value || "?";
 }
 
-// The narrative recap of a resolved action: what happened, what it granted or cost. Shared
-// between the completed-action dialog and the idle-state recap below the browser - previously
-// duplicated in both places as quest-only markup (F4), written once here
-// (docs/ISSUE-02-ACTION-FRAMEWORK.md §3.7).
+// The recap of a resolved action: what happened, what it granted or cost. Shared between the
+// completed-action dialog and the idle-state recap below the browser - previously duplicated in
+// both places as quest-only markup (F4), written once here (docs/ISSUE-02-ACTION-FRAMEWORK.md
+// §3.7). No prose line any more: the generated paragraph it used to open on went with the
+// narrative generator (docs/TODO.md "Narration removal").
 export default function ActionOutcome({ lastAction, showLoot, character }) {
   const sortedLoot = [...(lastAction.loot || [])].sort(
     (a, b) => RARITIES.findIndex((r) => r.value === b.rarity) - RARITIES.findIndex((r) => r.value === a.rarity)
@@ -21,8 +22,6 @@ export default function ActionOutcome({ lastAction, showLoot, character }) {
 
   return (
     <>
-      <p>{lastAction.narrativeText}</p>
-
       {lastAction.mission && (
         <p className="quest-info">
           Mission : {lastAction.mission.name}

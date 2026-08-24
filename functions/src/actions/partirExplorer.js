@@ -9,13 +9,9 @@
 // loop instead of once. No second consequence roller, no new encounter catalog: each round's
 // objective is a synthetic { tagIds, rarity } stand-in built from the location's own tagIds and the
 // round's own drawn difficulty (missionLoot.js's difficultyToRarity), the same pattern mission.js
-// uses for a mission - not drawn from the retired "objectif de quête" narrativeSubjects pool
-// (docs/TODO.md "Retiring quests and quest objectives for the subject-action system"). Loot is
-// drawn the same way, through missionLoot.js's drawMissionLoot. Narration is unaffected by that
-// retirement - it still falls back to the global narrativeSubjects catalog, since the synthetic
-// objective has no `type` field and can never itself be picked as a narration subject (same
-// fallback mission.js's own header comment used to describe, before missions stopped narrating at
-// all).
+// uses for a mission. Loot is drawn the same way, through missionLoot.js's drawMissionLoot. Rounds
+// are not narrated: the procedural generator this handler used to be the last caller of was removed
+// by docs/TODO.md "Narration removal", so a run's result pop-up shows only its per-round summary.
 
 const { FieldValue } = require("firebase-admin/firestore");
 const { rollWeighted } = require("../lib/rolls");
@@ -44,24 +40,20 @@ async function prepare({ db, character }) {
     if (locationSnap.exists) location = { id: locationSnap.id, ...locationSnap.data() };
   }
 
-  const [narrativeSubjectsSnap, verbPhrasesSnap, lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
-    db.collection("worldData").doc("narrativeSubjects").collection("items").get(),
-    db.collection("worldData").doc("verbPhrases").collection("items").get(),
+  const [lootTablesSnap, objectsSnap, talentsSnap] = await Promise.all([
     db.collection("worldData").doc("lootTables").collection("items").get(),
     db.collection("worldData").doc("objects").collection("items").get(),
     db.collection("worldData").doc("talents").collection("items").get(),
   ]);
-  const narrativeSubjects = narrativeSubjectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const verbPhrases = verbPhrasesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const lootTables = lootTablesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const objects = objectsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const talents = talentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return { location, narrativeSubjects, verbPhrases, lootTables, objects, talents };
+  return { location, lootTables, objects, talents };
 }
 
 async function resolve({ character, actionType, actionTypeId, today, context }) {
-  const { location, narrativeSubjects, verbPhrases, lootTables, objects, talents } = context;
+  const { location, lootTables, objects, talents } = context;
 
   const locationName = location?.name || null;
   const locationTagIds = location?.tagIds || [];
@@ -80,7 +72,6 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
   let totalReputationGained = 0;
   let anyWound = false;
   let died = false;
-  let lastNarrativeText = null;
 
   for (let i = 0; i < encounterCount; i++) {
     const difficulty = rollWeighted(difficultyWeights)?.difficulty || null;
@@ -96,13 +87,12 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
     // pipeline expects - see the header comment above.
     const roundObjective = { tagIds: locationTagIds, rarity: difficultyToRarity(difficulty) };
 
-    function drawLoot({ difficulty: d, lootTables: tables, objects: objectCatalog, accomplishmentMessage, rarityOffset }) {
+    function drawLoot({ difficulty: d, lootTables: tables, objects: objectCatalog, rarityOffset }) {
       return drawMissionLoot({
         difficulty: d,
         tagIds: locationTagIds,
         lootTables: tables,
         objects: objectCatalog,
-        accomplishmentMessage,
         rarityOffset,
       });
     }
@@ -111,18 +101,12 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
       character: roundCharacter,
       quest,
       questObjectives: [roundObjective],
-      narrativeSubjects,
-      verbPhrases,
       lootTables,
       objects,
       talents,
       locationName,
       today,
       circumstance,
-      defaultSuccessText: "Vous triomphez d'une rencontre.",
-      defaultSuccessClause: "vous triomphez d'une rencontre",
-      defaultFailureText: "Vous échouez face à une rencontre.",
-      defaultFailureClause: "vous échouez face à une rencontre",
       drawLoot,
     });
 
@@ -138,7 +122,6 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
     loot.push(...outcome.loot);
     talentEvolutions.push(...outcome.talentEvolutions);
     totalReputationGained += outcome.reputationGained;
-    lastNarrativeText = outcome.narrativeText;
     roundCharacter = { ...roundCharacter, talents: outcome.nextTalents };
 
     if (outcome.woundResult) {
@@ -169,7 +152,7 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
       // what actually distinguishes a clean sweep from a costly one (docs/TODO.md "Aventure
       // exploration mechanics", "Result pop-up" left this UI/summary decision to this entry).
       success: rounds.some((r) => r.success),
-      narrativeText: lastNarrativeText || "Vous n'avez rien trouvé à explorer.",
+      narrativeText: "",
       location: location ? { id: location.id, name: location.name } : null,
       rounds,
       totalReputationGained,

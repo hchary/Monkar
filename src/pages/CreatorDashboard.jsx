@@ -7,7 +7,6 @@ import QuestLocationsManager from "../components/creator/QuestLocationsManager";
 import OriginsManager from "../components/creator/OriginsManager";
 import TalentsManager from "../components/creator/TalentsManager";
 import TrainerTypesManager from "../components/creator/TrainerTypesManager";
-import TextGenerationManager from "../components/creator/TextGenerationManager";
 import TagsManager from "../components/creator/TagsManager";
 import CharactersOverview from "../components/creator/CharactersOverview";
 import ObjectsManager from "../components/creator/ObjectsManager";
@@ -50,9 +49,8 @@ const GROUPS = [
     },
   },
   {
-    name: "Narration",
+    name: "Système",
     tabs: {
-      "Génération de texte": TextGenerationManager,
       Tag: TagsManager,
     },
   },

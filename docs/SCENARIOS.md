@@ -157,14 +157,16 @@ profession from the picker, start it.
 
 **Setup**: none.
 
-**Steps**: creator → "Objectifs de quête" (narrative subjects) and "Phrases-verbes" sections —
-open the tag picker on each.
+**Steps**: creator → any tagged catalog's section ("Sujets de mission", "Objets", "Tables de
+tirage", "Talents") — open the tag picker on each.
 
-**Expected**:
-- Both use the same `worldData/tags/items`-backed multi-select (`MultiSelectModalField`) as
-  quests/objects/loot tables/talents — no free-text tags field remains on either form.
-- The reserved "objectif de quête" tag is force-injected on every quest objective and does **not**
-  appear as a togglable option in that form's own tags picker.
+**Expected**: all of them use the same `worldData/tags/items`-backed multi-select
+(`MultiSelectModalField`) — no free-text tags field remains on any form.
+
+**Obsolete**: this scenario originally exercised the "Objectifs de quête" (narrative subjects) and
+"Phrases-verbes" sections and the reserved "objectif de quête" tag. Both sections and their
+collections were retired — quest objectives by the subject-action rework, narrative subjects and
+verb phrases by "Narration removal" (docs/TODO.md).
 
 ## 11 — Location tags — roadmap #14
 
@@ -173,9 +175,8 @@ open the tag picker on each.
 **Steps**: creator → "Lieux de quête" → edit a location, open its tags picker, pick a couple of
 tags, save.
 
-**Expected**: the tags are saved and shown as chips on the location's list row. (They aren't
-consumed by narration yet, but they do gate encounter content for "Partir explorer" — see
-scenario 13.)
+**Expected**: the tags are saved and shown as chips on the location's list row. (They gate
+encounter content for "Partir explorer" — see scenario 13.)
 
 ## 12 — Aventure exploration mechanics ("Partir explorer") — roadmap #15, #16
 

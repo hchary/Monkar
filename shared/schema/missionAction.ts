@@ -8,7 +8,8 @@ import { z } from "zod";
 //
 // One half of the mission-name title-building pair described in docs/TODO.md "Mission subject and
 // action catalog" - paired at generation time with a worldData/missionSubjects/items entry sharing
-// the same `type`, and concatenated by functions/src/missionNaming.js into a mission title, e.g.
+// the same `type`, and concatenated by functions/src/actions/recherche.js's assembleMissionName
+// into a mission title, e.g.
 // "Vaincre" + "dragon noir" -> "Vaincre dragon noir". Deliberately separate from the gameplay
 // worldData/actionTypes/items catalog - nothing about starting a mission ties to which phrase named
 // it.

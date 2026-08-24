@@ -7,15 +7,15 @@ import { z } from "zod";
 // requires).
 
 export const AdventureZoneDocumentSchema = z.object({
-  name: z.string().describe("Location display name, substituted for {lieu} in verb-phrase templates."),
+  name: z.string().describe("Location display name, shown on a mission or exploration result."),
   description: z.string().default("").describe("Free-text flavour copy."),
   tagIds: z
     .array(z.string())
     .default([])
     .describe(
       "worldData/tags/items ids describing this location's flavour (e.g. forest, coastal village, ruins). " +
-        "Read by functions/src/textGeneration.js once the narrative grammar's opening slot is flavoured by " +
-        "location, alongside quest and talent tags."
+        "Read by functions/src/actions/partirExplorer.js, which builds each round's synthetic objective " +
+        "and its loot tag pool from them."
     ),
 });
 

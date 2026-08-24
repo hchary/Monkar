@@ -12,17 +12,12 @@
 // item against a curated objectives list the way the retired drawQuestLoot works. Rewards use the
 // mission's own drawn difficulty exactly, the same way a quest used to use quest.difficulty.
 //
-// A mission carries no worldData/narrativeSubjects/items objective of its own (docs/TODO.md
-// "Regional mission generation and journal" draws from the missionSubjects/missionActions catalog
-// pair instead, and the mission's title is already assembled at generation time - see recherche.js).
-// The threshold/wound/talent-evolution pipeline, which expects an "objective"-shaped
-// { tagIds, rarity } for its own tag/rank matching, is instead fed a synthetic stand-in built from
-// the mission's own tagIds and its difficulty's rarity equivalence (missionLoot.js's
-// difficultyToRarity). A mission's outcome is never narrated via the verb-phrase generator (docs/
-// TODO.md "Retiring quests..." - that paragraph retired along with the hand-authored catalog it
-// used to link successPhraseIds/failurePhraseIds from): resolveQuestOutcome is called with
-// narrate: false, so the result pop-up shows only "Succès"/"Échec", same as other non-narrated
-// actions.
+// A mission carries no objective document of its own: the mission's title and tags are already
+// assembled at generation time (see recherche.js). The threshold/wound/talent-evolution pipeline,
+// which expects an "objective"-shaped { tagIds, rarity } for its own tag/rank matching, is instead
+// fed a synthetic stand-in built from the mission's own tagIds and its difficulty's rarity
+// equivalence (missionLoot.js's difficultyToRarity). No outcome is narrated anywhere any more
+// (docs/TODO.md "Narration removal"), so the result pop-up shows only "Succès"/"Échec".
 
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
@@ -88,13 +83,12 @@ async function resolve({ character, actionTypeId, today, context }) {
     difficulty: mission.difficulty,
   };
 
-  function drawLoot({ difficulty, lootTables: tables, objects: objectCatalog, accomplishmentMessage, rarityOffset }) {
+  function drawLoot({ difficulty, lootTables: tables, objects: objectCatalog, rarityOffset }) {
     return drawMissionLoot({
       difficulty,
       tagIds: mission.tagIds || [],
       lootTables: tables,
       objects: objectCatalog,
-      accomplishmentMessage,
       rarityOffset,
     });
   }
@@ -109,11 +103,6 @@ async function resolve({ character, actionTypeId, today, context }) {
     locationName,
     today,
     circumstance: `lors de la mission « ${mission.name} »`,
-    narrate: false,
-    defaultSuccessText: "",
-    defaultSuccessClause: "vous revenez de votre mission",
-    defaultFailureText: "",
-    defaultFailureClause: "vous rentrez bredouille de votre mission",
     drawLoot,
   });
 
