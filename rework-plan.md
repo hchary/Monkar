@@ -1,9 +1,8 @@
 # Rework plan: porting the Python model onto the web project
 
-Companion to [python-model-logic-diff.md](python-model-logic-diff.md) (the analysis) and
-[simplification-plan.md](simplification-plan.md) (the outward trip, web → Python). This is the
-return trip: **what to change in `functions/`, `shared/` and `src/` so the web project runs the
-Python model's rules**, on the web project's existing architecture and existing look.
+Companion to [python-model-logic-diff.md](python-model-logic-diff.md) (the analysis). This is
+**what to change in `functions/`, `shared/` and `src/` so the web project runs the Python model's
+rules**, on the web project's existing architecture and existing look.
 
 The diff document is analysis only and ends with 17 questions that "need a call". This plan makes
 every one of those calls (§1.3), so the work below is buildable without a second design pass.
@@ -229,8 +228,8 @@ rewardRegionId   string|null   Which region the reputation lands in; null = wher
 
 **Replaces** `functions/src/lib/questResolution.js` (145 lines) **and** the non-narration half of
 `functions/src/missionResolution.js` (270 lines) with one file:
-`functions/src/lib/missionResolution.js`. The wrapper layer the simplification plan flagged as
-adding nothing but renames disappears with it, and the "quest"/"objective" vocabulary goes with it —
+`functions/src/lib/missionResolution.js`. The wrapper layer that adds nothing but renames
+disappears with it, and the "quest"/"objective" vocabulary goes with it —
 one name, *mission*, everywhere.
 
 Pure math, no Firestore, unit-testable against a seeded `Math.random` — the property
