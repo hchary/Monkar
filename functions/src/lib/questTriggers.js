@@ -12,8 +12,10 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { evaluateConditions, conditionsNeedInstances } = require("./actionConditions");
 
-// A Subject with no trigger, or an empty conditions list, is never auto-granted - see
-// shared/schema/missionSubject.ts's `trigger` field.
+// A Subject with no trigger, or an empty conditions list, is never auto-granted - the same rule the
+// field carries in its new home, shared/schema/monster.ts's `trigger`. INTERIM: this sweep still
+// reads worldData/missionSubjects/items and writes character.triggeredSubjectIds; it is repointed at
+// the bestiary by docs/TODO.md "Mission generation from the bestiary".
 function subjectsWithTriggers(subjects) {
   return subjects.filter((subject) => Array.isArray(subject?.trigger?.conditions) && subject.trigger.conditions.length > 0);
 }

@@ -20,17 +20,31 @@ export const RegionDocumentSchema = z.object({
       "Adjacent regions. direction is one of nord | sud | est | ouest. Stored on one side only - the " +
         "form does not mirror the edge onto the neighbour."
     ),
+  areaId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      "Id in worldData/areas/items - the Area (terrain) this region sits in, or null for a region no " +
+        "Area has been authored for yet. This is what mission generation filters the bestiary on: the " +
+        "eligible monsters are the ones whose resolved areaType equals this Area's type (see " +
+        "shared/schema/area.ts and shared/schema/monster.ts). A region left null generates no missions."
+    ),
   climatId: z.string().default("").describe('Id in worldData/climats/items, or "" when the region has no climate.'),
   climateIds: z
     .array(z.string())
     .default([])
     .describe(
-      "Ids in worldData/climats/items this region draws mission Subjects from (docs/TODO.md 'Regional " +
-        "mission generation and journal') - a region bordering several biomes can list more than one. " +
-        "Distinct from the single climatId above (which only drives the character page's banner " +
-        "illustration); the two are not kept in sync automatically."
+      "Ids in worldData/climats/items - a region bordering several biomes can list more than one. " +
+        "Display and origin matching only: mission generation keys on areaId above, not on climate " +
+        "(docs/TODO.md 'Area and Monster contracts'). Distinct from the single climatId above (which " +
+        "only drives the character page's banner illustration); the two are not kept in sync " +
+        "automatically."
     ),
-  reliefIds: z.array(z.string()).default([]).describe("Ids in worldData/reliefs/items."),
+  reliefIds: z
+    .array(z.string())
+    .default([])
+    .describe("Ids in worldData/reliefs/items. Display and origin matching only, like climateIds above."),
   factionIds: z.array(z.string()).default([]).describe("Ids in worldData/factions/items."),
   adventureZoneIds: z
     .array(z.string())
@@ -52,6 +66,7 @@ const DEFAULTED_KEYS = [
   "nameSuggestions",
   "description",
   "neighbors",
+  "areaId",
   "climatId",
   "climateIds",
   "reliefIds",
