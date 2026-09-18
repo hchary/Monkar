@@ -36,7 +36,11 @@ export const OriginDocumentSchema = z.object({
   reputationStart: z
     .number()
     .default(0)
-    .describe("The character's starting reputation, copied to character.reputation at creation."),
+    .describe(
+      "The character's starting reputation, written at creation as the starting region's entry in " +
+        "character.reputations (docs/TODO.md 'Per-region reputation'; it seeded the retired global " +
+        "character.reputation scalar before that)."
+    ),
   startingItemIds: z
     .array(z.string())
     .default([])

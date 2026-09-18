@@ -49,14 +49,15 @@ export const CharacterDocumentSchema = z.object({
     .describe("Every profession ever held. Absent until the first switch."),
   reputation: z
     .number()
+    .optional()
     .describe(
-      "LEGACY. The single global reputation score, starting at origin.reputationStart. Superseded by " +
-        "`reputations` below, which is per-region (docs/TODO.md 'Per-region reputation'); kept as a " +
-        "field so documents written before the migration stay schema-valid, and so " +
-        "functions/scripts/migrateReputationToPerRegion.js has something to read. Written by createCharacter " +
-        "(functions/src/index.ts) and kept in step with `reputations` by functions/src/lib/actionResult.js's " +
-        "applier, so the readers that have not moved to the map yet (CharacterBanner.jsx, the minReputation " +
-        "condition) do not see a frozen score; both writes go away with docs/TODO.md 'Per-region reputation'."
+      "LEGACY/dead. The single global reputation score, starting at origin.reputationStart, superseded by " +
+        "`reputations` below (docs/TODO.md 'Per-region reputation'). No longer written by anything and no " +
+        "longer read by anything: createCharacter (functions/src/index.ts) seeds the map instead, and " +
+        "functions/src/lib/actionResult.js's applier stopped keeping the scalar in step when the last reader " +
+        "(CharacterBanner.jsx and the minReputation condition) moved onto the map. Optional so a character " +
+        "created since then stays schema-valid; kept as a field so documents written before " +
+        "functions/scripts/migrateReputationToPerRegion.js ran keep the score that script reads."
     ),
   reputations: z
     .record(z.string(), z.number())
@@ -65,10 +66,13 @@ export const CharacterDocumentSchema = z.object({
       "{ [regionId]: score } - reputation held in each worldData/regions/items entry, replacing the " +
         "single `reputation` above. Seeded at creation with the origin's reputationStart under the " +
         "starting region's id, and seeded to 1 for a region the character travels to for the first " +
-        "time (docs/TODO.md 'Travel action (Voyager)'). Gains and losses are zero-sum across regions " +
-        "and always name the region they apply to; the `minReputation` condition and every UI reading " +
-        "reputation use the entry for the region the character currently stands in. Written by " +
-        "functions/src/lib/actionResult.js's applier, the single place any action's reputation lands."
+        "time (docs/TODO.md 'Travel action (Voyager)'); a region gaining or losing reputation without an " +
+        "entry yet starts its count at 0 rather than at either of those seeds. A resolved mission pays " +
+        "`1 + difficultyIndex` on a success and `difficultyIndex - 4` on a failure " +
+        "(functions/src/lib/reputation.js), so an entry can go negative. The `minReputation` condition and " +
+        "every UI reading reputation use the entry for the region the character currently stands in. " +
+        "Written by functions/src/lib/actionResult.js's applier, the single place any action's reputation " +
+        "lands."
     ),
   legendLevel: z.number().nullable().default(null).describe("Legendary tier, null until the first legendary roll."),
   alive: z.boolean().default(true).describe("False once the character has died."),

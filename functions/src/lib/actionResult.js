@@ -176,10 +176,9 @@ function applyActionResult(character, result, { today, circumstance, talentCatal
       // region never *raises* an unvisited one, it starts the count.
       const current = reputations[regionId] ?? 0;
       updates.reputations = { ...reputations, [regionId]: current + result.reputationGained };
-      // INTERIM: the legacy scalar is kept in step until docs/TODO.md "Per-region reputation"
-      // moves `minReputation` and the banner onto the map. Without this, reputation would appear
-      // frozen everywhere it is currently read.
-      updates.reputation = (character.reputation || 0) + result.reputationGained;
+      // The legacy `character.reputation` scalar is deliberately *not* kept in step any more
+      // (docs/TODO.md "Per-region reputation"): every reader has moved onto the map, so writing it
+      // would only keep a second, divergent number alive on the document.
       lastAction.reputationGained = result.reputationGained;
       lastAction.reputationRegionId = regionId;
     }

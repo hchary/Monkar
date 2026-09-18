@@ -31,7 +31,7 @@ const { pickRandom } = require("../lib/loot");
 const { resolveMission, DIFFICULTY_WEIGHTS } = require("../lib/missionResolution");
 const { monstersForAreaType } = require("../lib/monsters");
 const { rollTalentEvolutionIds } = require("../lib/talentEvolution");
-const { rollReputationReward } = require("../lib/reputation");
+const { reputationForOutcome } = require("../lib/reputation");
 const { createActionResult, applyActionResult } = require("../lib/actionResult");
 const { drawMissionLoot, difficultyToRarity } = require("../missionLoot");
 
@@ -131,7 +131,7 @@ async function resolve({ character, actionType, actionTypeId, today, context }) 
       }),
       talentsGained: gainedIds,
       talentTrained: trainedIds,
-      reputationGained: outcome.success ? rollReputationReward(difficulty) : 0,
+      reputationGained: reputationForOutcome({ success: outcome.success, difficulty }),
       injury: outcome.injury,
     });
 

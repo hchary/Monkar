@@ -27,7 +27,7 @@ const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
 const { resolveMission } = require("../lib/missionResolution");
 const { rollTalentEvolutionIds } = require("../lib/talentEvolution");
-const { rollReputationReward } = require("../lib/reputation");
+const { reputationForOutcome } = require("../lib/reputation");
 const { createActionResult, applyActionResult } = require("../lib/actionResult");
 const { drawMissionLoot, difficultyToRarity } = require("../missionLoot");
 const { indexMonstersById, resolveMonster } = require("../lib/monsters");
@@ -104,7 +104,8 @@ async function resolve({ character, actionTypeId, today, context }) {
     : { trainedIds: [], gainedIds: [] };
 
   // Rewards on failure: the same pool at the same rarity ceiling, just one item instead of three -
-  // and no reputation, no talent luck (docs/TODO.md "Monster-pool loot").
+  // and no talent luck (docs/TODO.md "Monster-pool loot"). Reputation does move on a failure, in
+  // the other direction (docs/TODO.md "Per-region reputation").
   const loot = drawMissionLoot({
     success: outcome.success,
     difficulty: mission.difficulty,
@@ -117,7 +118,11 @@ async function resolve({ character, actionTypeId, today, context }) {
     itemsGained: loot,
     talentsGained: gainedIds,
     talentTrained: trainedIds,
-    reputationGained: outcome.success ? rollReputationReward(mission.difficulty) : 0,
+    reputationGained: reputationForOutcome({ success: outcome.success, difficulty: mission.difficulty }),
+    // The mission's own region, not wherever the character stands. The two are the same today -
+    // prepare() refuses a mission generated elsewhere - but naming it is what keeps that true if
+    // the region lock is ever relaxed, and it is exactly what reputationRegionId exists for.
+    reputationRegionId: mission.regionId || null,
     injury: outcome.injury,
   });
 

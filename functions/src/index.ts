@@ -161,7 +161,11 @@ exports.createCharacter = onCall(
         professionLevel: 1,
         knownProfessions: [{ professionId: professionGranted.id, level: 1 }],
       }),
-      reputation: origin.reputationStart || 0,
+      // Reputation is per-region from the start (docs/TODO.md "Per-region reputation"): the origin's
+      // starting score is a relationship with the region the character is born into, not a career
+      // total. The legacy `reputation` scalar is no longer written at all - documents predating the
+      // map keep theirs, and functions/scripts/migrateReputationToPerRegion.js is what moved them.
+      reputations: { [regionId]: origin.reputationStart || 0 },
       talents: talentsGranted,
       createdAt: FieldValue.serverTimestamp(),
     };
