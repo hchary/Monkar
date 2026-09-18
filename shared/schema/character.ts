@@ -13,6 +13,15 @@ import { z } from "zod";
 // `firebase-admin/firestore` and cannot be imported into a browser bundle. The functions-side
 // schema refines them to the real, validated type.
 
+// REVAMP RESET (2026-09-18): every game component but this one was deleted, along with the
+// actions, the action framework and the scheduled sweep that used to write most of the fields
+// below. The document shape is kept intact so existing `characters/{characterId}` documents stay
+// schema-valid and so the new design can decide field by field what it keeps, but only the fields
+// `createCharacter` (functions/src/index.ts) still writes are live. Every `.describe()` below that
+// names a `functions/src/actions/*`, `functions/src/lib/*`, `src/components/*` or `docs/TODO.md`
+// reader now describes deleted code: read it as a record of what the field meant, not as a
+// pointer to code you can open. The pre-reset docs are under `docs/archives/`.
+
 export const CharacterDocumentSchema = z.object({
   ownerUid: z.string().describe("Auth uid of the owning player. Set once at creation, never changes."),
   name: z.string().describe("Player-chosen character name."),
