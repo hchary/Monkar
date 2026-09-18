@@ -2,9 +2,12 @@
 
 Web game where each player picks one action per day for their character (quest, rest, training, shopping...), with a server-side random roll for the outcome. Front hosted on GitHub Pages, backend on Firebase (Auth, Firestore, Cloud Functions).
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the technical deep dive (data model, security rules, Cloud Function logic, deployment details), and [docs/TODO.md](docs/TODO.md) for planned-but-not-built feature designs. Individual features
-with a fully-specified implementation plan get their own `docs/ISSUE-NN-*.md` doc, linked from
-their `docs/TODO.md` entry.
+**The game design is being revamped.** The previous direction (actions, missions, monsters,
+professions, talents, crafting, quests and their creator pages) was removed in the revamp reset:
+only the front shell, authentication and the character definition remain. Its documentation is
+kept under [docs/archives/](docs/archives/) - [ARCHITECTURE.md](docs/archives/ARCHITECTURE.md)
+for the old technical deep dive, [TODO-2026-09-18-pre-revamp.md](docs/archives/TODO-2026-09-18-pre-revamp.md)
+for the old roadmap - as reference for what was built, not as a description of the current code.
 
 ## Stack
 - **Front**: React + Vite
@@ -14,14 +17,17 @@ their `docs/TODO.md` entry.
 ## Project structure
 ```
 src/
-  lib/firebase.js        Firebase client config
-  context/AuthContext.jsx global auth state
-  components/             shared components (ProtectedRoute...)
-  pages/                  Login, Signup, CharacterProfile, CreatorDashboard
+  lib/firebase.js           Firebase client config
+  context/AuthContext.jsx   global auth state
+  components/               NavBar, ProtectedRoute
+  hooks/useOwnCharacter.js  live subscription to the caller's character document
+  pages/                    Login, Signup, CharacterProfile (placeholder)
+shared/schema/character.ts  the character contract, shared by client and functions
 functions/
-  src/index.js            performAction Cloud Function (roll + daily lock)
+  src/index.ts              createCharacter Cloud Function
+  src/schema/character.ts   server-side wrapper over the shared character contract
   scripts/setCreatorRole.js admin script to grant yourself the "creator" role
-firestore.rules            Firestore security rules
+firestore.rules             Firestore security rules
 ```
 
 ## Setup (manual steps)
@@ -61,7 +67,7 @@ firebase deploy --only functions
 cd functions
 node scripts/setCreatorRole.js <your-email-or-uid>
 ```
-4. Log out/back in on the site for the new role to take effect — you'll then see an "Espace créateur" link in the nav bar.
+4. Log out/back in on the site for the new role to take effect. The creator dashboard itself was removed in the revamp reset, so the role currently only widens what Firestore rules let you read and write.
 
 ### 6. Seed the world's starting data
 The game needs at least one region (with a background pool) and one action type to be playable. Run the seed script (uses your `gcloud` login, no service account key needed):
@@ -70,7 +76,7 @@ gcloud auth application-default login
 cd functions
 node scripts/seedWorldData.js
 ```
-See that script for the exact document shapes (`worldData/regions/items/{id}`, nested `backgrounds` per region, `worldData/actionTypes/items/{id}`). Until the creator dashboard's CRUD exists (Phase 3), editing that script (or the Firestore console directly) is the only way to add more world content — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full field reference.
+`createCharacter` still draws the new character's region and origin from `worldData`, so that data has to exist for character creation to succeed. The seed script and the Firestore console are the only ways to edit it now that the creator pages are gone. It seeds the pre-revamp world shape, which the revamp is expected to replace.
 
 ### 7. GitHub Pages deployment
 1. Create the repo on GitHub and push this project to the `main` branch.
@@ -84,10 +90,14 @@ See that script for the exact document shapes (`worldData/regions/items/{id}`, n
    - `VITE_FIREBASE_APP_ID`
 4. Every push to `main` triggers the automatic build and deployment (see `.github/workflows/deploy.yml`).
 
-## Current status (Phase 0 complete)
-- Done: email/password auth + character creation
-- Done: character profile page + daily action list
-- Done: `performAction` Cloud Function with daily lock and weighted roll
-- Done: Firestore rules (player = own data only, creator = everything)
-- Pending: creator dashboard page exists but the CRUD (factions, regions, gods, creatures) isn't built yet
-- Pending: visual theme, roll balancing
+## Current status (revamp reset)
+What survived the reset:
+- Email/password auth, protected routing, the nav bar and the existing stylesheet
+- The character contract (`shared/schema/character.ts`) and the `createCharacter` Cloud Function
+- Firestore rules and indexes, the Firebase and GitHub Pages deployment wiring
+
+What was removed, pending the new design:
+- Every action (récolte, artisanat, recherche, mission, entraînement, apprentissage, exploration, commerce) and the action framework behind them
+- Every world component other than the character: origins, professions, talents, monsters, regions, factions, objects, recettes, tags, loot tables, quest chains, areas, climats, reliefs, adventure zones
+- The whole creator dashboard and its per-component CRUD pages
+- The character screen's banner, tabs, inventory, crafting and action panel — `CharacterProfile` is a placeholder dumping the raw character document

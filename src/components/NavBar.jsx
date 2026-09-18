@@ -11,7 +11,6 @@ export default function NavBar() {
   return (
     <nav className="navbar">
       <Link to="/">Mon personnage</Link>
-      {user.role === "creator" && <Link to="/creator">Espace créateur</Link>}
       <button type="button" onClick={() => signOut(auth)}>
         Déconnexion
       </button>

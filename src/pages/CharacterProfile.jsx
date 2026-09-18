@@ -1,48 +1,19 @@
-import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../lib/firebase";
 import useOwnCharacter from "../hooks/useOwnCharacter";
-import CharacterCreation from "../components/CharacterCreation";
-import CharacterBanner from "../components/CharacterBanner";
-import CharacterTabs from "../components/CharacterTabs";
-import ActionPanel from "../components/ActionPanel";
-import ClimateBanner from "../components/ClimateBanner";
-import OriginIntroDialog from "../components/OriginIntroDialog";
 
+// Placeholder standing in for the character screen while the game is redesigned. It renders the
+// raw `characters/{id}` document - the one game component that survived the reset - so the shell
+// stays runnable and the player definition stays visible. Everything that used to live here
+// (banner, tabs, action panel, creation form) was removed with the old direction.
 export default function CharacterProfile() {
   const { character, checked } = useOwnCharacter();
-  const [regions, setRegions] = useState([]);
-  const [climats, setClimats] = useState([]);
-
-  useEffect(() => {
-    return onSnapshot(collection(db, "worldData", "regions", "items"), (snap) => {
-      setRegions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-  }, []);
-
-  useEffect(() => {
-    return onSnapshot(collection(db, "worldData", "climats", "items"), (snap) => {
-      setClimats(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-  }, []);
 
   if (!checked) return <p>Chargement du personnage...</p>;
-  if (!character) return <CharacterCreation />;
-
-  const region = regions.find((r) => r.id === character.region?.id);
-  const climat = climats.find((c) => c.id === region?.climatId);
+  if (!character) return <p>Aucun personnage. La creation de personnage est a refaire.</p>;
 
   return (
     <div className="character-page">
-      <OriginIntroDialog character={character} />
-      <CharacterBanner character={character} />
-      <div className="character-layout">
-        <CharacterTabs character={character} />
-        <ActionPanel character={character} />
-      </div>
-      <div className="bottom-banners">
-        <ClimateBanner bannerKey={climat?.bannerKey} />
-      </div>
+      <h1>{character.name}</h1>
+      <pre>{JSON.stringify(character, null, 2)}</pre>
     </div>
   );
 }
